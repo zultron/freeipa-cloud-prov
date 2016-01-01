@@ -1,0 +1,9 @@
+--admin-password={admin_password}
+--password={ds_password}
+--ip-address {ip_address}
+--setup-ca
+--setup-dns
+--no-forwarders
+--no-reverse
+--no-host-dns
+--unattended

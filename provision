@@ -1,0 +1,30 @@
+#!/bin/bash
+
+NAME="coreos-util"
+DIR="$(readlink -f $(dirname $0))"
+UID_GID=`id -u`:`id -g`
+
+cd "$DIR"
+
+if test "$1" = "build"; then
+    set -x
+    docker build -t "$NAME" .
+
+elif test "$1" = "shell"; then
+    shift
+    set -x
+    docker run --rm -it \
+	-v $HOME:/home/user \
+	-v $PWD:/data \
+	-u $UID_GID \
+	--entrypoint /bin/bash \
+	coreos-util "$@"
+
+else
+    set -x
+    docker run --rm -it \
+	-v $HOME:/home/user \
+	-v $PWD:/data \
+	-u $UID_GID \
+	coreos-util "$@"
+fi

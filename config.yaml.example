@@ -1,0 +1,48 @@
+# Copy this file to config.yaml, customize, and run prov.py script
+#
+hosts:
+  # Hosts are defined by hostname, and must have the following
+  # attributes:
+  # - region: DigitalOcean region with block storage feature
+  #   (currently nyc1, sfo2, fra1)
+  # - size:  Min. size 1gb
+  # - image:  One of `coreos-stable`, `coreos-beta`, `coreos-alpha`
+  # - volume_size:  In GB
+  # - swap_size: In GB; data partition will be (volume_size -
+  #   swap_size) GB
+  # - ipa_role:  Exactly one host must ba `server`, and others `replica`
+  #
+  # This system has been tested with three hosts.
+  ipa0.example.com:
+    region: nyc1
+    size: 1gb
+    image: coreos-stable
+    volume_size: 10
+    swap_size: 2
+    ipa_role: server
+  ipa1.example.com:
+    region: nyc1
+    size: 1gb
+    image: coreos-stable
+    volume_size: 10
+    swap_size: 2
+    ipa_role: replica
+  ipa2.example.com:
+    region: nyc1
+    size: 1gb
+    image: coreos-stable
+    volume_size: 10
+    swap_size: 2
+    ipa_role: replica
+# Names of DigitalOcean SSH keys to install
+keys:
+  - jdoe@example.com RSA
+# Domain name; used throughout configuration
+domain_name: example.com
+# FreeIPA passwords
+admin_password: test_admin_pass
+ds_password: test_ds_pass
+# Kerberos realm name for FreeIPA
+realm: EXAMPLE.COM
+# DigitalOcean API token
+token: 26402235852e4340bd6bdc3fc40edb2fbc63c76e37b6bb7bbc91bf4ca179d81b

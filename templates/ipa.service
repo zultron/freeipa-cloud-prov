@@ -1,0 +1,46 @@
+# Name this ipa-server.service
+[Unit]
+Description=FreeIPA service
+
+# Requirements
+Requires=etcd2.service
+Requires=docker.service
+Requires=ipsec.service
+
+# Dependency ordering
+After=etcd2.service
+After=docker.service
+After=ipsec.service
+
+[Service]
+# Let processes take awhile to start up (for first run Docker containers)
+TimeoutStartSec=0
+
+# Change killmode from "control-group" to "none" to let Docker remove
+# work correctly.
+KillMode=none
+
+# Get CoreOS environmental variables
+EnvironmentFile=/etc/environment
+
+# Pre-start and Start
+## Directives with "=-" are allowed to fail without consequence
+ExecStartPre=-/usr/bin/docker kill ipa
+ExecStartPre=-/usr/bin/docker rm ipa
+ExecStart=/usr/bin/docker run --rm \
+        --hostname %H.{domain_name} \
+        --net host \
+        --name ipa \
+        --volume /media/state/ipa-data:/data \
+        --volume /sys/fs/cgroup:/sys/fs/cgroup:ro \
+        -p 443:443 -p 389:389 -p 636:636 -p 88:88 -p 80:80 -p 464:464 -p 53:53 \
+        -p 88:88/udp -p 464:464/udp -p 53:53/udp \
+        -p 7389:7389 \
+        adelton/freeipa-server:centos-7
+
+# Stop
+ExecStop=/usr/bin/docker stop ipa
+
+[X-Fleet]
+MachineMetadata=ipa_role={ipa_role}
+Conflicts=ipa-replica@*.service

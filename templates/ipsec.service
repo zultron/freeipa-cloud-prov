@@ -1,0 +1,35 @@
+# Name this ipsec.service
+[Unit]
+Description=IPSec service
+
+After=network.target
+
+[Service]
+# Let processes take awhile to start up (for first run Docker containers)
+TimeoutStartSec=0
+
+# Change killmode from "control-group" to "none" to let Docker remove
+# work correctly.
+KillMode=none
+
+# Get CoreOS environmental variables
+EnvironmentFile=/etc/environment
+
+# Pre-start and Start
+## Directives with "=-" are allowed to fail without consequence
+ExecStartPre=-/usr/bin/docker kill ipsec
+ExecStartPre=-/usr/bin/docker rm ipsec
+ExecStart=/usr/bin/docker run --rm \
+	--privileged \
+	--net host \
+        --name ipsec \
+        --volume /media/state/ipsec:/etc/ipsec.d \
+        --volume /media/state/ipsec:/conf \
+        -p 500:500/udp -p 4500:4500/udp \
+        philplckthun/strongswan
+
+# Stop
+ExecStop=/usr/bin/docker stop ipsec
+
+[X-Fleet]
+Global=true
