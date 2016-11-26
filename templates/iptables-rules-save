@@ -1,17 +1,4 @@
 # /var/lib/iptables/rules-save
-*mangle
-:PREROUTING ACCEPT [315:97027]
-:INPUT ACCEPT [315:97027]
-:FORWARD ACCEPT [0:0]
-:OUTPUT ACCEPT [307:97758]
-:POSTROUTING ACCEPT [307:97758]
-# Dump IPSec-encrypted traffic
-# tcpdump -s 0 -n -i nflog:5
-# https://wiki.strongswan.org/projects/strongswan/wiki/CorrectTrafficDump
--A PREROUTING -m policy --dir in --pol ipsec -j NFLOG --nflog-group 5
--A POSTROUTING -m policy --dir out --pol ipsec -j NFLOG --nflog-group 5
-COMMIT
-
 *filter
 :INPUT DROP [0:0]
 :FORWARD DROP [0:0]
@@ -40,27 +27,47 @@ COMMIT
 # -A INPUT -p ESP -j ACCEPT
 # -I INPUT -m policy --dir in --pol ipsec --proto esp -j ACCEPT
 
-# FreeIPA
-# - HTTP/S (open)
--A INPUT -m state --state NEW -m tcp -p tcp --dport 80  -j ACCEPT
--A INPUT -m state --state NEW -m tcp -p tcp --dport 443  -j ACCEPT
-# - Kerberos (open)
--A INPUT -m state --state NEW -m tcp -p tcp --dport 88  -j ACCEPT
--A INPUT -m state --state NEW -m udp -p udp --dport 88 -j ACCEPT
--A INPUT -m state --state NEW -m tcp -p tcp --dport 464  -j ACCEPT
--A INPUT -m state --state NEW -m udp -p udp --dport 464 -j ACCEPT
-# LDAP/LDAPS (private)
--A INPUT -s {other_ips} -m state --state NEW -m tcp -p tcp --dport 389 -j ACCEPT
--A INPUT -s {other_ips} -m state --state NEW -m tcp -p tcp --dport 636 -j ACCEPT
-# DNS (private)
--A INPUT -s {other_ips} -m state --state NEW -m tcp -p tcp --dport 53  -j ACCEPT
--A INPUT -s {other_ips} -m state --state NEW -m udp -p udp --dport 53 -j ACCEPT
-# Dogtag (private)
--A INPUT -s {other_ips} -m state --state NEW -m tcp -p tcp --dport 8080  -j ACCEPT
-
-
 # ping
 -A INPUT -p icmp -m icmp --icmp-type 0 -j ACCEPT
 -A INPUT -p icmp -m icmp --icmp-type 3 -j ACCEPT
 -A INPUT -p icmp -m icmp --icmp-type 11 -j ACCEPT
 COMMIT
+
+*raw
+:PREROUTING ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+
+# FreeIPA
+#
+# Docker networking screws up `-t filter -A INPUT -s IPADDR` rules
+# because of the SNAT rules in the `-t nat -A PREROUTING` chain, so
+# restrictions service ports exposed from docker containers are
+# managed here.  These rules restrict services to cluster hosts only.
+
+# LDAP/LDAPS (private)
+-A PREROUTING -i eth0 -s {other_ips} -m tcp -p tcp --dport 389 -j ACCEPT
+-A PREROUTING -i eth0 -m tcp -p tcp --dport 389 -j DROP
+# DNS (private)
+-A PREROUTING -i eth0 -s {other_ips} -m tcp -p tcp --dport 53 -j ACCEPT
+-A PREROUTING -i eth0 -m tcp -p tcp --dport 53 -j DROP
+-A PREROUTING -i eth0 -s {other_ips} -m udp -p udp --dport 53 -j ACCEPT
+-A PREROUTING -i eth0 -m udp -p udp --dport 53 -j DROP
+# Dogtag (private)
+-A PREROUTING -i eth0 -s {other_ips} -m tcp -p tcp --dport 8080 -j ACCEPT
+-A PREROUTING -i eth0 -m tcp -p tcp --dport 8080 -j DROP
+
+COMMIT
+
+# *mangle
+# :PREROUTING ACCEPT [0:0]
+# :INPUT ACCEPT [0:0]
+# :FORWARD ACCEPT [0:0]
+# :OUTPUT ACCEPT [0:0]
+# :POSTROUTING ACCEPT [0:0]
+# # Dump IPSec-encrypted traffic
+# # tcpdump -s 0 -n -i nflog:5
+# # https://wiki.strongswan.org/projects/strongswan/wiki/CorrectTrafficDump
+# -A PREROUTING -m policy --dir in --pol ipsec -j NFLOG --nflog-group 5
+# -A POSTROUTING -m policy --dir out --pol ipsec -j NFLOG --nflog-group 5
+# COMMIT
+
