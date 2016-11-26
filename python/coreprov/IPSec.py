@@ -34,7 +34,7 @@ class ProvisionIPSec(CA):
             if rh == host:  continue
             res += self.render_file(
                 host, 'ipsec-conn.conf', extra_substitutions=dict(
-                    conn_name='%s_to_%s' % (
+                    conn_name='%s-to-%s' % (
                         self.short_hostname(host), self.short_hostname(rh)),
                     right_ip_address=self.to_ip(rh),
                     right_hostname=rh,

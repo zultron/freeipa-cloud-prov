@@ -1,8 +1,9 @@
-import yaml, pprint, os
+import yaml, pprint, os, sys
 
 
 class Config(object):
     pickle_fname = 'state.yaml'
+    state_dir = '/media/state'
 
     def __init__(self, configfile='config.yaml'):
         self.configfile = os.path.abspath(configfile)
@@ -44,11 +45,21 @@ class Config(object):
         with open(self.pickle_file_path, 'w') as f:
             f.write(yaml.dump(config, default_flow_style=False))
 
+    @classmethod
+    def state_subdir(cls, subdir_name):
+        return os.path.join(cls.state_dir, subdir_name)
+
     def to_ip(self, host):
         ip = self.hosts[host].get('ip_address', None)
         if ip is None:
             raise RuntimeError("No cached IP address for host %s" % host)
         return ip
+
+    def other_hosts(self, host):
+        return [ h for h in self.hosts if h != host ]
+
+    def other_ips(self, host):
+        return [ self.to_ip(h) for h in self.other_hosts(host) ]
 
     def substitutions(self, host, extra_substitutions={}):
         subs = self.__dict__.copy()
@@ -56,6 +67,7 @@ class Config(object):
         subs.update(extra_substitutions)
         subs['hostname'] = host
         subs['num_hosts'] = len(self.hosts)
+        subs['other_ips'] = ','.join(self.other_ips(host))
         # print "substitutions for %s:" % host
         # pprint(subs)
         return subs
@@ -68,6 +80,10 @@ class Config(object):
             for line in inf:
                 res += line.format(**subs)
         return res
+
+    def render_file_to_stdout(self, *args, **kwargs):
+        # sys.stdout.write(self.render_file(*args, **kwargs))
+        print(self.render_file(*args, **kwargs))
 
     def destroy_pickle(self):
         if not os.path.exists(self.pickle_file_path):

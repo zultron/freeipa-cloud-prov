@@ -1,6 +1,5 @@
 --hostname={hostname}
 --ds-password={ds_password}
---ip-address={ip_address}
 --admin-password={admin_password}
 --setup-dns
 --no-forwarders

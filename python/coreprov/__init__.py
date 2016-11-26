@@ -52,8 +52,11 @@ class CoreProvCLI(DOCoreos, FreeIPA, ProvisionIPSec):
                 self.install_host_certs(host)
             for host in hosts:
                 self.init_iptables(host)
-            for host in hosts:
-                self.install_ipsec(host)
+            # IPSec in transport mode not trivially adapted to Docker
+            # networking
+            #
+            # for host in hosts:
+            #     self.install_ipsec(host)
             for host in hosts:
                 self.install_known_hosts(host)
             # Provision FreeIPA
@@ -76,6 +79,10 @@ class CoreProvCLI(DOCoreos, FreeIPA, ProvisionIPSec):
 
         if self._args.dump_config:
             self.dump_config()
+
+        if self._args.render_file:
+            for host in hosts:
+                self.render_file_to_stdout(host, self._args.render_file)
 
         for host in hosts:
 
@@ -184,28 +191,32 @@ class CoreProvCLI(DOCoreos, FreeIPA, ProvisionIPSec):
                 self.install_host_certs(host)
 
 
-        ##############################
-        # - IPSec commands
+        # ##############################
+        # # - IPSec commands
 
-        for host in hosts:
-            if self._args.pull_ipsec_image or self._args.install_ipsec:
-                self.pull_ipsec_docker_image(host)
+        # IPSec in transport mode not trivially adapted to Docker
+        # networking
+        #
 
-            if self._args.install_ipsec_certs or self._args.install_ipsec:
-                self.install_ipsec_certs(host)
+        # for host in hosts:
+        #     if self._args.pull_ipsec_image or self._args.install_ipsec:
+        #         self.pull_ipsec_docker_image(host)
 
-            if self._args.install_ipsec_config or self._args.install_ipsec:
-                self.install_ipsec_config(host)
+        #     if self._args.install_ipsec_certs or self._args.install_ipsec:
+        #         self.install_ipsec_certs(host)
 
-        if self._args.load_ipsec_unit or self._args.install_ipsec:
-            self.load_ipsec_unit(host)
+        #     if self._args.install_ipsec_config or self._args.install_ipsec:
+        #         self.install_ipsec_config(host)
 
-        if self._args.start_ipsec or self._args.install_ipsec:
-            self.start_ipsec(host)
+        # if self._args.load_ipsec_unit or self._args.install_ipsec:
+        #     self.load_ipsec_unit(host)
 
-        for host in hosts:
-            if self._args.show_ipsec_config:
-                self.print_ipsec_config(host)
+        # if self._args.start_ipsec or self._args.install_ipsec:
+        #     self.start_ipsec(host)
+
+        # for host in hosts:
+        #     if self._args.show_ipsec_config:
+        #         self.print_ipsec_config(host)
 
 
 
@@ -269,6 +280,7 @@ class CLIArgParser(argparse.ArgumentParser):
         self.add_argument(
             '--run', action='store', metavar='COMMAND',
             help='Run command on remote hosts')
+
         self.add_argument(
             '--reboot', action='store_true',
             help='Reboot host')
@@ -276,6 +288,10 @@ class CLIArgParser(argparse.ArgumentParser):
         self.add_argument(
             'hosts', metavar='HOST', nargs='*',
             help='Hostnames to act on (all)')
+
+        self.add_argument(
+            '--render-file', metavar='FILENAME',
+            help='render a file from the "templates" directory')
 
         # - Provision coreos hosts
         droplet_group = self.add_argument_group(
@@ -375,30 +391,30 @@ class CLIArgParser(argparse.ArgumentParser):
             '--install-host-certs', action='store_true',
             help='Install host certificates (generate if needed)')
 
-        # - IPSec commands
-        ipsec_group = self.add_argument_group(
-            "IPSec configuration")
-        ipsec_group.add_argument(
-            '--install-ipsec', action='store_true',
-            help='Install and start IPSec in one command')
-        ipsec_group.add_argument(
-            '--pull-ipsec-image', action='store_true',
-            help='Pull IPSec Docker image')
-        ipsec_group.add_argument(
-            '--install-ipsec-certs', action='store_true',
-            help='Install IPSec certificates (same as host certs)')
-        ipsec_group.add_argument(
-            '--install-ipsec-config', action='store_true',
-            help='Install IPSec configuration files')
-        ipsec_group.add_argument(
-            '--load-ipsec-unit', action='store_true',
-            help='Load IPSec fleetctl unit file')
-        ipsec_group.add_argument(
-            '--start-ipsec', action='store_true',
-            help='Start IPSec fleetctl unit')
-        ipsec_group.add_argument(
-            '--show-ipsec-config', action='store_true',
-            help='Print IPSec configuration files')
+        # # - IPSec commands
+        # ipsec_group = self.add_argument_group(
+        #     "IPSec configuration")
+        # ipsec_group.add_argument(
+        #     '--install-ipsec', action='store_true',
+        #     help='Install and start IPSec in one command')
+        # ipsec_group.add_argument(
+        #     '--pull-ipsec-image', action='store_true',
+        #     help='Pull IPSec Docker image')
+        # ipsec_group.add_argument(
+        #     '--install-ipsec-certs', action='store_true',
+        #     help='Install IPSec certificates (same as host certs)')
+        # ipsec_group.add_argument(
+        #     '--install-ipsec-config', action='store_true',
+        #     help='Install IPSec configuration files')
+        # ipsec_group.add_argument(
+        #     '--load-ipsec-unit', action='store_true',
+        #     help='Load IPSec fleetctl unit file')
+        # ipsec_group.add_argument(
+        #     '--start-ipsec', action='store_true',
+        #     help='Start IPSec fleetctl unit')
+        # ipsec_group.add_argument(
+        #     '--show-ipsec-config', action='store_true',
+        #     help='Print IPSec configuration files')
 
         # - FreeIPA commands
         freeipa_group = self.add_argument_group(

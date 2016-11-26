@@ -8,12 +8,6 @@ import json, tempfile, os, sys, subprocess, pprint, shutil
 from Config import Config
 
 class CA(Config):
-    etcd_config_path = '/media/state/etcd'
-    serv_cert_file_path = '%s/etcd.pem' % etcd_config_path
-    serv_key_file_path = '%s/etcd-key.pem' % etcd_config_path
-    clnt_cert_file_path = '%s/client.pem' % etcd_config_path
-    clnt_key_file_path = '%s/client-key.pem' % etcd_config_path
-    ca_cert_file_path = '%s/ca.pem' % etcd_config_path
 
     @property
     def ca_config(self):
@@ -189,21 +183,3 @@ class CA(Config):
         finally:
             self.ca_teardown()
         return self.hosts[hostname]['cert']
-
-    def install_host_certs(self, hostname):
-        ip = self.to_ip(hostname)
-        if not self.hosts[hostname].has_key('cert'):
-            self.gen_host_cert(hostname, ip)
-        print "Installing SSL certificates on %s" % hostname
-        self.remote_sudo("install -d -o core %s" % self.etcd_config_path, ip)
-        self.put_file(ip, self.hosts[hostname]['cert']['cert'],
-                      self.serv_cert_file_path, mode=0644)
-        self.put_file(ip, self.hosts[hostname]['cert']['cert'],
-                      self.clnt_cert_file_path, mode=0644)
-        self.put_file(ip, self.hosts[hostname]['cert']['key'],
-                      self.serv_key_file_path)
-        self.put_file(ip, self.hosts[hostname]['cert']['key'],
-                      self.clnt_key_file_path)
-        self.put_file(ip, self.ca_cert, self.ca_cert_file_path, mode=0644)
-        self.remote_sudo("chown -R etcd:etcd %s" % self.etcd_config_path, ip)
-

@@ -1,52 +1,65 @@
 # /var/lib/iptables/rules-save
+*mangle
+:PREROUTING ACCEPT [315:97027]
+:INPUT ACCEPT [315:97027]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [307:97758]
+:POSTROUTING ACCEPT [307:97758]
+# Dump IPSec-encrypted traffic
+# tcpdump -s 0 -n -i nflog:5
+# https://wiki.strongswan.org/projects/strongswan/wiki/CorrectTrafficDump
+-A PREROUTING -m policy --dir in --pol ipsec -j NFLOG --nflog-group 5
+-A POSTROUTING -m policy --dir out --pol ipsec -j NFLOG --nflog-group 5
+COMMIT
+
 *filter
 :INPUT DROP [0:0]
 :FORWARD DROP [0:0]
 :OUTPUT ACCEPT [0:0]
 
-# Accept all loopback (local) traffic:
+# loopback traffic
 -A INPUT -i lo -j ACCEPT
 
-# Keep existing connections (like our SSH session) alive:
+# existing connections
 -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 
-# Accept SSH
+# SSH
 -A INPUT -p tcp -m tcp --dport 22 -j ACCEPT
 
-# etcd2
--A INPUT -p tcp -m tcp --dport 2379 -j ACCEPT
--A INPUT -p tcp -m tcp --dport 2380 -j ACCEPT
+# etcd2 (client and peer)
+-A INPUT -s {other_ips} -p tcp -m tcp --dport 2379 -j ACCEPT
+-A INPUT -s {other_ips} -p tcp -m tcp --dport 2380 -j ACCEPT
 # Legacy port
-# -A INPUT -p tcp -m tcp --dport 4001 -j ACCEPT
+# -A INPUT -s {other_ips} -p tcp -m tcp --dport 4001 -j ACCEPT
 
-# IPSec
--A INPUT -p udp -m udp --dport 4500 -j ACCEPT
--A INPUT -p udp -m udp --dport 500 -j ACCEPT
--A INPUT -p 50 -j ACCEPT
--A INPUT -p 51 -j ACCEPT
--A INPUT -p ESP -j ACCEPT
--I INPUT -m policy --dir in --pol ipsec --proto esp -j ACCEPT
+# # IPSec
+# -A INPUT -p udp -m udp --dport 4500 -j ACCEPT
+# -A INPUT -p udp -m udp --dport 500 -j ACCEPT
+# -A INPUT -p 50 -j ACCEPT
+# -A INPUT -p 51 -j ACCEPT
+# -A INPUT -p ESP -j ACCEPT
+# -I INPUT -m policy --dir in --pol ipsec --proto esp -j ACCEPT
 
 # FreeIPA
 # - HTTP/S (open)
 -A INPUT -m state --state NEW -m tcp -p tcp --dport 80  -j ACCEPT
 -A INPUT -m state --state NEW -m tcp -p tcp --dport 443  -j ACCEPT
-# - kerberos (open)
+# - Kerberos (open)
 -A INPUT -m state --state NEW -m tcp -p tcp --dport 88  -j ACCEPT
 -A INPUT -m state --state NEW -m udp -p udp --dport 88 -j ACCEPT
 -A INPUT -m state --state NEW -m tcp -p tcp --dport 464  -j ACCEPT
 -A INPUT -m state --state NEW -m udp -p udp --dport 464 -j ACCEPT
-# LDAP/LDAPS (encapsulated)
--A INPUT -m state --state NEW -m tcp -p tcp --dport 389 -j ACCEPT
--A INPUT -m state --state NEW -m tcp -p tcp --dport 636 -j ACCEPT
-# DNS (encapsulated)
--A INPUT -m state --state NEW -m tcp -p tcp --dport 53  -j ACCEPT
--A INPUT -m state --state NEW -m udp -p udp --dport 53 -j ACCEPT
-# Dogtag (encapsulated)
--A INPUT -m state --state NEW -m tcp -p tcp --dport 8080  -j ACCEPT
+# LDAP/LDAPS (private)
+-A INPUT -s {other_ips} -m state --state NEW -m tcp -p tcp --dport 389 -j ACCEPT
+-A INPUT -s {other_ips} -m state --state NEW -m tcp -p tcp --dport 636 -j ACCEPT
+# DNS (private)
+-A INPUT -s {other_ips} -m state --state NEW -m tcp -p tcp --dport 53  -j ACCEPT
+-A INPUT -s {other_ips} -m state --state NEW -m udp -p udp --dport 53 -j ACCEPT
+# Dogtag (private)
+-A INPUT -s {other_ips} -m state --state NEW -m tcp -p tcp --dport 8080  -j ACCEPT
 
 
-# Accept pings:
+# ping
 -A INPUT -p icmp -m icmp --icmp-type 0 -j ACCEPT
 -A INPUT -p icmp -m icmp --icmp-type 3 -j ACCEPT
 -A INPUT -p icmp -m icmp --icmp-type 11 -j ACCEPT
