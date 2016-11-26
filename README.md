@@ -167,10 +167,12 @@ These should be added to automation
 
           ipa dnszone-mod --allow-transfer="none;"
 
-  - Disable recursion in `/data/etc/named.conf`
+  - Disable recursion in `/data/etc/named.conf` (followed by
+    `systemctl restart named-pkcs11.service`)
 
-          allow-recursion {"none";};
-          recursion no;
+          options {
+              allow-recursion {"none";};
+          }
 
   - Disable unauth'd LDAP access
 
