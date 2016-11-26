@@ -141,6 +141,10 @@ FreeIPA information commands
         # List agreements for a server
         ipa-replica-manage list h00.zultron.com
 
+Querying LDAP needs SASL auth mech explicitly defined
+
+        docker exec -it ipa ldapsearch -H ldaps://h20.zultron.com -Y GSSAPI
+
 ## IPA configuration TODO
 
 These should be added to automation
