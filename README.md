@@ -116,7 +116,7 @@ configure FreeIPA:
 Run `etcdctl` with SSL:
 
     cd /media/state/etcd
-    etcdctl --endpoint=https://127.0.0.1:4001 \
+    etcdctl --endpoint=https://127.0.0.1:2380 \
         --ca-file=ca.pem --cert-file=client.pem --key-file=client-key.pem \
         cluster-health
 
@@ -165,5 +165,14 @@ These should be added to automation
           recursion no;
 
   - Disable unauthed LDAP access
+
+          ldapmodify -c -x -H ldap://h00.zultron.com \
+              -D "cn=Directory Manager" -W << EOF
+          dn: cn=config
+          changetype: modify
+          replace: nsslapd-allow-anonymous-access
+          nsslapd-allow-anonymous-access: rootdse
+
+          EOF
 
 [freeipa-hardening]: https://www.redhat.com/archives/freeipa-users/2014-April/msg00246.html
