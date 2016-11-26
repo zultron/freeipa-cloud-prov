@@ -145,6 +145,10 @@ FreeIPA information commands
 
 These should be added to automation
 
+- FreeIPA server and replicas end up with `172.16.0.2` address in
+  DNS; these need to be removed, along with the
+  `0.16.172.in-addr.arpa` zone
+
 - Connect replica servers to eliminate h00 as SPOF
 
         ipa-replica-manage connect h10.zultron.com h20.zultron.com
@@ -164,7 +168,7 @@ These should be added to automation
           allow-recursion {"none";};
           recursion no;
 
-  - Disable unauthed LDAP access
+  - Disable unauth'd LDAP access
 
           ldapmodify -c -x -H ldap://h00.zultron.com \
               -D "cn=Directory Manager" -W << EOF
