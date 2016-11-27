@@ -13,8 +13,16 @@ class Config(object):
         if os.path.exists(self.pickle_file_path):
             self.update_config(self.pickle_file_path)
 
+    @property
+    def sanitized_config(self):
+        config = self.__dict__.copy()
+        for key in self.__dict__:
+            if key.startswith('_'):
+                del(config[key])
+        return config
+
     def dump_config(self):
-        pprint.pprint(self.__dict__)
+        pprint.pprint(self.sanitized_config)
 
     def short_hostname(self, hostname):
         return hostname.split('.')[0]
@@ -38,28 +46,33 @@ class Config(object):
         return self.config_file_path(self.pickle_fname)
 
     def pickle_config(self):
-        config = self.__dict__.copy()
-        for key in self.__dict__:
-            if key.startswith('_'):
-                del(config[key])
         with open(self.pickle_file_path, 'w') as f:
-            f.write(yaml.dump(config, default_flow_style=False))
+            f.write(yaml.dump(self.sanitized_config, default_flow_style=False))
 
     @classmethod
     def state_subdir(cls, subdir_name):
         return os.path.join(cls.state_dir, subdir_name)
 
-    def to_ip(self, host):
+    def hconfig(self, host, key=None, val=None):
+        if key is None:
+            return self.hosts[host]
+        elif val is None:
+            return self.hosts[host][key]
+        else:
+            self.hosts[host][key] = val
+
+    def to_ip(self, host, bomb=True):
         ip = self.hosts[host].get('ip_address', None)
-        if ip is None:
+        if bomb and ip is None:
             raise RuntimeError("No cached IP address for host %s" % host)
         return ip
 
     def other_hosts(self, host):
         return [ h for h in self.hosts if h != host ]
 
-    def other_ips(self, host):
-        return [ self.to_ip(h) for h in self.other_hosts(host) ]
+    def other_ips(self, host, bomb=True):
+        return [ self.to_ip(h, bomb=bomb) for h in self.other_hosts(host)
+                 if self.to_ip(h, bomb=bomb) is not None ]
 
     def substitutions(self, host, extra_substitutions={}):
         subs = self.__dict__.copy()
@@ -67,7 +80,7 @@ class Config(object):
         subs.update(extra_substitutions)
         subs['hostname'] = host
         subs['num_hosts'] = len(self.hosts)
-        subs['other_ips'] = ','.join(self.other_ips(host))
+        subs['other_ips'] = ','.join(self.other_ips(host, bomb=False))
         # print "substitutions for %s:" % host
         # pprint(subs)
         return subs

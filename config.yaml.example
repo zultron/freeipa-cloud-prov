@@ -20,6 +20,11 @@ hosts:
     volume_size: 10
     swap_size: 2
     ipa_role: server
+    host_id: 00
+    network:
+      name: cnet
+      subnet: 172.16.0.0/24
+      gateway: 172.16.0.1
   ipa1.example.com:
     region: nyc1
     size: 1gb
@@ -27,6 +32,11 @@ hosts:
     volume_size: 10
     swap_size: 2
     ipa_role: replica
+    host_id: 1
+    network:
+      name: cnet
+      subnet: 172.16.1.0/24
+      gateway: 172.16.1.1
   ipa2.example.com:
     region: nyc1
     size: 1gb
@@ -34,6 +44,11 @@ hosts:
     volume_size: 10
     swap_size: 2
     ipa_role: replica
+    host_id: 2
+    network:
+      name: cnet
+      subnet: 172.16.2.0/24
+      gateway: 172.16.2.1
 # Names of DigitalOcean SSH keys to install
 keys:
   - jdoe@example.com RSA

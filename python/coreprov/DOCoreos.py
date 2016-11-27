@@ -15,8 +15,8 @@ from .CA import CA
 # https://urllib3.readthedocs.io/en/latest/advanced-usage.html#ssl-warnings
 # import urllib3
 # urllib3.disable_warnings()
-import logging
-logging.captureWarnings(RemoteControl)
+# import logging
+# logging.captureWarnings(RemoteControl)
 
 class DOCoreos(RemoteControl, CA):
     etcd_config_path = RemoteControl.state_subdir('etcd')
@@ -219,8 +219,10 @@ class DOCoreos(RemoteControl, CA):
 
     def get_ip_addr(self, host):
         d = self.get_droplet(host, raise_error=False)
-        return None if d is None else \
-            self.hosts[host].get('ip_address', d.ip_address)
+        if d is None:  return None
+        a = self.hosts[host].get('ip_address', d.ip_address)
+        self.pickle_config()
+        return a
 
     def substitutions(self, host, extra_substitutions={}):
         # Add extra metadata
@@ -229,6 +231,7 @@ class DOCoreos(RemoteControl, CA):
             fleet_metadata += ',ipa=true,ipa_role=server'
         if self.hosts[host].get('ipa_role') == "replica":
             fleet_metadata += ',ipa=true,ipa_role=replica'
+        fleet_metadata += ',host_id=%s' % self.hosts[host]['host_id']
 
         replica_names = [n for n in self.hosts \
                          if self.hosts[n]['ipa_role'] == 'replica' ]
@@ -328,16 +331,3 @@ class DOCoreos(RemoteControl, CA):
             print("Data OK")
         else:
             print("Data partition not mounted")
-
-    def render_iptables_config(self, host):
-        return self.render_file(host, 'iptables-rules-save')
-
-    def init_iptables(self, host):
-        ip = self.get_ip_addr(host)
-        print "Copying firewall rules to %s:/var/lib/iptables/rules-save" % host
-        self.put_file(
-            ip, self.render_iptables_config(host), 'iptables-rules-save')
-        self.remote_sudo(
-            'mv iptables-rules-save /var/lib/iptables/rules-save', ip)
-        self.remote_sudo(
-            'systemctl restart iptables-restore.service', ip)

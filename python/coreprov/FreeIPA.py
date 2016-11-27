@@ -46,29 +46,16 @@ class FreeIPA(RemoteControl):
                 ip, self.render_file(host, 'ipa-server-install-options'),
                 self.freeipa_file_path('ipa-server-install-options'))
 
-            print "Installing fleet ipa-server.service unit file"
-            self.put_file(
-                ip, self.render_file(host, 'ipa.service',
-                                     extra_substitutions=dict(
-                                         ipa_server_ip='')),
-                self.freeipa_file_path('ipa-server.service'))
-            self.remote_run('fleetctl submit %s' % \
-                            self.freeipa_file_path('ipa-server.service'), ip)
-            self.remote_run('fleetctl load ipa-server.service', ip)
-
-            print "Installing fleet ipa-replica@.service unit file"
+            print "Installing fleet ipa@.service unit file"
             self.put_file(
                 ip, self.render_file(
-                    host, 'ipa.service',
+                    host, 'ipa@.service',
                     extra_substitutions=dict(
-                        ipa_role='replica',
                         ipa_server_ip=self.to_ip(self.freeipa_master))),
-                self.freeipa_file_path('ipa-replica@.service'))
+                self.freeipa_file_path('ipa@.service'))
             self.remote_run('fleetctl submit %s' % \
-                            self.freeipa_file_path('ipa-replica@.service'), ip)
-            for instance_num in range(len(self.freeipa_replicas)):
-                self.remote_run('fleetctl load ipa-replica@%s.service' % \
-                                instance_num, ip)
+                            self.freeipa_file_path('ipa@.service'), ip)
+
         else:
 
             self.put_file(
@@ -76,8 +63,8 @@ class FreeIPA(RemoteControl):
                 os.path.join(self.freeipa_data_dir,
                              'ipa-replica-install-options'))
 
-    def start_freeipa_install(self, host):
-        ip = self.to_ip(host)
+        self.remote_run(
+            'fleetctl load ipa@%s.service' % self.hconfig(host)['host_id'], ip)
 
     def install_rndc_config(self, host):
         ip = self.to_ip(self.freeipa_master)
@@ -89,9 +76,11 @@ class FreeIPA(RemoteControl):
     def install_freeipa_server(self):
         ip = self.to_ip(self.freeipa_master)
         print 'Running FreeIPA server install on %s' % self.freeipa_master
-        self.remote_run('fleetctl start ipa-server.service', ip)
+        self.remote_run('fleetctl start ipa@%s.service' %
+                        self.hconfig(self.freeipa_master)['host_id'], ip)
         self.remote_run_and_grep(
-            'fleetctl journal -lines 0 -f ipa-server.service',
+            'fleetctl journal -lines 0 -f ipa@%s.service' %
+            self.hconfig(self.freeipa_master)['host_id'],
             ip, timeout=20*60,
             success_re=r'FreeIPA server configured\.',
             fail_re=r'Failed with result')
@@ -101,26 +90,9 @@ class FreeIPA(RemoteControl):
         # kinit admin
         # ipa user-find admin
 
-    def freeipa_fleet_replica_id(self, host):
-        if self.hosts[host].has_key('fleet_replica_id'):
-            return self.hosts[host]['fleet_replica_id']
-
-        ip = self.to_ip(self.freeipa_master)
-        filt = re.compile(r'ipa-replica@([0-9]+).service.*/([0-9.]+)\s')
-        replica_ip = self.to_ip(host)
-        print 'Running FreeIPA replica install on %s' % host
-        o = self.remote_run_output('fleetctl list-units -l -no-legend', ip)
-        res = None
-        for line in o:
-            m = filt.match(line)
-            if m is not None and replica_ip == m.group(2):
-                self.hosts[host]['fleet_replica_id'] = res = m.group(1)
-        return res
-
     def install_ipa_replica(self, replica):
         ip = self.to_ip(self.freeipa_master)
         replica_ip = self.to_ip(replica)
-        replica_id = self.freeipa_fleet_replica_id(replica)
         fname = 'replica-info-%s.gpg' % replica
         src = '%s/var/lib/ipa/%s' % (self.freeipa_data_dir, fname)
         dst = '%s/%s' % (self.freeipa_data_dir, fname)
@@ -136,10 +108,11 @@ class FreeIPA(RemoteControl):
         self.put_file(replica_ip, replica_info, dst)
 
         print 'Running FreeIPA replica install on %s' % replica
-        self.remote_run('fleetctl start ipa-replica@%s.service' % replica_id,
-                        replica_ip)
+        self.remote_run('fleetctl start ipa@%s.service' %
+                        (self.hconfig(replica)['host_id']), replica_ip)
         self.remote_run_and_grep(
-            'fleetctl journal -lines 0 -f ipa-replica@%s.service' % replica_id,
+            'fleetctl journal -lines 0 -f ipa@%s.service' %
+            ( self.hconfig(replica)['host_id']),
             replica_ip, timeout=20*60,
             success_re=r'FreeIPA server configured\.',
             fail_re=r'Failed with result')

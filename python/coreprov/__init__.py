@@ -2,6 +2,7 @@ from .DOCoreos import DOCoreos
 from .CA import CA
 from .IPSec import ProvisionIPSec
 from .FreeIPA import FreeIPA
+from .DockerNetwork import DockerNetwork
 #from .RemoteControl import RemoteControl
 
 import argparse
@@ -11,7 +12,7 @@ __all__ = ['CLIArgParser', 'CoreProvCLI']
 ########################################################################
 # CLI Processing
 
-class CoreProvCLI(DOCoreos, FreeIPA, ProvisionIPSec):
+class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, ProvisionIPSec):
     '''
     CoreProvCLI().run()
     '''
@@ -47,6 +48,8 @@ class CoreProvCLI(DOCoreos, FreeIPA, ProvisionIPSec):
                 self.init_data_volume(host)
             for host in hosts:
                 self.update_etc_hosts(host)
+            for host in hosts:
+                self.init_docker_network(host)
             # Set up network security
             for host in hosts:
                 self.install_host_certs(host)
@@ -129,6 +132,9 @@ class CoreProvCLI(DOCoreos, FreeIPA, ProvisionIPSec):
 
             if self._args.update_etc_hosts:
                 self.update_etc_hosts(host)
+
+            if self._args.init_docker_network:
+                self.init_docker_network(host)
 
             if self._args.init_iptables:
                 self.init_iptables(host)
@@ -344,6 +350,9 @@ class CLIArgParser(argparse.ArgumentParser):
         post_group.add_argument(
             '--update-etc-hosts', action='store_true',
             help='Add /etc/hosts entries for droplets')
+        post_group.add_argument(
+            '--init-docker-network', action='store_true',
+            help='Initialize Docker container network')
         post_group.add_argument(
             '--init-iptables', action='store_true',
             help='Initialize iptables rules')

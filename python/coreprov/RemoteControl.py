@@ -140,9 +140,10 @@ class RemoteControl(Config):
     def remote_sudo(self, command, hostname, **kwargs):
         return self.remote_run('sudo ' + command, hostname, **kwargs)
 
-    def remote_run_output(self, command, hostname, username=default_user):
+    def remote_run_output(self, command, hostname, username=default_user,
+                          quiet=True):
         stdout = self.remote_run(command, hostname, username,
-                                 read_stdout=False, quiet=True)
+                                 read_stdout=False, quiet=quiet)
         return stdout.readlines()
 
     def close(self, hostname, username=default_user):

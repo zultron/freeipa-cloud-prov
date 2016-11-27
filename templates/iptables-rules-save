@@ -4,11 +4,36 @@
 :FORWARD DROP [0:0]
 :OUTPUT ACCEPT [0:0]
 
+# Forwarding rules
+
+# FreeIPA
+#
+# HTTP/HTTPS
+-A FORWARD ! -i {network[netif]} -o {network[netif]} -m tcp -p tcp --dport 80 -j ACCEPT
+-A FORWARD ! -i {network[netif]} -o {network[netif]} -m tcp -p tcp --dport 443 -j ACCEPT
+# DNS
+-A FORWARD ! -i {network[netif]} -o {network[netif]} -m tcp -p tcp --dport 53 -j ACCEPT
+-A FORWARD ! -i {network[netif]} -o {network[netif]} -m udp -p udp --dport 53 -j ACCEPT
+# LDAP/LDAPS
+-A FORWARD ! -i {network[netif]} -o {network[netif]} -m tcp -p tcp --dport 389 -j ACCEPT
+-A FORWARD ! -i {network[netif]} -o {network[netif]} -m tcp -p tcp --dport 636 -j ACCEPT
+# Kerberos
+-A FORWARD ! -i {network[netif]} -o {network[netif]} -m tcp -p tcp --dport 88 -j ACCEPT
+-A FORWARD ! -i {network[netif]} -o {network[netif]} -m udp -p udp --dport 88 -j ACCEPT
+-A FORWARD ! -i {network[netif]} -o {network[netif]} -m tcp -p tcp --dport 464 -j ACCEPT
+-A FORWARD ! -i {network[netif]} -o {network[netif]} -m udp -p udp --dport 464 -j ACCEPT
+# Dogtag (private)
+-A FORWARD ! -i {network[netif]} -o {network[netif]} -m tcp -p tcp --dport 8080 -j ACCEPT
+
 # loopback traffic
 -A INPUT -i lo -j ACCEPT
 
 # existing connections
 -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A FORWARD -o {network[netif]} -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+
+# container outgoing connections
+-A FORWARD -i {network[netif]} ! -o {network[netif]} -j ACCEPT
 
 # SSH
 -A INPUT -p tcp -m tcp --dport 22 -j ACCEPT
@@ -30,31 +55,39 @@
 # ping
 -A INPUT -p icmp -m icmp --icmp-type 0 -j ACCEPT
 -A INPUT -p icmp -m icmp --icmp-type 3 -j ACCEPT
+-A INPUT -p icmp -m icmp --icmp-type 8 -j ACCEPT
 -A INPUT -p icmp -m icmp --icmp-type 11 -j ACCEPT
 COMMIT
 
-*raw
+*nat
 :PREROUTING ACCEPT [0:0]
+:INPUT ACCEPT [0:0]
 :OUTPUT ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+
+# DNAT rules for containers
 
 # FreeIPA
 #
-# Docker networking screws up `-t filter -A INPUT -s IPADDR` rules
-# because of the SNAT rules in the `-t nat -A PREROUTING` chain, so
-# restrictions service ports exposed from docker containers are
-# managed here.  These rules restrict services to cluster hosts only.
-
-# LDAP/LDAPS (private)
--A PREROUTING -i eth0 -s {other_ips} -m tcp -p tcp --dport 389 -j ACCEPT
--A PREROUTING -i eth0 -m tcp -p tcp --dport 389 -j DROP
-# DNS (private)
--A PREROUTING -i eth0 -s {other_ips} -m tcp -p tcp --dport 53 -j ACCEPT
--A PREROUTING -i eth0 -m tcp -p tcp --dport 53 -j DROP
--A PREROUTING -i eth0 -s {other_ips} -m udp -p udp --dport 53 -j ACCEPT
--A PREROUTING -i eth0 -m udp -p udp --dport 53 -j DROP
+# HTTP/HTTPS
+-A PREROUTING ! -i {network[netif]} -m tcp -p tcp --dport 80 -j DNAT --to-destination 10.26.{host_id}.2
+-A PREROUTING ! -i {network[netif]} -m tcp -p tcp --dport 443 -j DNAT --to-destination 10.26.{host_id}.2
+# DNS
+-A PREROUTING ! -i {network[netif]} -m tcp -p tcp --dport 53 -j DNAT --to-destination 10.26.{host_id}.2
+-A PREROUTING ! -i {network[netif]} -m udp -p udp --dport 53 -j DNAT --to-destination 10.26.{host_id}.2
+# LDAP/LDAPS
+-A PREROUTING ! -i {network[netif]} -m tcp -p tcp --dport 389 -j DNAT --to-destination 10.26.{host_id}.2
+-A PREROUTING ! -i {network[netif]} -m tcp -p tcp --dport 636 -j DNAT --to-destination 10.26.{host_id}.2
+# Kerberos
+-A PREROUTING ! -i {network[netif]} -m tcp -p tcp --dport 88 -j DNAT --to-destination 10.26.{host_id}.2
+-A PREROUTING ! -i {network[netif]} -m udp -p udp --dport 88 -j DNAT --to-destination 10.26.{host_id}.2
+-A PREROUTING ! -i {network[netif]} -m tcp -p tcp --dport 464 -j DNAT --to-destination 10.26.{host_id}.2
+-A PREROUTING ! -i {network[netif]} -m udp -p udp --dport 464 -j DNAT --to-destination 10.26.{host_id}.2
 # Dogtag (private)
--A PREROUTING -i eth0 -s {other_ips} -m tcp -p tcp --dport 8080 -j ACCEPT
--A PREROUTING -i eth0 -m tcp -p tcp --dport 8080 -j DROP
+-A PREROUTING ! -i {network[netif]} -s {other_ips} -m tcp -p tcp --dport 8080 -j DNAT --to-destination 10.26.{host_id}.2
+
+# Outgoing connections
+-A POSTROUTING ! -o {network[netif]} -s 10.26.{host_id}.0/24 -j MASQUERADE
 
 COMMIT
 

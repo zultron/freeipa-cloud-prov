@@ -30,9 +30,7 @@ ExecStart=/usr/bin/docker run --rm \
         --name ipa \
         --volume /media/state/ipa-data:/data \
         --volume /sys/fs/cgroup:/sys/fs/cgroup:ro \
-        -p 443:443 -p 389:389 -p 636:636 -p 88:88 -p 80:80 -p 464:464 -p 53:53 \
-        -p 88:88/udp -p 464:464/udp -p 53:53/udp \
-        -p 7389:7389 \
+	--net cnet --ip 10.26.%i.2 \
         -e IPA_SERVER_IP={ipa_server_ip} \
         adelton/freeipa-server:centos-7
 
@@ -40,5 +38,4 @@ ExecStart=/usr/bin/docker run --rm \
 ExecStop=/usr/bin/docker stop ipa
 
 [X-Fleet]
-MachineMetadata=ipa_role={ipa_role}
-Conflicts=ipa-replica@*.service
+MachineMetadata=host_id=%i

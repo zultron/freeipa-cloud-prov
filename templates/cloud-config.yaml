@@ -106,6 +106,18 @@ write_files:
   - path: /etc/modules-load.d/af_key.conf
     content: af_key
 
+  - path: /run/systemd/system/docker.service.d/no-ip-masq.conf
+    content: |
+      [Service]
+      Environment="DOCKER_OPT_IPMASQ=--ip-masq=false --iptables=false --userland-proxy=false"
+
+  # Wish for a purpose-built Docker container with IPA tools, and
+  # apt-get install -y emacs-nox tcpdump ldap-utils bridge-utils psutils iptables net-tools dnsutils telnet
+  - path: /home/core/.toolboxrc
+    content: |
+      TOOLBOX_DOCKER_IMAGE=debian
+      TOOLBOX_USER=root
+
   # done in coreos/etcd2 above
   # # tell etcd2 and fleet where our certificates are going to live:
   # - path: /run/systemd/system/etcd2.service.d/30-certificates.conf
