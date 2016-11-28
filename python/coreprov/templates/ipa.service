@@ -1,5 +1,5 @@
 [Unit]
-Description=HAProxy service
+Description=FreeIPA service
 
 # Requirements
 Requires=etcd2.service
@@ -20,23 +20,21 @@ KillMode=none
 # Get CoreOS environmental variables
 EnvironmentFile=/etc/environment
 
-Environment=HAPROXY_CONFIG=/usr/local/etc/haproxy/haproxy.cfg
-Environment=HAPROXY_DATA=/media/state/haproxy-data
-
 # Pre-start and Start
 ## Directives with "=-" are allowed to fail without consequence
-ExecStartPre=-/usr/bin/docker kill haproxy
-ExecStartPre=-/usr/bin/docker rm haproxy
+ExecStartPre=-/usr/bin/docker kill ipa
+ExecStartPre=-/usr/bin/docker rm ipa
 ExecStart=/usr/bin/docker run --rm \
-        --hostname %H \
-        --name haproxy \
-        --volume $HAPROXY_DATA:/data \
-        --volume $HAPROXY_DATA/haproxy.cfg:$HAPROXY_CONFIG:ro \
-        --net cnet --ip 10.26.%i.3 \
-        haproxy
+        --hostname ${HOST_NAME} \
+        --name ipa \
+        --volume /media/state/ipa-data:/data \
+        --volume /sys/fs/cgroup:/sys/fs/cgroup:ro \
+	--net cnet --ip ${SERVER_IP_ipa} \
+        -e IPA_SERVER_IP=${COREOS_PUBLIC_IPV4} \
+        adelton/freeipa-server:centos-7
 
 # Stop
-ExecStop=/usr/bin/docker stop haproxy
+ExecStop=/usr/bin/docker stop ipa
 
 [X-Fleet]
-MachineMetadata=host_id=%i
+MachineMetadata=ipa=true

@@ -2,7 +2,7 @@ import os, re
 from .RemoteControl import RemoteControl
 
 class Syslog(RemoteControl):
-    syslog_docker_image = 'zultron/syslog-server'
+    syslog_docker_image = 'zultron/freeipa-cloud-prov:syslog'
     syslog_data_dir = '/media/state/syslog-data'
     syslog_log_dir = '%s/logs' % syslog_data_dir
 
@@ -25,12 +25,12 @@ class Syslog(RemoteControl):
             ip, self.render_jinja2(host, 'rsyslog.conf'),
                 self.syslog_file_path('rsyslog.conf'))
 
-    def install_syslog_server(self):
-        ip = self.to_ip(self.master)
-        print 'Starting rsyslog services (on %s)' % self.master
+    def start_syslog_server(self):
+        ip = self.to_ip(self.master_host)
+        print 'Starting syslog services (on %s)' % self.master_host
         self.put_file(
-            ip, self.render_file(host, 'syslog.service'),
-            self.freeipa_file_path('ipa@.service'))
+            ip, self.render_jinja2(self.master_host, 'syslog.service'),
+            self.syslog_file_path('syslog.service'))
         self.remote_run(
             'fleetctl submit %s' % self.syslog_file_path('syslog.service'), ip)
         self.remote_run(

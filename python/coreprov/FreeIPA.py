@@ -46,15 +46,14 @@ class FreeIPA(RemoteControl):
                 ip, self.render_file(host, 'ipa-server-install-options'),
                 self.freeipa_file_path('ipa-server-install-options'))
 
-            print "Installing fleet ipa@.service unit file"
+            print "Installing fleet ipa.service unit file"
             self.put_file(
-                ip, self.render_file(
-                    host, 'ipa@.service',
-                    extra_substitutions=dict(
-                        ipa_server_ip=self.to_ip(self.freeipa_master))),
-                self.freeipa_file_path('ipa@.service'))
-            self.remote_run('fleetctl submit %s' % \
-                            self.freeipa_file_path('ipa@.service'), ip)
+                ip, self.render_jinja2(host, 'ipa.service'),
+                self.freeipa_file_path('ipa.service'))
+            self.remote_run(
+                'fleetctl submit %s' % \
+                self.freeipa_file_path('ipa.service'), ip)
+            self.remote_run('fleetctl load ipa.service', ip)
 
         else:
 
@@ -63,9 +62,6 @@ class FreeIPA(RemoteControl):
                 os.path.join(self.freeipa_data_dir,
                              'ipa-replica-install-options'))
 
-        self.remote_run(
-            'fleetctl load ipa@%s.service' % self.hconfig(host)['host_id'], ip)
-
     def install_rndc_config(self, host):
         ip = self.to_ip(self.freeipa_master)
         print 'Installing rndc config and key on %s' % host
@@ -73,47 +69,34 @@ class FreeIPA(RemoteControl):
         self.remote_run('docker exec -i ipa rndc-confgen -a', ip)
         self.remote_run('docker exec -i ipa restorecon /etc/rndc.key', ip)
 
-    def install_freeipa_server(self):
-        ip = self.to_ip(self.freeipa_master)
-        print 'Running FreeIPA server install on %s' % self.freeipa_master
-        self.remote_run('fleetctl start ipa@%s.service' %
-                        self.hconfig(self.freeipa_master)['host_id'], ip)
+    def install_ipa(self, host):
+        ip = self.to_ip(host)
+
+        if host != self.freeipa_master:
+            server_ip = self.to_ip(self.freeipa_master)
+            fname = 'replica-info-%s.gpg' % host
+            src = '%s/var/lib/ipa/%s' % (self.freeipa_data_dir, fname)
+            dst = '%s/%s' % (self.freeipa_data_dir, fname)
+
+            print 'Preparing FreeIPA replica info for %s' % host
+            self.remote_run(
+                'docker exec -i ipa ipa-replica-prepare %s'
+                ' --ip-address %s --no-reverse' % (host, ip), server_ip,
+                stdin_in='%s\n' % self.ds_password, read_stdout=False)
+            self.remote_sudo('mv %s %s' % (src, dst), server_ip)
+            self.remote_sudo('chown core %s' % dst, server_ip)
+            replica_info = self.get_file(server_ip, dst)
+            self.put_file(ip, replica_info, dst)
+
+        print 'Running FreeIPA install on %s' % host
+        self.remote_run('systemctl start ipa.service', ip)
         self.remote_run_and_grep(
-            'fleetctl journal -lines 0 -f ipa@%s.service' %
-            self.hconfig(self.freeipa_master)['host_id'],
+            'journalctl -fu ipa.service -n 0',
             ip, timeout=20*60,
             success_re=r'FreeIPA server configured\.',
             fail_re=r'Failed with result')
-        self.install_rndc_config(self.freeipa_master)
+        self.install_rndc_config(host)
 
         # Simple functionality test
         # kinit admin
         # ipa user-find admin
-
-    def install_ipa_replica(self, replica):
-        ip = self.to_ip(self.freeipa_master)
-        replica_ip = self.to_ip(replica)
-        fname = 'replica-info-%s.gpg' % replica
-        src = '%s/var/lib/ipa/%s' % (self.freeipa_data_dir, fname)
-        dst = '%s/%s' % (self.freeipa_data_dir, fname)
-
-        print 'Preparing FreeIPA replica info for %s' % replica
-        self.remote_run(
-            'docker exec -i ipa ipa-replica-prepare %s'
-            ' --ip-address %s --no-reverse' % (replica, replica_ip), ip,
-            stdin_in='%s\n' % self.ds_password, read_stdout=False)
-        self.remote_sudo('mv %s %s' % (src, dst), ip)
-        self.remote_sudo('chown core %s' % dst, ip)
-        replica_info = self.get_file(ip, dst)
-        self.put_file(replica_ip, replica_info, dst)
-
-        print 'Running FreeIPA replica install on %s' % replica
-        self.remote_run('fleetctl start ipa@%s.service' %
-                        (self.hconfig(replica)['host_id']), replica_ip)
-        self.remote_run_and_grep(
-            'fleetctl journal -lines 0 -f ipa@%s.service' %
-            ( self.hconfig(replica)['host_id']),
-            replica_ip, timeout=20*60,
-            success_re=r'FreeIPA server configured\.',
-            fail_re=r'Failed with result')
-        self.install_rndc_config(replica)

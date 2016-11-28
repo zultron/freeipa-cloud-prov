@@ -19,6 +19,7 @@ KillMode=none
 
 # Get CoreOS environmental variables
 EnvironmentFile=/etc/environment
+EnvironmentFile=/media/state/system.env
 
 Environment=SYSLOG_DATA=/media/state/syslog-data
 
@@ -27,12 +28,13 @@ Environment=SYSLOG_DATA=/media/state/syslog-data
 ExecStartPre=-/usr/bin/docker kill syslog
 ExecStartPre=-/usr/bin/docker rm syslog
 ExecStart=/usr/bin/docker run --rm \
-        --hostname %H \
+        --hostname ${HOST_NAME} \
         --name syslog \
-        --volume $SYSLOG_DATA/logs:/var/log \
-        --volume $SYSLOG_DATA/rsyslog.conf:/etc/rsyslog.conf \
-        --net cnet --ip 10.26.%i.4 \
-        syslog
+        --volume "${SYSLOG_DATA}/logs:/var/log" \
+        --volume "${SYSLOG_DATA}/rsyslog.conf:/etc/rsyslog.conf" \
+	-p 514 -p 514/udp \
+        --net cnet --ip "${SYSLOG_IP}" \
+        zultron/freeipa-cloud-prov:syslog
 
 # Stop
 ExecStop=/usr/bin/docker stop syslog

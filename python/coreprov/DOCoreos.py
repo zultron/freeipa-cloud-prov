@@ -247,6 +247,7 @@ class DOCoreos(RemoteControl, CA):
         subs.update(extra_substitutions)
         return subs
 
+
     def install_host_certs(self, hostname):
         ip = self.to_ip(hostname)
         if not self.hosts[hostname].has_key('cert'):
@@ -317,6 +318,8 @@ class DOCoreos(RemoteControl, CA):
                          ip)
         self.remote_sudo('mkfs.ext4 /dev/sda2', ip)
         self.remote_sudo('systemctl start media-state.mount', ip)
+        self.remote_sudo('install -d -o core %s' % self.state_dir, ip)
+        self.install_system_env(host)
 
     def data_volume_status(self, host):
         ip = self.get_ip_addr(host)
@@ -331,3 +334,10 @@ class DOCoreos(RemoteControl, CA):
             print("Data OK")
         else:
             print("Data partition not mounted")
+
+
+    def install_system_env(self, host):
+        ip = self.to_ip(host)
+        print "Installing system environment file on %s" % host
+        self.put_file(ip, self.render_jinja2(host, 'system.env'),
+                      os.path.join(self.state_dir, 'system.env'))

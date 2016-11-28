@@ -19,7 +19,7 @@ class DockerNetwork(RemoteControl):
         self.pickle_config()  # stash netif for iptables, etc.
 
     def render_iptables_config(self, host):
-        return self.render_file(host, 'iptables-rules-save')
+        return self.render_jinja2(host, 'iptables-rules-save')
 
     def init_iptables(self, host):
         ip = self.get_ip_addr(host)

@@ -1,6 +1,5 @@
 import yaml, pprint, os, sys, jinja2, collections
 
-
 class Config(object):
     pickle_fname = 'state.yaml'
     state_dir = '/media/state'
@@ -13,7 +12,8 @@ class Config(object):
             self.update_config(self.pickle_file_path)
         self.update_config(self.configfile)
         self._jenv = jinja2.Environment(
-            loader=jinja2.PackageLoader('coreprov'))
+            loader=jinja2.PackageLoader('coreprov'),
+            extensions=['jinja2.ext.with_'])
 
     @property
     def sanitized_config(self):

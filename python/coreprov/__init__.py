@@ -1,9 +1,9 @@
 from .DOCoreos import DOCoreos
-from .CA import CA
-from .IPSec import ProvisionIPSec
-from .FreeIPA import FreeIPA
+#from .IPSec import ProvisionIPSec
 from .DockerNetwork import DockerNetwork
-#from .RemoteControl import RemoteControl
+from .FreeIPA import FreeIPA
+from .Syslog import Syslog
+from .HAProxy import HAProxy
 
 import argparse
 
@@ -12,7 +12,7 @@ __all__ = ['CLIArgParser', 'CoreProvCLI']
 ########################################################################
 # CLI Processing
 
-class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, ProvisionIPSec):
+class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, Syslog, HAProxy):
     '''
     CoreProvCLI().run()
     '''
@@ -70,11 +70,7 @@ class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, ProvisionIPSec):
             for host in [self.freeipa_master] + self.freeipa_replicas:
                 # IPA server first, replicas second
                 if host not in hosts:  continue
-
-                if host == self.freeipa_master:
-                    self.install_freeipa_server()
-                if host in self.freeipa_replicas:
-                    self.install_ipa_replica(host)
+                self.install_freeipa(host)
 
         if self._args.run:
             for host in hosts:
@@ -133,6 +129,9 @@ class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, ProvisionIPSec):
             # - Coreos post-provisioning configuration
             if self._args.init_volumes:
                 self.init_data_volume(host)
+
+            if self._args.install_system_env:
+                self.install_system_env(host)
 
             if self._args.update_etc_hosts:
                 self.update_etc_hosts(host)
@@ -244,15 +243,37 @@ class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, ProvisionIPSec):
                 self.install_freeipa_config(host)
 
         if self._args.init_ipa or self._args.install_ipa:
-            if self.freeipa_master in hosts:
-                self.install_freeipa_server()
-
-            for r in [r for r in self.freeipa_replicas if r in hosts]:
-                self.install_ipa_replica(r)
+            self.install_ipa(host)
 
         if self._args.show_ipa_hosts:
             print "Server:  %s" % self.freeipa_master
             print "Replicas:  %s" % ', '.join(self.freeipa_replicas)
+
+        ########################
+        # - Provision Syslog containers
+
+        for host in hosts:
+            if self._args.pull_syslog_image or self._args.install_syslog:
+                self.pull_syslog_docker_image(host)
+
+            if self._args.install_syslog_config or self._args.install_syslog:
+                self.install_syslog_config(host)
+
+        if self._args.start_syslog or self._args.install_syslog:
+            self.start_syslog_server()
+
+        ########################
+        # - Provision HAProxy containers
+
+        for host in hosts:
+            if self._args.pull_haproxy_image or self._args.install_haproxy:
+                self.pull_haproxy_docker_image(host)
+
+            if self._args.install_haproxy_config or self._args.install_haproxy:
+                self.install_haproxy_config(host)
+
+            if self._args.start_haproxy or self._args.install_haproxy:
+                self.start_haproxy_server(host)
 
 
 ########################################################################
@@ -356,6 +377,9 @@ class CLIArgParser(argparse.ArgumentParser):
             '--init-volumes', action='store_true',
             help='Initialize volumes with swap and data partitions')
         post_group.add_argument(
+            '--install-system-env', action='store_true',
+            help='Install system environment file')
+        post_group.add_argument(
             '--update-etc-hosts', action='store_true',
             help='Add /etc/hosts entries for droplets')
         post_group.add_argument(
@@ -451,6 +475,38 @@ class CLIArgParser(argparse.ArgumentParser):
         freeipa_group.add_argument(
             '--show-ipa-hosts', action='store_true',
             help='Print FreeIPA server and replicas')
+
+        # - Syslog commands
+        syslog_group = self.add_argument_group(
+            "syslog configuration")
+        syslog_group.add_argument(
+            '--install-syslog', action='store_true',
+            help='Install syslog servers in one command')
+        syslog_group.add_argument(
+            '--pull-syslog-image', action='store_true',
+            help='Pull syslog Docker image')
+        syslog_group.add_argument(
+            '--install-syslog-config', action='store_true',
+            help='Install syslog configuration files')
+        syslog_group.add_argument(
+            '--start-syslog', action='store_true',
+            help='Start syslog containers')
+
+        # - HAProxy commands
+        haproxy_group = self.add_argument_group(
+            "HAProxy configuration")
+        haproxy_group.add_argument(
+            '--install-haproxy', action='store_true',
+            help='Install HAProxy servers in one command')
+        haproxy_group.add_argument(
+            '--pull-haproxy-image', action='store_true',
+            help='Pull HAProxy Docker image')
+        haproxy_group.add_argument(
+            '--install-haproxy-config', action='store_true',
+            help='Install HAProxy configuration files')
+        haproxy_group.add_argument(
+            '--start-haproxy', action='store_true',
+            help='Start HAProxy containers')
 
         return super(CLIArgParser, self).parse_args(*args, **kwargs)
 
