@@ -146,6 +146,10 @@ class RemoteControl(Config):
                                  read_stdout=False, quiet=quiet)
         return stdout.readlines()
 
+    def remote_docker_exec(self, hostname, container, command, quiet=True):
+        return self.remote_run('docker exec %s %s' % (container, command),
+                               hostname, quiet=quiet)
+
     def close(self, hostname, username=default_user):
         self.conn(hostname, username).close()
 

@@ -9,6 +9,4 @@ RUN apt-get update && \
 RUN adduser --system --no-create-home --uid 202 --group \
         --disabled-password --disabled-login syslog
 
-EXPOSE 514 514/udp
-
 CMD ["rsyslogd", "-n"]

@@ -76,6 +76,11 @@ class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, Syslog, HAProxy):
             for host in hosts:
                 self.remote_run(self._args.run, self.get_ip_addr(host))
 
+        if self._args.docker_exec:
+            for host in hosts:
+                self.remote_docker_exec(host, self._args.container,
+                                        self._args.docker_exec)
+
         if self._args.dump_config:
             self.dump_config()
 
@@ -275,7 +280,6 @@ class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, Syslog, HAProxy):
             if self._args.start_haproxy or self._args.install_haproxy:
                 self.start_haproxy_server(host)
 
-
 ########################################################################
 # CLI argument parsing
 
@@ -311,6 +315,14 @@ class CLIArgParser(argparse.ArgumentParser):
         self.add_argument(
             '--run', action='store', metavar='COMMAND',
             help='Run command on remote hosts')
+
+        self.add_argument(
+            '--container', action='store', metavar='CONTAINER_NAME',
+            help='Specify container to use for --docker-exec command')
+
+        self.add_argument(
+            '--docker-exec', action='store', metavar='COMMAND',
+            help='Run command in remote container specified by --container')
 
         self.add_argument(
             '--reboot', action='store_true',

@@ -182,3 +182,26 @@ These should be added to automation
           EOF
 
 [freeipa-hardening]: https://www.redhat.com/archives/freeipa-users/2014-April/msg00246.html
+
+## DNS
+
+	[root@h00 /]# ipa help dns
+
+	[root@h00 /]# ipa dnszone-show zultron.com --all
+
+	[root@h00 /]# ipa dnszone-find zultron.com --forward-only --all
+
+	[root@h00 /]# ipa dnsrecord-show zultron.com @ --all
+
+	[root@h00 /]# ipa dnszone-add nyc1.zultron.com --forward-policy=none \
+	  --admin-email=hostmaster@zultron.com --name-from-ip=10.26.0.0/24
+
+Add DNS zone:
+
+    [root@h00 /]# ipa dnszone-add nyc1.zultron.com \
+        --forward-policy=none --admin-email=hostmaster@zultron.com
+    [root@h00 /]# ipa dnszone-show nyc1.zultron.com --all
+    [root@h00 /]# ipa dnszone-add sfo2.zultron.com \
+        --forward-policy=none --admin-email=hostmaster@zultron.com
+    [root@h00 /]# ipa dnszone-add fra1.zultron.com \
+        --forward-policy=none --admin-email=hostmaster@zultron.com

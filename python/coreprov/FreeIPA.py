@@ -100,3 +100,9 @@ class FreeIPA(RemoteControl):
         # Simple functionality test
         # kinit admin
         # ipa user-find admin
+
+    def kinit_admin(self, host):
+        self.remote_docker_exec(
+            host, 'ipa',
+            'bash -c \"echo %s | kinit admin\" >/dev/null' %
+            self.admin_password, quiet=False)

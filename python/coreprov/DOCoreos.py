@@ -247,7 +247,6 @@ class DOCoreos(RemoteControl, CA):
         subs.update(extra_substitutions)
         return subs
 
-
     def install_host_certs(self, hostname):
         ip = self.to_ip(hostname)
         if not self.hosts[hostname].has_key('cert'):

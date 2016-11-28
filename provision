@@ -6,6 +6,10 @@ UID_GID=`id -u`:`id -g`
 
 cd "$DIR"
 
+if tty >/dev/null; then
+    DOCKER_TTY_ARGS="-t"
+fi
+
 if test "$1" = "build"; then
     set -x
     docker build -t "$NAME" .
@@ -13,7 +17,7 @@ if test "$1" = "build"; then
 elif test "$1" = "shell"; then
     shift
     set -x
-    docker run --rm -it \
+    docker run --rm -i ${DOCKER_TTY_ARGS} \
 	-v $HOME:/home/user \
 	-v $PWD:/data \
 	-u $UID_GID \
@@ -22,7 +26,7 @@ elif test "$1" = "shell"; then
 
 else
     set -x
-    docker run --rm -it \
+    docker run --rm -i ${DOCKER_TTY_ARGS} \
 	-v $HOME:/home/user \
 	-v $PWD:/data \
 	-u $UID_GID \
