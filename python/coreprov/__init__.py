@@ -87,6 +87,10 @@ class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, ProvisionIPSec):
             for host in hosts:
                 self.render_file_to_stdout(host, self._args.render_file)
 
+        if self._args.render_jinja2:
+            for host in hosts:
+                self.render_jinja2_to_stdout(host, self._args.render_jinja2)
+
         for host in hosts:
 
             ##########################
@@ -298,6 +302,10 @@ class CLIArgParser(argparse.ArgumentParser):
         self.add_argument(
             '--render-file', metavar='FILENAME',
             help='render a file from the "templates" directory')
+
+        self.add_argument(
+            '--render-jinja2', metavar='FILENAME',
+            help='render a jinja2 file from the "coreprov/templates" directory')
 
         # - Provision coreos hosts
         droplet_group = self.add_argument_group(

@@ -1,5 +1,5 @@
 [Unit]
-Description=FreeIPA service
+Description=Syslog service
 
 # Requirements
 Requires=etcd2.service
@@ -20,21 +20,22 @@ KillMode=none
 # Get CoreOS environmental variables
 EnvironmentFile=/etc/environment
 
+Environment=SYSLOG_DATA=/media/state/syslog-data
+
 # Pre-start and Start
 ## Directives with "=-" are allowed to fail without consequence
-ExecStartPre=-/usr/bin/docker kill ipa
-ExecStartPre=-/usr/bin/docker rm ipa
+ExecStartPre=-/usr/bin/docker kill syslog
+ExecStartPre=-/usr/bin/docker rm syslog
 ExecStart=/usr/bin/docker run --rm \
         --hostname %H \
-        --name ipa \
-        --volume /media/state/ipa-data:/data \
-        --volume /sys/fs/cgroup:/sys/fs/cgroup:ro \
-	--net cnet --ip 10.26.%i.2 \
-        -e IPA_SERVER_IP={ipa_server_ip} \
-        adelton/freeipa-server:centos-7
+        --name syslog \
+        --volume $SYSLOG_DATA/logs:/var/log \
+        --volume $SYSLOG_DATA/rsyslog.conf:/etc/rsyslog.conf \
+        --net cnet --ip 10.26.%i.4 \
+        syslog
 
 # Stop
-ExecStop=/usr/bin/docker stop ipa
+ExecStop=/usr/bin/docker stop syslog
 
 [X-Fleet]
-MachineMetadata=host_id=%i
+Global=true

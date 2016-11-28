@@ -1,4 +1,4 @@
-import yaml, pprint, os, sys
+import yaml, pprint, os, sys, jinja2, collections
 
 
 class Config(object):
@@ -9,9 +9,11 @@ class Config(object):
         self.configfile = os.path.abspath(configfile)
         self.config_dir = os.path.dirname(self.configfile)
         self.template_dir = os.path.join(self.config_dir, 'templates')
-        self.update_config(self.configfile)
         if os.path.exists(self.pickle_file_path):
             self.update_config(self.pickle_file_path)
+        self.update_config(self.configfile)
+        self._jenv = jinja2.Environment(
+            loader=jinja2.PackageLoader('coreprov'))
 
     @property
     def sanitized_config(self):
@@ -33,7 +35,16 @@ class Config(object):
             if name == self.short_hostname(h):  return h
 
     def update_config(self, fname):
-        self.__dict__.update(yaml.load(file(fname, 'r')))
+        def update(d, u):
+            for k, v in u.iteritems():
+                if isinstance(v, collections.Mapping):
+                    r = update(d.get(k, {}), v)
+                    d[k] = r
+                else:
+                    d[k] = u[k]
+            return d
+
+        update(self.__dict__, yaml.load(file(fname, 'r')))
 
     def config_file_path(self, fname):
         return os.path.join(self.config_dir, fname)
@@ -67,6 +78,16 @@ class Config(object):
             raise RuntimeError("No cached IP address for host %s" % host)
         return ip
 
+    @property
+    def master_host(self):
+        # FIXME Need metadata rework, 'master=true' or something
+        master_list = [h for h in self.hosts
+                       if self.hconfig(h, 'ipa_role') == 'server']
+        if len(master_list) != 1:
+            raise RuntimeError(
+                "Config should define exactly one host 'ipa_role: server'")
+        return master_list[0]
+
     def other_hosts(self, host):
         return [ h for h in self.hosts if h != host ]
 
@@ -97,6 +118,15 @@ class Config(object):
     def render_file_to_stdout(self, *args, **kwargs):
         # sys.stdout.write(self.render_file(*args, **kwargs))
         print(self.render_file(*args, **kwargs))
+
+    def render_jinja2(self, host, fname, extra_substitutions={}):
+        subs = self.substitutions(host, extra_substitutions)
+        tmpl = self._jenv.get_template(fname)
+        return tmpl.render(**subs)
+
+    def render_jinja2_to_stdout(self, *args, **kwargs):
+        # sys.stdout.write(self.render_file(*args, **kwargs))
+        print(self.render_jinja2(*args, **kwargs))
 
     def destroy_pickle(self):
         if not os.path.exists(self.pickle_file_path):

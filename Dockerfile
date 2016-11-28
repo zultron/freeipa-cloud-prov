@@ -18,6 +18,9 @@ RUN pip install python-digitalocean
 RUN pip install --upgrade \
         cffi
 RUN pip install paramiko
+RUN pip install Jinja2
+# https://pypi.python.org/pypi/ipcalc/
+RUN pip install ipcalc
 
 RUN useradd -s /bin/bash user
 
