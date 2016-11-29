@@ -12,7 +12,7 @@ class Config(object):
             self.update_config(self.pickle_file_path)
         self.update_config(self.configfile)
         self._jenv = jinja2.Environment(
-            loader=jinja2.PackageLoader('coreprov'),
+            loader=jinja2.FileSystemLoader(self.template_dir),
             extensions=['jinja2.ext.with_'])
 
     @property
