@@ -28,14 +28,23 @@ class HAProxy(RemoteControl):
         ip = self.to_ip(host)
 
         if host == self.master_host:
-            print 'Installing HAProxy service'
+            print 'Installing HAProxy (and sidekick) service'
             self.put_file(
-                ip, self.render_jinja2(self.master_host, 'haproxy.service'),
+                ip, self.render_jinja2(
+                    self.master_host, 'haproxy.service'),
                 self.haproxy_file_path('haproxy.service'))
+            self.put_file(
+                ip, self.render_jinja2(
+                    self.master_host, 'haproxy-iptables.service'),
+                self.haproxy_file_path('haproxy-iptables.service'))
             self.remote_run(
                 'fleetctl submit %s' %
                 self.haproxy_file_path('haproxy.service'), ip)
+            self.remote_run(
+                'fleetctl submit %s' %
+                self.haproxy_file_path('haproxy-iptables.service'), ip)
             self.remote_run('fleetctl load haproxy.service', ip)
+            self.remote_run('fleetctl load haproxy-iptables.service', ip)
 
         print 'Starting HAProxy service on %s' % host
         self.remote_sudo(

@@ -1,0 +1,34 @@
+FROM zultron/docker-freeipa:centos-7-client
+
+# Base packages
+RUN yum install -y \
+        ipa-admintools \
+	which \
+	emacs-nox \
+	tcpdump \
+	openldap-clients \
+	bridge-utils \
+	psutils \
+	net-tools \
+	telnet \
+	PyYAML \
+	python-jinja2 \
+	epel-release
+
+# EPEL packages
+RUN yum install -y \
+    	python-pip \
+	python2-paramiko
+	
+# PIP packages
+RUN pip install \
+    	python-digitalocean \
+	ipcalc
+
+RUN groupadd -g 500 core
+RUN useradd -M -u 500 -g 500 --shell /bin/bash core
+
+USER core
+
+VOLUME /home/core
+WORKDIR /home/core

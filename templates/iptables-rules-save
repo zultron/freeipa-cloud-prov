@@ -70,6 +70,7 @@ COMMIT
 :OUTPUT ACCEPT [0:0]
 :POSTROUTING ACCEPT [0:0]
 :DOCKER - [0:0]
+:DOCKER_HA - [0:0]
 
 # DNAT rules for containers
 #
@@ -79,15 +80,25 @@ COMMIT
     {%- for portnum in docker_ports[ip][name] %}
       {%- with proto = docker_ports[ip][name][portnum] %}
         {%- if proto == 'both' %}
--A DOCKER ! -i {{network['netif']}} -m tcp -p tcp --dport {{portnum}} -j DNAT --to-destination {{ip}}
--A DOCKER ! -i {{network['netif']}} -m udp -p udp --dport {{portnum}} -j DNAT --to-destination {{ip}}
+-A DOCKER ! -i {{network['netif']}}                   -m tcp       -p tcp       --dport {{portnum}} -j DNAT --to-destination {{ip}}
+-A DOCKER ! -i {{network['netif']}}                   -m udp       -p udp       --dport {{portnum}} -j DNAT --to-destination {{ip}}
+-A DOCKER   -i {{network['netif']}} -d {{ip_address}} -m tcp       -p tcp       --dport {{portnum}} -j DNAT --to-destination {{ip}}
+-A DOCKER   -i {{network['netif']}} -d {{ip_address}} -m udp       -p udp       --dport {{portnum}} -j DNAT --to-destination {{ip}}
         {%- else %}
--A DOCKER ! -i {{network['netif']}} -m {{proto}} -p {{proto}} --dport {{portnum}} -j DNAT --to-destination {{ip}}
+-A DOCKER ! -i {{network['netif']}}                   -m {{proto}} -p {{proto}} --dport {{portnum}} -j DNAT --to-destination {{ip}}
+-A DOCKER   -i {{network['netif']}} -d {{ip_address}} -m {{proto}} -p {{proto}} --dport {{portnum}} -j DNAT --to-destination {{ip}}
         {%- endif %}
       {%- endwith %}
     {%- endfor %}
   {%- endfor %}
 {%- endfor %}
+#
+# DNAT rules for HA proxy
+-A DOCKER_HA ! -i {{network['netif']}}                   -m tcp -p tcp --dport 80  -j DNAT --to-destination {{haproxy_ip}}
+-A DOCKER_HA ! -i {{network['netif']}}                   -m tcp -p tcp --dport 443 -j DNAT --to-destination {{haproxy_ip}}
+-A DOCKER_HA   -i {{network['netif']}} -d {{ip_address}} -m tcp -p tcp --dport 80  -j DNAT --to-destination {{haproxy_ip}}
+-A DOCKER_HA   -i {{network['netif']}} -d {{ip_address}} -m tcp -p tcp --dport 443 -j DNAT --to-destination {{haproxy_ip}}
+
 
 # Packets destined for local addresses may be forwarded to containers
 -A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER

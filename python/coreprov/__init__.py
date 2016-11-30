@@ -246,6 +246,12 @@ class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, Syslog, HAProxy):
         if self._args.init_ipa or self._args.install_ipa:
             self.init_ipa_service(host)
 
+        if self._args.install_resolv_conf or self._args.install_ipa:
+            self.install_resolv_conf(host)
+
+        if self._args.install_ipa_client:
+            self.install_ipa_client(host)
+
         if self._args.show_ipa_hosts:
             print "Server:  %s" % self.freeipa_master
             print "Replicas:  %s" % ', '.join(self.freeipa_replicas)
@@ -276,10 +282,10 @@ class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, Syslog, HAProxy):
             if self._args.start_haproxy or self._args.install_haproxy:
                 self.start_haproxy_server(host)
 
-        # Testing
+        # # Testing
         # for host in hosts:
         #     # self.kinit_admin(host)
-        #     self.ipa_set_default_login_shell(host)
+        #     self.install_resolv_conf(host)
 
 
 ########################################################################
@@ -482,6 +488,12 @@ class CLIArgParser(argparse.ArgumentParser):
         freeipa_group.add_argument(
             '--init-ipa', action='store_true',
             help='Run "ipa-{server,replica}-install" on FreeIPA server/replica')
+        freeipa_group.add_argument(
+            '--install-resolv-conf', action='store_true',
+            help='Install /etc/resolv.conf pointing to IPA on host')
+        freeipa_group.add_argument(
+            '--install-ipa-client', action='store_true',
+            help='Install IPA client container on FreeIPA server/replica')
         freeipa_group.add_argument(
             '--show-ipa-hosts', action='store_true',
             help='Print FreeIPA server and replicas')

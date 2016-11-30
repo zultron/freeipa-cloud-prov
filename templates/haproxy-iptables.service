@@ -1,0 +1,15 @@
+[Unit]
+Description=Direct HTTP/S requests to HAProxy
+BindsTo=haproxy.service
+After=haproxy.service
+
+[Service]
+# Get CoreOS environmental variables
+EnvironmentFile=/etc/environment
+EnvironmentFile=/media/state/system.env
+
+ExecStart=iptables -t nat -I PREROUTING -m addrtype --dst-type LOCAL -j DOCKER_HA
+ExecStop=iptables -t nat -D PREROUTING -m addrtype --dst-type LOCAL -j DOCKER_HA
+
+[X-Fleet]
+Global=true

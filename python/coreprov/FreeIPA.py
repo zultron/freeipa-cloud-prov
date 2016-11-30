@@ -5,6 +5,7 @@ from .RemoteControl import RemoteControl
 
 class FreeIPA(RemoteControl):
     freeipa_docker_image = 'adelton/freeipa-server:centos-7'
+    freeipa_docker_client_image = 'zultron/docker-freeipa:centos-7-client'
     freeipa_data_dir = '/media/state/ipa-data'
 
     def pull_freeipa_docker_image(self, host):
@@ -176,7 +177,42 @@ class FreeIPA(RemoteControl):
 
     def kinit_admin(self, host):
         ip = self.to_ip(host)
+        print "Initializing kerberos ticket for admin on %s" % host
         self.remote_docker_exec(
             ip, 'ipa',
             'bash -c \"echo %s | kinit admin\" >/dev/null' %
             self.admin_password, quiet=False)
+
+    def install_resolv_conf(self, host):
+        ip = self.to_ip(host)
+        print "Installing /etc/resolv.conf on %s" % host
+        # resolv_conf = ''.join(
+        #     [ 'nameserver %s\n' % self.hconfig(h, 'ip_address')
+        #       for h in self.hosts ])
+        resolv_conf = 'nameserver %s\n' % self.hconfig(host, 'ipa_ip')
+        self.put_file(ip, resolv_conf, '/tmp/resolv.conf')
+        self.remote_sudo('mv /tmp/resolv.conf /etc/resolv.conf', ip)
+
+    def install_ipa_client(self, host):
+        ip = self.to_ip(host)
+
+        print "Installing IPA client on host %s" % host
+        self.remote_run(
+            "docker pull %s" % self.freeipa_docker_client_image, ip)
+        install_opts = "-N --force-join --force --server=%s" \
+            " --fixed-primary --domain=zultron.com" % host
+        self.remote_run_and_grep(
+            "docker run -it --privileged --rm"
+            "    --name ipa_client"
+            "    -e IPA_PORT_53_UDP_ADDR=%(ip_address)s"
+            "    -e PASSWORD=%(admin_password)s"
+            "    -e IPA_PORT_80_TCP_ADDR=%(ip_address)s"
+            "    -e IPA_CLIENT_INSTALL_OPTS=\"%(install_opts)s\""
+            "    -h ipaclient-%(hostname)s"
+            "    --net %(network_name)s --ip %(ipa_client_ip)s"
+            "    %(image)s" %
+            self.substitutions(host, extra_substitutions=dict(
+                image = self.freeipa_docker_client_image,
+                install_opts = install_opts)),
+            ip, success_re=r'FreeIPA-enrolled', fail_re=r'docker: Error',
+            get_pty=True)
