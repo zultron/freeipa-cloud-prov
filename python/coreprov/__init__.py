@@ -249,11 +249,15 @@ class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, Syslog, HAProxy):
         if self._args.install_resolv_conf or self._args.install_ipa:
             self.install_resolv_conf(host)
 
-        if self._args.install_ipa_client:
+        if self._args.install_ipa_client or self._args.install_ipa:
             self.install_ipa_client(host)
 
-        if self._args.ipa_client_start:
+        if self._args.ipa_client_start or self._args.install_ipa:
             self.ipa_client_start()
+
+        if self._args.ipa_init_dns or self._args.install_ipa:
+            for host in hosts:
+                self.ipa_init_dns(host)
 
         if self._args.ipa_client_exec:
             self.ipa_client_exec(self._args.ipa_client_exec)
@@ -292,7 +296,6 @@ class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, Syslog, HAProxy):
         # for host in hosts:
         #     # self.kinit_admin(host)
         #     self.install_resolv_conf(host)
-
 
 ########################################################################
 # CLI argument parsing
@@ -503,6 +506,9 @@ class CLIArgParser(argparse.ArgumentParser):
         freeipa_group.add_argument(
             '--ipa-client-start', action='store_true',
             help='Start IPA client container on FreeIPA server and kinit admin')
+        freeipa_group.add_argument(
+            '--ipa-init-dns', action='store_true',
+            help='Initialize DNS for IPA host with zone and container records')
         freeipa_group.add_argument(
             '--ipa-client-exec', action='store', metavar='COMMAND',
             help='Run command in IPA client container')

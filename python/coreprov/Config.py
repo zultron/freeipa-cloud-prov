@@ -95,10 +95,11 @@ class Config(object):
         return [ self.to_ip(h, bomb=bomb) for h in self.other_hosts(host)
                  if self.to_ip(h, bomb=bomb) is not None ]
 
-    def substitutions(self, host, extra_substitutions={}):
+    def substitutions(self, host, extra_substitutions={}, **kwargs):
         subs = self.__dict__.copy()
         subs.update(self.hosts[host])
         subs.update(extra_substitutions)
+        subs.update(kwargs)
         subs['hostname'] = host
         subs['num_hosts'] = len(self.hosts)
         subs['other_ips'] = ','.join(self.other_ips(host, bomb=False))
@@ -109,8 +110,8 @@ class Config(object):
         # pprint(subs)
         return subs
 
-    def render_jinja2(self, host, fname, extra_substitutions={}):
-        subs = self.substitutions(host, extra_substitutions)
+    def render_jinja2(self, host, fname, extra_substitutions={}, **kwargs):
+        subs = self.substitutions(host, extra_substitutions, **kwargs)
         tmpl = self._jenv.get_template(fname)
         return tmpl.render(**subs)
 

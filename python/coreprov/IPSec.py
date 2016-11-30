@@ -33,12 +33,12 @@ class ProvisionIPSec(CA):
         for rh in self.hosts:
             if rh == host:  continue
             res += self.render_jinja2(
-                host, 'ipsec-conn.conf', extra_substitutions=dict(
-                    conn_name='%s-to-%s' % (
-                        self.short_hostname(host), self.short_hostname(rh)),
-                    right_ip_address=self.to_ip(rh),
-                    right_hostname=rh,
-                ))
+                host, 'ipsec-conn.conf',
+                conn_name=('%s-to-%s' % 
+                           self.short_hostname(host), self.short_hostname(rh)),
+                right_ip_address=self.to_ip(rh),
+                right_hostname=rh,
+                )
         return res
 
     def print_ipsec_config(self, host):

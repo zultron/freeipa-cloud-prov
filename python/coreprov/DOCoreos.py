@@ -61,14 +61,13 @@ class DOCoreos(RemoteControl, CA):
             default_flow_style=False)
         return self.render_jinja2(
             hostname, 'cloud-config.yaml',
-            extra_substitutions=dict(
-                ssh_authorized_keys = keys,
-                serv_cert_file_path = self.serv_cert_file_path,
-                serv_key_file_path = self.serv_key_file_path,
-                clnt_cert_file_path = self.clnt_cert_file_path,
-                clnt_key_file_path = self.clnt_key_file_path,
-                ca_cert_file_path = self.ca_cert_file_path,
-            ))
+            ssh_authorized_keys = keys,
+            serv_cert_file_path = self.serv_cert_file_path,
+            serv_key_file_path = self.serv_key_file_path,
+            clnt_cert_file_path = self.clnt_cert_file_path,
+            clnt_key_file_path = self.clnt_key_file_path,
+            ca_cert_file_path = self.ca_cert_file_path,
+            )
 
     def get_droplet(self, name, raise_error=False):
         droplet = None
@@ -232,7 +231,7 @@ class DOCoreos(RemoteControl, CA):
         self.pickle_config()
         return a
 
-    def substitutions(self, host, extra_substitutions={}):
+    def substitutions(self, host, **kwargs):
         # Add extra metadata
         fleet_metadata = "region=%s" % self.hosts[host]['region']
         if self.hosts[host].get('ipa_role') == "server":
@@ -247,12 +246,11 @@ class DOCoreos(RemoteControl, CA):
                          if self.hosts[n]['ipa_role'] == 'replica' ]
 
         subs = super(DOCoreos, self).substitutions(
-            host, extra_substitutions=dict(
-                fleet_metadata=fleet_metadata,
-                replica_names=replica_names,
-                replica_ips=replica_ips,
-            ))
-        subs.update(extra_substitutions)
+            host,
+            fleet_metadata=fleet_metadata,
+            replica_names=replica_names,
+            replica_ips=replica_ips,
+            **kwargs)
         return subs
 
     def install_host_certs(self, hostname):

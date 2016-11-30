@@ -1,4 +1,4 @@
-import os, re
+import os, ipcalc
 from .RemoteControl import RemoteControl
 
 # https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/6/html/Identity_Management_Guide/install-command.html
@@ -208,30 +208,99 @@ class FreeIPA(RemoteControl):
             "    -e PASSWORD=%(admin_password)s"
             "    -e IPA_PORT_80_TCP_ADDR=%(ip_address)s"
             "    -e IPA_CLIENT_INSTALL_OPTS=\"%(install_opts)s\""
-            "    -h ipaclient-%(hostname)s"
-            "    --net %(network_name)s --ip %(ipa_client_ip)s"
+            "    -h ipaclient.%(local_zone)s"
+            "    --net %(network_name)s --ip %(ipaclient_ip)s"
             "    -v %(state_dir)s:/data"
             "    %(image)s" %
-            self.substitutions(host, extra_substitutions=dict(
-                image = self.freeipa_docker_client_image,
-                install_opts = install_opts)),
+            self.substitutions(
+                host,
+                image=self.freeipa_docker_client_image,
+                install_opts=install_opts,
+                local_zone=self.local_zone(host)),
             ip, success_re=r'FreeIPA-enrolled', fail_re=r'docker: Error',
             get_pty=True)
+        self.ipa_client_start(host)
 
-    def ipa_client_exec(self, command, **kwargs):
+    def ipa_client_exec(self, command, host=None, **kwargs):
+        if host is None:  host = self.freeipa_master
         return self.remote_docker_exec(
-            self.freeipa_master, 'ipaclient', command, **kwargs)
+            host, 'ipaclient', command, **kwargs)
 
-    def ipa_client_start(self):
-        print "Starting IPA client container on IPA server %s" % \
-            self.freeipa_master
-        self.remote_run("docker start ipaclient", self.freeipa_master)
+    def ipa_client_start(self, host=None):
+        if host is None:  host = self.freeipa_master
+        print "Starting IPA client container on IPA host %s" % host
+        self.remote_run("docker start ipaclient", host)
         self.ipa_client_exec(
             "bash -c 'echo %s | kinit admin'" % self.admin_password,
             read_stdout=False)
         self.ipa_client_exec("klist")
 
-    def add_local_dns_entry(self, name, arecord):
-        ip = self.to_ip(self.freeipa_master)
-        print "Adding DNS records for %s (%s)" % (name, arecord)
-        
+    def ptr_record(self, ip):
+        (a,b,c,d) = ip.split('.')
+        return (d, "%s.%s.%s.in-addr.arpa" % (c,b,a))
+
+    def zone_and_host(self, name):
+        return list(reversed(name.split('.',1)))
+
+    def dns_local_zone_add(self, name):
+        print "Adding DNS local zone for %s" % (name)
+        self.ipa_client_exec(
+            "ipa dnszone-add %s --forward-policy=none" % name)
+
+    def dns_a_record_del(self, name, ip=None):
+        zone, host = self.zone_and_host(name)
+        if ip is None:
+            print "Removing DNS A records for %s" % (name)
+            self.ipa_client_exec(
+                "ipa dnsrecord-del %s %s --del-all" % (zone, host))
+        else:
+            print "Removing DNS A record for %s -> %s" % (name, ip)
+            self.ipa_client_exec(
+                "ipa dnsrecord-del %s %s --a-rec=%s" % (zone, host, ip))
+
+    def dns_ptr_record_del(self, ip, name=None):
+        last_octet, zone = self.ptr_record(ip)
+        if name is None:
+            print "Removing DNS ptr records for %s" % (ip)
+            self.ipa_client_exec(
+                "ipa dnsrecord-del %s %s --del-all" %
+                (zone, last_octet))
+        else:
+            print "Removing DNS ptr record for %s -> %s" % (ip, name)
+            self.ipa_client_exec(
+                "ipa dnsrecord-del %s %s --ptr-rec=%s." %
+                (zone, last_octet, name))
+
+    def dns_local_host_add(self, name, ip, reverse=True):
+        print "Adding DNS records for %s (%s)" % (name, ip)
+        (zone, short) = self.zone_and_host(name)
+        reverse_arg = "--a-create-reverse" if reverse else ""
+        self.ipa_client_exec(
+            "ipa dnsrecord-add %s %s --a-ip-address=%s %s" %
+            (zone, short, ip, reverse_arg))
+
+    def local_zone(self, host, name=None):
+        if name is not None:
+            return '%s.%s' % (name, self.local_zone(host))
+        else:
+            return '%s.%s' % (self.hconfig(host, 'region'), self.domain_name)
+
+    def ipa_init_dns(self, host):
+        self.dns_local_zone_add(self.local_zone(host))
+        # Clear auto-added IPA local reverse IP entry
+        self.dns_ptr_record_del(self.hconfig(host, 'ipa_ip'), host)
+        # Fix auto-added `ipa-ca` entry
+        self.dns_a_record_del('ipa-ca.%s' % self.domain_name,
+                              self.hconfig(host, 'ipa_ip'))
+        self.dns_local_host_add('ipa-ca.%s' % self.domain_name,
+                                self.hconfig(host, 'ip_address'),
+                                reverse=False)
+        # Add host internal record host.domain -> x.x.x.1
+        self.dns_local_host_add(
+            self.local_zone(host, self.zone_and_host(host)[1]),
+            ipcalc.Network(self.hconfig(host,'network')['subnet'])[1])
+        # Add basic containers
+        for name in ('ipa', 'syslog', 'haproxy', 'ipaclient'):
+            self.dns_local_host_add(
+                self.local_zone(host, name),
+                self.hconfig(host, '%s_ip' % name))
