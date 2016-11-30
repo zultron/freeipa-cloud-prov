@@ -153,35 +153,6 @@ These should be added to automation
 
         ipa-replica-manage connect h10.zultron.com h20.zultron.com
 
-- Set default login shell
-
-        ipa config-mod --defaultshell /bin/bash
-
-- [FreeIPA hardening][freeipa-hardening]
-  - Either block Internet access, or
-  - Disable zone transfers
-
-          ipa dnszone-mod --allow-transfer="none;"
-
-  - Disable recursion in `/data/etc/named.conf` (followed by
-    `systemctl restart named-pkcs11.service`)
-
-          options {
-              allow-recursion {"none";};
-          }
-
-  - Disable unauth'd LDAP access
-
-          ldapmodify -c -x -H ldap://h00.zultron.com \
-              -D "cn=Directory Manager" -W << EOF
-          dn: cn=config
-          changetype: modify
-          replace: nsslapd-allow-anonymous-access
-          nsslapd-allow-anonymous-access: rootdse
-
-          EOF
-
-[freeipa-hardening]: https://www.redhat.com/archives/freeipa-users/2014-April/msg00246.html
 
 ## DNS
 
@@ -205,3 +176,25 @@ Add DNS zone:
         --forward-policy=none --admin-email=hostmaster@zultron.com
     [root@h00 /]# ipa dnszone-add fra1.zultron.com \
         --forward-policy=none --admin-email=hostmaster@zultron.com
+
+## Redo stuff
+
+For each FreeIPA server (first) and replicas (later):
+- Set up server data in config.yaml
+- Provision droplet
+  - `./provision --create-volumes --provision`
+- Create & init volume
+- Install docker network
+  - `./provision --init-docker-network`
+- For all hosts: /etc/hosts, known-hosts, iptables
+  - `./provision --init-iptables --install-known-hosts --update-etc-hosts`
+- If replica:  Add droplet to cluster
+- Install FreeIPA server/replica
+  - `./provision --pull-ipa-image --install-ipa-config --init-ipa`
+- Install FreeIPA client
+- Tweak IPA security, etc.
+- Set up IPA:  droplet DNS zone; delegations to client
+- Generate & install etcd certs from client
+- Set up FreeIPA service
+- Set up syslog service
+- Set up haproxy service

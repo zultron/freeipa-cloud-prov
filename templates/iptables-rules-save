@@ -41,12 +41,14 @@
 # SSH
 -A INPUT -p tcp -m tcp --dport 22 -j ACCEPT
 
+{%- if other_ips %}
 # etcd2 (client and peer)
 -A INPUT -s {{other_ips}} -p tcp -m tcp --dport 2379 -j ACCEPT
 -A INPUT -s {{other_ips}} -p tcp -m tcp --dport 2380 -j ACCEPT
 # Legacy port
 # -A INPUT -s {{other_ips}} -p tcp -m tcp --dport 4001 -j ACCEPT
 
+{%- endif %}
 # # IPSec
 # -A INPUT -p udp -m udp --dport 4500 -j ACCEPT
 # -A INPUT -p udp -m udp --dport 500 -j ACCEPT

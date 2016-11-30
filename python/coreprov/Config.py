@@ -106,26 +106,13 @@ class Config(object):
         # pprint(subs)
         return subs
 
-    def render_file(self, host, fname, extra_substitutions={}):
-        subs = self.substitutions(host, extra_substitutions)
-        in_path = self.template_file_path(fname)
-        res = ''
-        with open(in_path, 'r') as inf:
-            for line in inf:
-                res += line.format(**subs)
-        return res
-
-    def render_file_to_stdout(self, *args, **kwargs):
-        # sys.stdout.write(self.render_file(*args, **kwargs))
-        print(self.render_file(*args, **kwargs))
-
     def render_jinja2(self, host, fname, extra_substitutions={}):
         subs = self.substitutions(host, extra_substitutions)
         tmpl = self._jenv.get_template(fname)
         return tmpl.render(**subs)
 
     def render_jinja2_to_stdout(self, *args, **kwargs):
-        # sys.stdout.write(self.render_file(*args, **kwargs))
+        # sys.stdout.write(self.render_jinja2(*args, **kwargs))
         print(self.render_jinja2(*args, **kwargs))
 
     def destroy_pickle(self):

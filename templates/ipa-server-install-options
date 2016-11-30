@@ -1,7 +1,7 @@
---hostname={hostname}
---ds-password={ds_password}
---admin-password={admin_password}
+--hostname={{hostname}}
+--ds-password={{ds_password}}
+--admin-password={{admin_password}}
 --setup-dns
 --no-forwarders
 --unattended
---realm={realm}
+--realm={{realm}}

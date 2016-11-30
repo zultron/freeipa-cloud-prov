@@ -8,10 +8,9 @@
 # `drop-ins`:
 #   https://coreos.com/os/docs/latest/using-systemd-drop-in-units.html
 
-hostname: {hostname}
+hostname: {{hostname}}
 
-ssh_authorized_keys:
-  # For user "core"; filled out by templating code
+{{ssh_authorized_keys}}
 
 coreos:
   update:
@@ -21,7 +20,7 @@ coreos:
     # generate a new token for each unique cluster:
     # curl -w "\n" "https://discovery.etcd.io/new?size=3"
     #
-    discovery: {discovery_url}
+    discovery: {{discovery_url}}
     # multi-region and multi-cloud deployments need to use $public_ipv4
     # advertise-client-urls: https://$public_ipv4:2379,https://$public_ipv4:4001
     advertise-client-urls: https://$public_ipv4:2379
@@ -36,27 +35,27 @@ coreos:
     heartbeat-interval: 300
     election-timeout: 3000
     # SSL cert file locations
-    cert_file: /media/state/etcd/etcd.pem
-    key_file: /media/state/etcd/etcd-key.pem
-    trusted_ca_file: /media/state/etcd/ca.pem
+    cert_file: {{serv_cert_file_path}}
+    key_file: {{serv_key_file_path}}
+    trusted_ca_file: {{ca_cert_file_path}}
     client_cert_auth: true
-    peer_cert_file: /media/state/etcd/etcd.pem
-    peer_key_file: /media/state/etcd/etcd-key.pem
-    peer_trusted_ca_file: /media/state/etcd/ca.pem
+    peer_cert_file: {{clnt_cert_file_path}}
+    peer_key_file: {{clnt_key_file_path}}
+    peer_trusted_ca_file: {{ca_cert_file_path}}
     peer_client_cert_auth: true
   fleet:
-    metadata: {fleet_metadata}
+    metadata: {{fleet_metadata}}
     # Use HTTPS on port 2379:
     etcd_servers: https://$public_ipv4:2379
     public-ip: $public_ipv4   # used for fleetctl ssh command
-    etcd_cafile: /media/state/etcd/ca.pem
-    etcd_certfile: /media/state/etcd/client.pem
-    etcd_keyfile: /media/state/etcd/client-key.pem
+    etcd_cafile: {{ca_cert_file_path}}
+    etcd_certfile: {{clnt_cert_file_path}}
+    etcd_keyfile: {{clnt_key_file_path}}
   locksmith:
     endpoint: https://$public_ipv4:2379
-    etcd_cafile: /media/state/etcd/ca.pem
-    etcd_certfile: /media/state/etcd/client.pem
-    etcd_keyfile: /media/state/etcd/client-key.pem
+    etcd_cafile: {{ca_cert_file_path}}
+    etcd_certfile: {{clnt_cert_file_path}}
+    etcd_keyfile: {{clnt_key_file_path}}
   units:
     #######################################
     # base daemons
@@ -95,9 +94,9 @@ coreos:
 
         [Install]
         WantedBy=multi-user.target
-  # Load IPSec kernel module
-  # https://coreos.com/os/docs/latest/other-settings.html#via-cloud-init
-  # Also see below /etc/modules-load.d/af_key.conf
+    # Load IPSec kernel module
+    # https://coreos.com/os/docs/latest/other-settings.html#via-cloud-init
+    # Also see below /etc/modules-load.d/af_key.conf
     - name: systemd-modules-load.service
       command: restart
 
@@ -118,21 +117,6 @@ write_files:
       TOOLBOX_DOCKER_IMAGE=debian
       TOOLBOX_USER=root
 
-  # done in coreos/etcd2 above
-  # # tell etcd2 and fleet where our certificates are going to live:
-  # - path: /run/systemd/system/etcd2.service.d/30-certificates.conf
-  #   permissions: 0644
-  #   content: |
-  #     [Service]
-  #     # client environment variables
-  #     Environment=ETCD_CA_FILE=/media/state/etcd/ca.pem
-  #     Environment=ETCD_CERT_FILE=/media/state/etcd/etcd.pem
-  #     Environment=ETCD_KEY_FILE=/media/state/etcd/etcd-key.pem
-  #     # peer environment variables
-  #     Environment=ETCD_PEER_CA_FILE=/media/state/etcd/ca.pem
-  #     Environment=ETCD_PEER_CERT_FILE=/media/state/etcd/etcd.pem
-  #     Environment=ETCD_PEER_KEY_FILE=/media/state/etcd/etcd-key.pem
-
   # This seems to break provisioning
   # - path: /usr/share/skel/.bashrc
   #   permissions: 0644
@@ -141,6 +125,6 @@ write_files:
   #     #
   #     # Set environment so etcdctl works over SSL
   #     export ETCDCTL_ENDPOINT=https://127.0.0.1:2379/
-  #     export ETCDCTL_CERT_FILE=/media/state/etcd/client.pem
-  #     export ETCDCTL_KEY_FILE=/media/state/etcd/client-key.pem
-  #     export ETCDCTL_CA_FILE=/media/state/etcd/ca.pem
+  #     export ETCDCTL_CERT_FILE={{clnt_cert_file_path}}
+  #     export ETCDCTL_KEY_FILE={{clnt_key_file_path}}
+  #     export ETCDCTL_CA_FILE={{ca_cert_file_path}}

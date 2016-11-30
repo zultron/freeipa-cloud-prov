@@ -84,10 +84,6 @@ class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, Syslog, HAProxy):
         if self._args.dump_config:
             self.dump_config()
 
-        if self._args.render_file:
-            for host in hosts:
-                self.render_file_to_stdout(host, self._args.render_file)
-
         if self._args.render_jinja2:
             for host in hosts:
                 self.render_jinja2_to_stdout(host, self._args.render_jinja2)
@@ -248,7 +244,7 @@ class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, Syslog, HAProxy):
                 self.install_freeipa_config(host)
 
         if self._args.init_ipa or self._args.install_ipa:
-            self.install_ipa(host)
+            self.init_ipa_service(host)
 
         if self._args.show_ipa_hosts:
             print "Server:  %s" % self.freeipa_master
@@ -279,6 +275,12 @@ class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, Syslog, HAProxy):
 
             if self._args.start_haproxy or self._args.install_haproxy:
                 self.start_haproxy_server(host)
+
+        # Testing
+        # for host in hosts:
+        #     # self.kinit_admin(host)
+        #     self.ipa_set_default_login_shell(host)
+
 
 ########################################################################
 # CLI argument parsing
@@ -331,10 +333,6 @@ class CLIArgParser(argparse.ArgumentParser):
         self.add_argument(
             'hosts', metavar='HOST', nargs='*',
             help='Hostnames to act on (all)')
-
-        self.add_argument(
-            '--render-file', metavar='FILENAME',
-            help='render a file from the "templates" directory')
 
         self.add_argument(
             '--render-jinja2', metavar='FILENAME',

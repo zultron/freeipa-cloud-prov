@@ -34,18 +34,108 @@ class FreeIPA(RemoteControl):
 
     def install_freeipa_config(self, host):
         ip = self.to_ip(host)
-        print "Setting up FreeIPA %s %s" % \
-            ('server' if self.is_master(host) else 'replica', host)
-
-        self.remote_sudo('install -d -o core %s' % self.freeipa_data_dir, ip)
 
         if self.is_master(host):
+            fname = 'ipa-server-install-options'
+        else:
+            fname = 'ipa-replica-install-options'
 
-            print "Installing ipa-server-install-options"
-            self.put_file(
-                ip, self.render_file(host, 'ipa-server-install-options'),
-                self.freeipa_file_path('ipa-server-install-options'))
+        print "Installing %s on %s" % (fname, host)
 
+        self.remote_sudo('install -d -o core %s' % self.freeipa_data_dir, ip)
+        self.put_file(
+            ip, self.render_jinja2(host, fname), self.freeipa_file_path(fname))
+
+    def init_ipa_service(self, host):
+        ip = self.to_ip(host)
+
+        print 'Running FreeIPA install on %s' % host
+        self.remote_run(
+            "docker run -d"
+            "    --hostname %(hostname)s"
+            "    --name ipa"
+            "    --volume /media/state/ipa-data:/data"
+            "    --volume /sys/fs/cgroup:/sys/fs/cgroup:ro"
+            "    --net cnet --ip %(ipa_ip)s"
+            "    -e IPA_SERVER_IP=%(ip_address)s"
+            "    adelton/freeipa-server:centos-7" %
+            self.substitutions(host),
+            ip)
+        self.remote_run_and_grep(
+            "docker attach ipa",
+            ip, timeout=20*60,
+            success_re=r'FreeIPA server configured\.',
+            fail_re=r'Failed with result')
+        self.install_rndc_config(host)
+        self.harden_named(host)
+        self.harden_ldap(host)
+        self.kinit_admin(host)
+        self.named_disable_zone_transfers(host)
+
+        # Simple functionality test
+        # kinit admin
+        # ipa user-find admin
+
+
+    def install_rndc_config(self, host):
+        ip = self.to_ip(host)
+        print 'Installing rndc config and key on %s' % host
+
+        self.remote_run('docker exec -i ipa rndc-confgen -a', ip)
+        self.remote_run('docker exec -i ipa restorecon /etc/rndc.key', ip)
+
+    # Hardening IPA:
+    # https://www.redhat.com/archives/freeipa-users/2014-April/msg00246.html
+    def harden_named(self, host):
+        ip = self.to_ip(host)
+        print "Restricting DNS recursion and zone transfers on %s" % host
+        acl="127.0.0.1; 10.0.0.0/8;"
+        self.remote_docker_exec(
+            ip, 'ipa',
+            "sed -i /data/etc/named.conf"
+            " -e '/allow-recursion/ s,any;,%s,'"
+            " -e '/allow-recursion/ a\        allow-transfer { none; };'" %
+            acl, quiet=False)
+
+        self.remote_docker_exec(
+            ip, 'ipa',
+            "systemctl restart named-pkcs11.service",
+            quiet=False)
+
+    def harden_ldap(self, host):
+        ip = self.to_ip(host)
+        print "Restricting LDAP anonymous binds on %s" % host
+        input = (
+            "dn: cn=config\n"
+            "changetype: modify\n"
+            "replace: nsslapd-allow-anonymous-access\n"
+            "nsslapd-allow-anonymous-access: rootdse\n"
+            "\n")
+        self.remote_run(
+            'echo "%s" | docker exec -i ipa '
+            'ldapmodify -c -x -D "cn=Directory Manager" -w %s' %
+            (input, self.ds_password), ip, stdin_in=input, get_pty=True)
+
+    def named_disable_zone_transfers(self, host, domain=None):
+        ip = self.to_ip(host)
+        if domain is None:  domain = self.domain_name
+        print "Disabling DNS zone transfers on %s" % host
+        self.remote_docker_exec(
+            ip, 'ipa',
+            "ipa dnszone-mod %s --allow-transfer='none;'" % domain,
+            quiet=False)
+
+    def ipa_set_default_login_shell(self, host):
+        ip = self.to_ip(host)
+        print "Setting default shell to /bin/bash"
+        self.remote_docker_exec(
+            ip, 'ipa', "ipa config-mod --defaultshell /bin/bash",
+            quiet=False)
+
+    def install_ipa_service(self, host):
+        ip = self.to_ip(host)
+
+        if host == self.freeipa_master:
             print "Installing fleet ipa.service unit file"
             self.put_file(
                 ip, self.render_jinja2(host, 'ipa.service'),
@@ -56,23 +146,6 @@ class FreeIPA(RemoteControl):
             self.remote_run('fleetctl load ipa.service', ip)
 
         else:
-
-            self.put_file(
-                ip, self.render_file(host, 'ipa-replica-install-options'),
-                os.path.join(self.freeipa_data_dir,
-                             'ipa-replica-install-options'))
-
-    def install_rndc_config(self, host):
-        ip = self.to_ip(self.freeipa_master)
-        print 'Installing rndc config and key on %s' % host
-
-        self.remote_run('docker exec -i ipa rndc-confgen -a', ip)
-        self.remote_run('docker exec -i ipa restorecon /etc/rndc.key', ip)
-
-    def install_ipa(self, host):
-        ip = self.to_ip(host)
-
-        if host != self.freeipa_master:
             server_ip = self.to_ip(self.freeipa_master)
             fname = 'replica-info-%s.gpg' % host
             src = '%s/var/lib/ipa/%s' % (self.freeipa_data_dir, fname)
@@ -102,7 +175,8 @@ class FreeIPA(RemoteControl):
         # ipa user-find admin
 
     def kinit_admin(self, host):
+        ip = self.to_ip(host)
         self.remote_docker_exec(
-            host, 'ipa',
+            ip, 'ipa',
             'bash -c \"echo %s | kinit admin\" >/dev/null' %
             self.admin_password, quiet=False)

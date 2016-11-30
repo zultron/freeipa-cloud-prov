@@ -55,12 +55,20 @@ class DOCoreos(RemoteControl, CA):
 
     def cloud_config(self, hostname):
         self.get_discovery_url()
-        rawfile = self.render_file(hostname, 'cloud-config.yaml')
-        conf = yaml.load(rawfile)
-        conf['ssh_authorized_keys'] = [ str(k.public_key) \
-                                        for k in self.ssh_keys ]
-        # pprint(conf)
-        return '#cloud-config\n' + yaml.dump(conf, default_flow_style=False)
+        keys = yaml.dump(
+            dict(ssh_authorized_keys=[
+                str(k.public_key) for k in self.ssh_keys ]),
+            default_flow_style=False)
+        return self.render_jinja2(
+            hostname, 'cloud-config.yaml',
+            extra_substitutions=dict(
+                ssh_authorized_keys = keys,
+                serv_cert_file_path = self.serv_cert_file_path,
+                serv_key_file_path = self.serv_key_file_path,
+                clnt_cert_file_path = self.clnt_cert_file_path,
+                clnt_key_file_path = self.clnt_key_file_path,
+                ca_cert_file_path = self.ca_cert_file_path,
+            ))
 
     def get_droplet(self, name, raise_error=False):
         droplet = None
@@ -263,18 +271,6 @@ class DOCoreos(RemoteControl, CA):
                       self.clnt_key_file_path)
         self.put_file(ip, self.ca_cert, self.ca_cert_file_path, mode=0644)
         self.remote_sudo("chown -R etcd:etcd %s" % self.etcd_config_path, ip)
-
-    def render_host_config(self, host):
-        fnames = ["init.sh"]
-        if self.hosts[host].get('ipa_role') == "server":
-            fnames += ["ipa-replica@.service",
-                       "ipa-server-install-options",
-                       "ipa-server.service"]
-        if self.hosts[host].get('ipa_role') == "replica":
-            fnames += ["ipa-replica-install-options"]
-        for fname in fnames:
-            self.render_file(host, fname)
-                
 
     def check_fleet_status(self, host):
         ip = self.get_ip_addr(host)

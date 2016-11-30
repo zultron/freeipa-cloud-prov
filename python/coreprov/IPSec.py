@@ -29,10 +29,10 @@ class ProvisionIPSec(CA):
                       '/media/state/ipsec/cacerts/ca-cert.pem')
 
     def gen_ipsec_config(self, host):
-        res = self.render_file(host, 'ipsec.conf')
+        res = self.render_jinja2(host, 'ipsec.conf')
         for rh in self.hosts:
             if rh == host:  continue
-            res += self.render_file(
+            res += self.render_jinja2(
                 host, 'ipsec-conn.conf', extra_substitutions=dict(
                     conn_name='%s-to-%s' % (
                         self.short_hostname(host), self.short_hostname(rh)),
@@ -43,7 +43,7 @@ class ProvisionIPSec(CA):
 
     def print_ipsec_config(self, host):
         print "ipsec.secrets:"
-        print self.render_file(host, 'ipsec.secrets')
+        print self.render_jinja2(host, 'ipsec.secrets')
         print
         print "ipsec.conf:"
         print self.gen_ipsec_config(host)
@@ -51,18 +51,18 @@ class ProvisionIPSec(CA):
     def install_ipsec_config(self, host):
         ip = self.to_ip(host)
         print "Installing IPSec configuration files on host %s" % host
-        self.put_file(ip, self.render_file(host, 'ipsec.secrets'),
+        self.put_file(ip, self.render_jinja2(host, 'ipsec.secrets'),
                       '/media/state/ipsec/ipsec.secrets')
         self.put_file(ip, self.gen_ipsec_config(host),
                       '/media/state/ipsec/ipsec.conf')
-        self.put_file(ip, self.render_file(host, 'strongswan.conf'),
+        self.put_file(ip, self.render_jinja2(host, 'strongswan.conf'),
                       '/media/state/ipsec/strongswan.conf')
 
     def load_ipsec_unit(self, host=None):
         if host is None: host = self.hosts.keys()[0]
         ip = self.to_ip(host)
         print "Loading ipsec.service unit"
-        self.put_file(ip, self.render_file(host, 'ipsec.service'),
+        self.put_file(ip, self.render_jinja2(host, 'ipsec.service'),
                       '/media/state/ipsec/ipsec.service')
         self.remote_run('fleetctl submit /media/state/ipsec/ipsec.service', ip)
         self.remote_run('fleetctl load ipsec.service', ip)
