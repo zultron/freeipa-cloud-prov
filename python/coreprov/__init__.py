@@ -252,6 +252,12 @@ class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, Syslog, HAProxy):
         if self._args.install_ipa_client:
             self.install_ipa_client(host)
 
+        if self._args.ipa_client_start:
+            self.ipa_client_start()
+
+        if self._args.ipa_client_exec:
+            self.ipa_client_exec(self._args.ipa_client_exec)
+
         if self._args.show_ipa_hosts:
             print "Server:  %s" % self.freeipa_master
             print "Replicas:  %s" % ', '.join(self.freeipa_replicas)
@@ -494,6 +500,12 @@ class CLIArgParser(argparse.ArgumentParser):
         freeipa_group.add_argument(
             '--install-ipa-client', action='store_true',
             help='Install IPA client container on FreeIPA server/replica')
+        freeipa_group.add_argument(
+            '--ipa-client-start', action='store_true',
+            help='Start IPA client container on FreeIPA server and kinit admin')
+        freeipa_group.add_argument(
+            '--ipa-client-exec', action='store', metavar='COMMAND',
+            help='Run command in IPA client container')
         freeipa_group.add_argument(
             '--show-ipa-hosts', action='store_true',
             help='Print FreeIPA server and replicas')

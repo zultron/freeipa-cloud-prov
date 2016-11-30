@@ -102,6 +102,7 @@ class Config(object):
         subs['hostname'] = host
         subs['num_hosts'] = len(self.hosts)
         subs['other_ips'] = ','.join(self.other_ips(host, bomb=False))
+        subs['state_dir'] = self.state_dir
         for key, val in self.hconfig(host, 'network').items():
             subs['network_%s' % key] = val
         # print "substitutions for %s:" % host

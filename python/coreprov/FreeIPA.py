@@ -5,8 +5,8 @@ from .RemoteControl import RemoteControl
 
 class FreeIPA(RemoteControl):
     freeipa_docker_image = 'adelton/freeipa-server:centos-7'
-    freeipa_docker_client_image = 'zultron/docker-freeipa:centos-7-client'
-    freeipa_data_dir = '/media/state/ipa-data'
+    freeipa_docker_client_image = 'zultron/freeipa-cloud-prov:ipaclient'
+    freeipa_data_dir = '%s/ipa-data' % RemoteControl.state_dir
 
     def pull_freeipa_docker_image(self, host):
         ip = self.to_ip(host)
@@ -202,17 +202,36 @@ class FreeIPA(RemoteControl):
         install_opts = "-N --force-join --force --server=%s" \
             " --fixed-primary --domain=zultron.com" % host
         self.remote_run_and_grep(
-            "docker run -it --privileged --rm"
-            "    --name ipa_client"
+            "docker run -it --privileged"
+            "    --name ipaclient"
             "    -e IPA_PORT_53_UDP_ADDR=%(ip_address)s"
             "    -e PASSWORD=%(admin_password)s"
             "    -e IPA_PORT_80_TCP_ADDR=%(ip_address)s"
             "    -e IPA_CLIENT_INSTALL_OPTS=\"%(install_opts)s\""
             "    -h ipaclient-%(hostname)s"
             "    --net %(network_name)s --ip %(ipa_client_ip)s"
+            "    -v %(state_dir)s:/data"
             "    %(image)s" %
             self.substitutions(host, extra_substitutions=dict(
                 image = self.freeipa_docker_client_image,
                 install_opts = install_opts)),
             ip, success_re=r'FreeIPA-enrolled', fail_re=r'docker: Error',
             get_pty=True)
+
+    def ipa_client_exec(self, command, **kwargs):
+        return self.remote_docker_exec(
+            self.freeipa_master, 'ipaclient', command, **kwargs)
+
+    def ipa_client_start(self):
+        print "Starting IPA client container on IPA server %s" % \
+            self.freeipa_master
+        self.remote_run("docker start ipaclient", self.freeipa_master)
+        self.ipa_client_exec(
+            "bash -c 'echo %s | kinit admin'" % self.admin_password,
+            read_stdout=False)
+        self.ipa_client_exec("klist")
+
+    def add_local_dns_entry(self, name, arecord):
+        ip = self.to_ip(self.freeipa_master)
+        print "Adding DNS records for %s (%s)" % (name, arecord)
+        
