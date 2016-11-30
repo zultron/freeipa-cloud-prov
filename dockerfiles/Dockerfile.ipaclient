@@ -28,7 +28,5 @@ RUN pip install \
 RUN groupadd -g 500 core
 RUN useradd -M -u 500 -g 500 --shell /bin/bash core
 
-USER core
-
 VOLUME /home/core
 WORKDIR /home/core
