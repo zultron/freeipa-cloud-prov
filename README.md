@@ -47,12 +47,18 @@ configure FreeIPA:
 
 [paramiko]: http://docs.paramiko.org/en/2.0/index.html
 
+- [`jinja2` documentation][jinja2-docs]
+
+[jinja2-docs]: http://jinja.pocoo.org/docs/dev/
+
 - [CoreOS][coreos]:
   - Basic configuration:
 	- [Running CoreOS on DigitalOcean tutorial][coreos-do]
 	- [CoreOS `cloud-config`][cloud-config] and
 	  [validator][coreos-cloud-config-validate]
 	- [`etcd2` options][etcd2-options]
+	- [CoreOS clustering][coreos-clustering]:  "static" section
+	- [CoreOS cluster reconfiguration][coreos-cluster-reconfig]
   - SSL on CoreOS:
 	- [SSL Certificate Authority][coreos-ca]
     - [`etcd2` SSL][coreos-etcd-ssl]
@@ -69,6 +75,8 @@ configure FreeIPA:
 [cloud-config]: https://coreos.com/os/docs/latest/cloud-config.html
 [coreos-cloud-config-validate]: https://coreos.com/validate/
 [etcd2-options]: https://github.com/coreos/etcd/blob/master/Documentation/v2/configuration.md
+[coreos-clustering]: https://coreos.com/etcd/docs/latest/clustering.html
+[coreos-cluster-reconfig]: https://coreos.com/etcd/docs/latest/etcd-live-cluster-reconfiguration.html
 [coreos-ca]: https://coreos.com/os/docs/latest/generate-self-signed-certificates.html
 [coreos-etcd-ssl]: https://coreos.com/etcd/docs/latest/etcd-live-http-to-https-migration.html
 [coreos-clients-ssl]: https://coreos.com/etcd/docs/latest/tls-etcd-clients.html
@@ -90,26 +98,43 @@ configure FreeIPA:
 
 - [FreeIPA][freeipa]:
   - [FreeIPA in Docker][freeipa-docker]
+  - [FreeIPA client in Docker][freeipa-docker-client]
   - Man-pages:
 	- [ipa-server-install][ipa-server-install-man]
 	- [ipa-replica-prepare][ipa-replica-prepare-man]
 	- [ipa-replica-install][ipa-replica-install-man]
 	- [ipa-client-install][ipa-client-install-man]
+	- [getcert-request][getcert-request-man]
+
   - Docs:
     - [RHEL7 IdM Guide][idm-guide]
 	- RHEL7 system auth guide [certmonger][certmonger]
     - [RHEL6 replication docs][rhel6-ipa-rep-docs]
+	- [NSS `certutil`][nss-certutil]
 
 [freeipa]: http://www.freeipa.org/page/Main_Page
 [freeipa-docker]: https://github.com/adelton/docker-freeipa
+[freeipa-docker-client]: https://github.com/zultron/docker-freeipa/tree/centos-7-client
 [ipa-server-install-man]: https://linux.die.net/man/1/ipa-server-install
 [ipa-replica-prepare-man]: https://linux.die.net/man/1/ipa-replica-prepare
 [ipa-replica-install-man]: https://linux.die.net/man/1/ipa-replica-install
 [ipa-client-install-man]: https://linux.die.net/man/1/ipa-client-install
+[getcert-request-man]: https://linux.die.net/man/1/getcert-request
+
 [idm-guide]: https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/7/html/Linux_Domain_Identity_Authentication_and_Policy_Guide/index.html
 [certmonger]: https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/7/html/System-Level_Authentication_Guide/certmongerX.html
 [rhel6-ipa-rep-docs]: https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/6/html/Identity_Management_Guide/ipa-replica-manage.html
+[nss-certutil]: https://developer.mozilla.org/en-US/docs/Mozilla/Projects/NSS/tools/NSS_Tools_certutil
 
+- [HAProxy][haproxy]:
+  - [Official HAProxy Docker Hub images][haproxy-docker-hub]
+  - [Official HAProxy Dockerfiles][haproxy-docker-github]
+  - [HAProxy documentation][haproxy-docs]
+
+[haproxy]: http://www.haproxy.org/
+[haproxy-docker-hub]: https://hub.docker.com/_/haproxy/
+[haproxy-docker-github]: https://github.com/docker-library/haproxy/tree/master/1.6
+[haproxy-docs]: http://cbonte.github.io/haproxy-dconv/
 
 ## Misc maintenance commands
 
@@ -179,6 +204,43 @@ Add DNS zone:
 
 ## Redo stuff
 
+### Ansible
+
+- [Manage CoreOS with Ansible][CoreOS-ansible]
+- [Bootstrap CoreOS with Ansible][CoreOS-ansible-bootstrap]
+- [Manage Docker with Ansible][Docker-ansible]
+
+[CoreOS-ansible]: https://coreos.com/blog/managing-coreos-with-ansible/
+[CoreOS-ansible-bootstrap]: https://github.com/defunctzombie/ansible-coreos-bootstrap
+[Docker-ansible]: http://docs.ansible.com/ansible/guide_docker.html
+
+### Bootstrapping
+
+- Start by bootstrapping IPA server node from start to finish
+- The `cloud-config` file represents final configuration, except for
+  `initial-cluster` static configuration params
+- Use DNS FQDN in advertised URLs
+  - Hopefully we can use `http://127.0.0.1:2379` and
+    `https://infra0.example.com:2379` so `etcdctl` can use `localhost`
+    as endpoint without mess of SSL cert/key/ca path options
+  - FreeIPA won't write certs with IP addresses in the
+    `subjectAltName`, so the usual guides ([1][coreos-etcd-ssl],
+    [2][coreos-clients-ssl], [3][do-coreos-ssl]) must be changed
+- Initial URL resolution via `/etc/hosts`
+  - Initial version can't be complete; unit file to copy from
+    `/media/state`?
+- Bring up FreeIPA server
+- Bring up FreeIPA client
+- Set up DNS
+  - CoreOS host should already point at DNS
+- Set up certs
+  - Client container `certmonger` manages certs for other containers
+- Bring up syslog container
+- Bring up HAProxy container
+  - HAProxy sidekick service installs IPTables rules
+- Now ready to bring up replicas
+
+### Flow
 For each FreeIPA server (first) and replicas (later):
 - Set up server data in config.yaml
 - Provision droplet
