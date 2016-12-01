@@ -13,6 +13,7 @@ RUN yum install -y \
 	telnet \
 	PyYAML \
 	python-jinja2 \
+	man \
 	epel-release
 
 # EPEL packages
