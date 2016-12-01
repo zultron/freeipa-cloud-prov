@@ -259,6 +259,10 @@ class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, Syslog, HAProxy):
             for host in hosts:
                 self.ipa_init_dns(host)
 
+        if self._args.install_etcd_certs or self._args.install_ipa:
+            for host in hosts:
+                self.install_etcd_certs(host)
+
         if self._args.ipa_client_exec:
             self.ipa_client_exec(self._args.ipa_client_exec)
 
@@ -294,8 +298,13 @@ class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, Syslog, HAProxy):
 
         # # Testing
         # for host in hosts:
-        #     # self.kinit_admin(host)
-        #     self.install_resolv_conf(host)
+        #     self.install_ca_cert(host, self.ca_cert_file_path)
+        #     self.issue_cert_pem(
+        #         host, self.serv_cert_file_path, self.serv_key_file_path,
+        #         host, "ETCD")
+        #     self.issue_cert_pem(
+        #         host, self.clnt_cert_file_path, self.clnt_key_file_path,
+        #         host, "ETCD")
 
 ########################################################################
 # CLI argument parsing
@@ -509,6 +518,9 @@ class CLIArgParser(argparse.ArgumentParser):
         freeipa_group.add_argument(
             '--ipa-init-dns', action='store_true',
             help='Initialize DNS for IPA host with zone and container records')
+        freeipa_group.add_argument(
+            '--install-etcd-certs', action='store_true',
+            help='Install etcd2 cluster server and client SSL certificates')
         freeipa_group.add_argument(
             '--ipa-client-exec', action='store', metavar='COMMAND',
             help='Run command in IPA client container')

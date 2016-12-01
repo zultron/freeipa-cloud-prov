@@ -6,7 +6,8 @@ from .RemoteControl import RemoteControl
 class FreeIPA(RemoteControl):
     freeipa_docker_image = 'adelton/freeipa-server:centos-7'
     freeipa_docker_client_image = 'zultron/freeipa-cloud-prov:ipaclient'
-    freeipa_data_dir = '%s/ipa-data' % RemoteControl.state_dir
+    freeipa_data_dir = os.path.join(RemoteControl.state_dir, 'ipa-data')
+    cert_db_dir = os.path.join(freeipa_data_dir, 'root')
 
     def pull_freeipa_docker_image(self, host):
         ip = self.to_ip(host)
@@ -210,7 +211,7 @@ class FreeIPA(RemoteControl):
             "    -e IPA_CLIENT_INSTALL_OPTS=\"%(install_opts)s\""
             "    -h ipaclient.%(local_zone)s"
             "    --net %(network_name)s --ip %(ipaclient_ip)s"
-            "    -v %(state_dir)s:/data"
+            "    -v %(state_dir)s:%(state_dir)s"
             "    %(image)s" %
             self.substitutions(
                 host,
@@ -304,3 +305,87 @@ class FreeIPA(RemoteControl):
             self.dns_local_host_add(
                 self.local_zone(host, name),
                 self.hconfig(host, '%s_ip' % name))
+
+    def create_svc_principal(self, host, svc):
+        print "Creating service principal %s/%s" % (svc, host)
+        # Delegate service admin to host
+        self.ipa_client_exec(
+            "ipa service-add-host --hosts=%s %s/%s" % (
+                self.local_zone(host, 'ipaclient'), svc, host))
+        # Create service principal
+        self.ipa_client_exec(
+            "ipa service-add %s/%s" % (svc, host))
+
+    def issue_cert_pem(self, host, cert_fname, key_fname, cn, svc,
+                       ca_cert_fname=None, altname_ips=[]):
+        ip = self.to_ip(host)
+        print "Creating pem cert on host %s for %s" % (host, svc)
+        dirs = dict([(os.path.dirname(f), 1) for f in (cert_fname, key_fname)])
+        for d in dirs:
+            self.remote_sudo("mkdir -p %s" % d, ip)
+        # Request cert from certmonger
+        cl = ("ipa-getcert request -w -f '%s' -k '%s' -K %s/%s -N '%s'"
+              " -g 2048" + ''.join([" -A %s" for i in altname_ips]))
+        vals = [cert_fname, key_fname, svc, host, host] + altname_ips
+        if ca_cert_fname is not None:
+            cl += " -F '%s'"
+            vals.append(ca_cert_fname)
+        self.ipa_client_exec(cl % tuple(vals), host=host)
+        # Check cert request
+        self.ipa_client_exec(
+            "ipa-getcert list -f '%s'" % cert_fname, host=host)
+        # Check cert status
+        # self.ipa_client_exec(
+        #     "openssl x509 -in '%s' -noout -text" % cert_fname, host=host)
+
+    def issue_cert_nss(self, host, cert_db, cn, svc):
+        subject = "CN=%s,OU=%s,O=%s" % (cn, svc, self.realm)
+        passf = os.path.join(cert_db, 'pass.txt')
+        # noisef = os.path.join(cert_db, 'noise.bin')
+        csrf = os.path.join(cert_db, 'csr.pem')
+        print "Creating cert on host %s for '%s'" % (host, subject)
+        # Create service principal
+        self.ipa_client_exec(
+            "ipa service-add %s/%s" % (svc, host))
+        # Init DB
+        self.ipa_client_exec(
+            "rm -rf '%s'" % cert_db, host=host)
+        self.ipa_client_exec(
+            "install -d -o core -m 0700 '%s'" % cert_db, host=host)
+        self.put_file(host, "%s\n" % self.admin_password, passf, mode=0700)
+        # self.ipa_client_exec(
+        #     "openssl rand -out '%s' 2048" % noisef, host=host)
+        self.ipa_client_exec(
+            "certutil -N -d '%s' -f '%s'" %
+            (cert_db, passf), host=host)
+        # Import CA cert
+        self.ipa_client_exec(
+            "bash -c \"certutil -A -d '%s' -f '%s' -n '%s IPA CA' -t CT,, -a "
+            "< /etc/ipa/ca.crt\"" % (cert_db, passf, self.realm), host=host)
+        # Create CSR
+        self.ipa_client_exec(
+            "ipa-getcert request -d '%s' -f '%s' -n cert -K %s/%s -N '%s' -g 2048" %
+            (cert_db, passf, svc, host, subject), host=host)
+        # Check cert
+        self.ipa_client_exec(
+            "ipa-getcert list -d '%s' -n cert" % cert_db, host=host)
+        self.ipa_client_exec(
+            "certutil -V -u V -d '%s' -n cert" % cert_db, host=host)
+        
+    def install_etcd_certs(self, host):
+        ip = self.to_ip(host)
+        print "Installing CoreOS etcd2 certs on host %s" % host
+        # self.issue_cert_pem(
+        #     host, self.serv_cert_file_path, self.serv_key_file_path,
+        #     host, "ETCD")
+        # self.remote_sudo("chown etcd %s %s" %
+        #                  (self.serv_cert_file_path, self.serv_key_file_path),
+        #                  ip)
+        self.issue_cert_pem(
+            host, self.clnt_cert_file_path, self.clnt_key_file_path,
+            host, "ETCD", ca_cert_fname=self.ca_cert_file_path,
+            altname_ips=['127.0.0.1', self.hconfig(host, 'ip_address'),
+                         self.hconfig(host, 'ipa_ip')])
+        self.remote_sudo("chmod a+r %s %s" %
+                         (self.clnt_cert_file_path, self.clnt_key_file_path),
+                         ip)
