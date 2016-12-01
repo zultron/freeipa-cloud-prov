@@ -110,8 +110,8 @@ class Config(object):
         # pprint(subs)
         return subs
 
-    def render_jinja2(self, host, fname, extra_substitutions={}, **kwargs):
-        subs = self.substitutions(host, extra_substitutions, **kwargs)
+    def render_jinja2(self, host, fname, **kwargs):
+        subs = self.substitutions(host, **kwargs)
         tmpl = self._jenv.get_template(fname)
         return tmpl.render(**subs)
 
