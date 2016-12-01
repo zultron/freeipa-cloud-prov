@@ -69,12 +69,15 @@ configure FreeIPA:
   - Launching containers in CoreOS:
 	- [Launching containers with fleet][fleet]
 	- [Unit files][unit-files]
+  - IPA integration
+	- [CoreOS SSSD integration][coreos-sssd]
+  
 
 [coreos]: https://coreos.com/
 [coreos-do]: https://www.digitalocean.com/community/tutorials/how-to-set-up-a-coreos-cluster-on-digitalocean
 [cloud-config]: https://coreos.com/os/docs/latest/cloud-config.html
 [coreos-cloud-config-validate]: https://coreos.com/validate/
-[etcd2-options]: https://github.com/coreos/etcd/blob/master/Documentation/v2/configuration.md
+[etcd2-options]: https://coreos.com/etcd/docs/latest/configuration.html
 [coreos-clustering]: https://coreos.com/etcd/docs/latest/clustering.html
 [coreos-cluster-reconfig]: https://coreos.com/etcd/docs/latest/etcd-live-cluster-reconfiguration.html
 [coreos-ca]: https://coreos.com/os/docs/latest/generate-self-signed-certificates.html
@@ -84,6 +87,7 @@ configure FreeIPA:
 [cfssl]: https://github.com/cloudflare/cfssl
 [fleet]: https://coreos.com/fleet/docs/latest/launching-containers-fleet.html
 [unit-files]: https://coreos.com/fleet/docs/latest/unit-files-and-scheduling.html
+[coreos-sssd]: https://coreos.com/os/docs/latest/sssd.html
 
 - [StrongSwan][strongswan]:
   - [StrongSwan in Docker][docker-strongswan]
