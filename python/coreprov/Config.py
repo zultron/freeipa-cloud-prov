@@ -118,9 +118,7 @@ class Config(object):
         # sys.stdout.write(self.render_jinja2(*args, **kwargs))
         print(self.render_jinja2(*args, **kwargs))
 
-    def destroy_pickle(self):
-        if not os.path.exists(self.pickle_file_path):
-            print "No state file %s to remove" % self.pickle_file_path
-        else:
-            print "Removing state file %s" % self.pickle_file_path
-            os.remove(self.pickle_file_path)
+    def destroy_pickle(self, host):
+        print "Deleting cached state for %s" % host
+        del self.hosts[host]
+        self.pickle_config()
