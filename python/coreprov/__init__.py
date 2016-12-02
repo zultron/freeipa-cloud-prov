@@ -294,8 +294,8 @@ class CoreProvCLI(DOCoreos, DockerNetwork, HAProxy, Syslog):
                 self.start_haproxy_server(host)
 
         # # Testing
-        for host in hosts:
-            self.ipa_fix_https_redirect(host)
+        # for host in hosts:
+        #     self.ipa_fix_https_redirect(host)
         #     self.install_ca_cert(host, self.ca_cert_file_path)
         #     self.issue_cert_pem(
         #         host, self.serv_cert_file_path, self.serv_key_file_path,
