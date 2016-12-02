@@ -48,36 +48,6 @@ class FreeIPA(RemoteControl):
         self.put_file(
             ip, self.render_jinja2(host, fname), self.freeipa_file_path(fname))
 
-    def init_ipa_service(self, host):
-        ip = self.to_ip(host)
-
-        print 'Running FreeIPA install on %s' % host
-        self.remote_run(
-            "docker run -d"
-            "    --hostname %(hostname)s"
-            "    --name ipa"
-            "    --volume /media/state/ipa-data:/data"
-            "    --volume /sys/fs/cgroup:/sys/fs/cgroup:ro"
-            "    --net cnet --ip %(ipa_ip)s"
-            "    -e IPA_SERVER_IP=%(ip_address)s"
-            "    adelton/freeipa-server:centos-7" %
-            self.substitutions(host),
-            ip)
-        self.remote_run_and_grep(
-            "docker attach ipa",
-            ip, timeout=20*60,
-            success_re=r'FreeIPA server configured\.',
-            fail_re=r'Failed with result')
-        self.install_rndc_config(host)
-        self.harden_named(host)
-        self.harden_ldap(host)
-        self.kinit_admin(host)
-        self.named_disable_zone_transfers(host)
-
-        # Simple functionality test
-        # kinit admin
-        # ipa user-find admin
-
 
     def install_rndc_config(self, host):
         ip = self.to_ip(host)
@@ -164,17 +134,22 @@ class FreeIPA(RemoteControl):
             self.put_file(ip, replica_info, dst)
 
         print 'Running FreeIPA install on %s' % host
-        self.remote_run('systemctl start ipa.service', ip)
+        self.remote_sudo('systemctl start ipa.service', ip)
         self.remote_run_and_grep(
             'journalctl -fu ipa.service -n 0',
             ip, timeout=20*60,
             success_re=r'FreeIPA server configured\.',
             fail_re=r'Failed with result')
         self.install_rndc_config(host)
+        self.harden_named(host)
+        self.harden_ldap(host)
+        self.kinit_admin(host)
+        self.named_disable_zone_transfers(host)
 
         # Simple functionality test
         # kinit admin
         # ipa user-find admin
+
 
     def kinit_admin(self, host):
         ip = self.to_ip(host)
@@ -183,16 +158,6 @@ class FreeIPA(RemoteControl):
             ip, 'ipa',
             'bash -c \"echo %s | kinit admin\" >/dev/null' %
             self.admin_password, quiet=False)
-
-    def install_resolv_conf(self, host):
-        ip = self.to_ip(host)
-        print "Installing /etc/resolv.conf on %s" % host
-        # resolv_conf = ''.join(
-        #     [ 'nameserver %s\n' % self.hconfig(h, 'ip_address')
-        #       for h in self.hosts ])
-        resolv_conf = 'nameserver %s\n' % self.hconfig(host, 'ipa_ip')
-        self.put_file(ip, resolv_conf, '/tmp/resolv.conf')
-        self.remote_sudo('mv /tmp/resolv.conf /etc/resolv.conf', ip)
 
     def install_ipa_client(self, host):
         ip = self.to_ip(host)

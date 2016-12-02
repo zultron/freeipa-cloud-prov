@@ -58,8 +58,8 @@ class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, Syslog, HAProxy):
                 self.install_known_hosts(host)
                 # Provision FreeIPA
                 self.pull_freeipa_docker_image(host)
-                # self.install_freeipa_config(host)
-                # self.install_freeipa(host)
+                self.install_freeipa_config(host)
+                self.install_ipa_service(host)
 
         if self._args.run:
             for host in hosts:
@@ -239,7 +239,7 @@ class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, Syslog, HAProxy):
                 self.install_freeipa_config(host)
 
         if self._args.init_ipa or self._args.install_ipa:
-            self.init_ipa_service(host)
+            self.install_ipa_service(host)
 
         if self._args.install_ipa_client or self._args.install_ipa:
             self.install_ipa_client(host)

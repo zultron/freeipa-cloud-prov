@@ -19,6 +19,7 @@ KillMode=none
 
 # Get CoreOS environmental variables
 EnvironmentFile=/etc/environment
+EnvironmentFile=/media/state/system.env
 
 # Pre-start and Start
 ## Directives with "=-" are allowed to fail without consequence
