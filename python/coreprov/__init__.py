@@ -33,9 +33,8 @@ class CoreProvCLI(DOCoreos, DockerNetwork, HAProxy, Syslog):
         if self._args.destroy_all:
             for host in hosts:
                 self.destroy_droplet(host)
-            for host in hosts:
                 self.destroy_host_volumes(host)
-            self.destroy_pickle()
+                self.destroy_pickle(host)
 
         if self._args.provision_all:
             # IPA server first, replicas second
@@ -169,9 +168,6 @@ class CoreProvCLI(DOCoreos, DockerNetwork, HAProxy, Syslog):
             for key in self.keys:
                 print "%s:\n    %s" % (key.name, key.public_key)
 
-        if self._args.show_discovery_url:
-            print self.get_discovery_url()
-
         if self._args.reboot:
             for host in hosts:
                 self.reboot(host)
@@ -200,9 +196,6 @@ class CoreProvCLI(DOCoreos, DockerNetwork, HAProxy, Syslog):
 
             if self._args.show_host_keys:
                 print self.gen_host_cert(host)['key']
-
-            if self._args.install_host_certs:
-                self.install_host_certs(host)
 
 
         # ##############################
@@ -376,9 +369,6 @@ class CLIArgParser(argparse.ArgumentParser):
             '--show-cloud-config', action='store_true',
             help='Print droplet cloud config')
         droplet_group.add_argument(
-            '--show-discovery-url', action='store_true',
-            help='Print etcd discovery URL')
-        droplet_group.add_argument(
             '--show-ssh-keys', action='store_true',
             help='Print SSH keys')
 
@@ -463,9 +453,6 @@ class CLIArgParser(argparse.ArgumentParser):
         ca_group.add_argument(
             '--show-host-keys', action='store_true',
             help='Print host keys ***INSECURE***')
-        ca_group.add_argument(
-            '--install-host-certs', action='store_true',
-            help='Install host certificates (generate if needed)')
 
         # # - IPSec commands
         # ipsec_group = self.add_argument_group(

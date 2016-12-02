@@ -10,9 +10,8 @@ class FreeIPA(RemoteControl):
     cert_db_dir = os.path.join(freeipa_data_dir, 'root')
 
     def pull_freeipa_docker_image(self, host):
-        ip = self.to_ip(host)
         print "Pulling docker image on host %s" % host
-        self.remote_run('docker pull %s' % self.freeipa_docker_image, ip)
+        self.remote_run('docker pull %s' % self.freeipa_docker_image, host)
 
     @property
     def freeipa_master(self):
@@ -33,8 +32,6 @@ class FreeIPA(RemoteControl):
         return os.path.join(self.freeipa_data_dir, fname)
 
     def install_freeipa_config(self, host):
-        ip = self.to_ip(host)
-
         if self.is_master(host):
             fname = 'ipa-server-install-options'
         else:
@@ -42,25 +39,24 @@ class FreeIPA(RemoteControl):
 
         print "Installing %s on %s" % (fname, host)
 
-        self.remote_sudo('install -d -o core %s' % self.freeipa_data_dir, ip)
+        self.remote_sudo('install -d -o core %s' % self.freeipa_data_dir, host)
         self.put_file(
-            ip, self.render_jinja2(host, fname), self.freeipa_file_path(fname))
+            host, self.render_jinja2(host, fname), self.freeipa_file_path(fname))
 
 
     def install_ipa_service(self, host):
-        ip = self.to_ip(host)
-
         if host == self.freeipa_master:
             print "Installing fleet ipa.service unit file"
             self.put_file(
-                ip, self.render_jinja2(host, 'ipa.service'),
+                host, self.render_jinja2(host, 'ipa.service'),
                 self.freeipa_file_path('ipa.service'))
             self.remote_run(
                 'fleetctl submit %s' % \
-                self.freeipa_file_path('ipa.service'), ip)
-            self.remote_run('fleetctl load ipa.service', ip)
+                self.freeipa_file_path('ipa.service'), host)
+            self.remote_run('fleetctl load ipa.service', host)
 
         else:
+            replica_ip = self.to_ip(host)
             server_ip = self.to_ip(self.freeipa_master)
             fname = 'replica-info-%s.gpg' % host
             src = '%s/var/lib/ipa/%s' % (self.freeipa_data_dir, fname)
@@ -69,18 +65,18 @@ class FreeIPA(RemoteControl):
             print 'Preparing FreeIPA replica info for %s' % host
             self.remote_run(
                 'docker exec -i ipa ipa-replica-prepare %s'
-                ' --ip-address %s --no-reverse' % (host, ip), server_ip,
+                ' --ip-address %s --no-reverse' % (host, replica_ip), server_ip,
                 stdin_in='%s\n' % self.ds_password, read_stdout=False)
             self.remote_sudo('mv %s %s' % (src, dst), server_ip)
             self.remote_sudo('chown core %s' % dst, server_ip)
             replica_info = self.get_file(server_ip, dst)
-            self.put_file(ip, replica_info, dst)
+            self.put_file(host, replica_info, dst)
 
         print 'Running FreeIPA install on %s' % host
-        self.remote_sudo('systemctl start ipa.service', ip)
+        self.remote_sudo('systemctl start ipa.service', host)
         self.remote_run_and_grep(
             'journalctl -fu ipa.service -n 0',
-            ip, timeout=20*60,
+            host, timeout=20*60,
             success_re=r'FreeIPA server configured\.',
             fail_re=r'Failed with result')
 
@@ -90,27 +86,25 @@ class FreeIPA(RemoteControl):
 
 
     def install_ipa_client(self, host):
-        ip = self.to_ip(host)
-
         if host == self.freeipa_master:
             print "Installing fleet ipaclient.service unit file"
             self.remote_sudo(
-                "install -d -o core %s" % self.freeipa_file_path(), ip)
+                "install -d -o core %s" % self.freeipa_file_path(), host)
             self.put_file(
-                ip, self.render_jinja2(
+                host, self.render_jinja2(
                     host, 'ipaclient.service',
                     DOCKER_IMAGE=self.freeipa_docker_client_image),
                 self.freeipa_file_path('ipaclient.service'))
             self.remote_run(
                 'fleetctl submit %s' % \
-                self.freeipa_file_path('ipaclient.service'), ip)
-            self.remote_run('fleetctl load ipaclient.service', ip)
+                self.freeipa_file_path('ipaclient.service'), host)
+            self.remote_run('fleetctl load ipaclient.service', host)
 
         print 'Running FreeIPA client install on %s' % host
-        self.remote_sudo('systemctl start ipaclient.service', ip)
+        self.remote_sudo('systemctl start ipaclient.service', host)
         self.remote_run_and_grep(
             'journalctl -fu ipaclient.service -n 0',
-            ip, timeout=20*60,
+            host, timeout=20*60,
             success_re=r'FreeIPA-enrolled',
             fail_re=r'(docker: Error|Failed with result)')
 
@@ -121,7 +115,6 @@ class FreeIPA(RemoteControl):
 
     def kinit_admin(self, host=None):
         if host is None:  host = self.freeipa_master
-        ip = self.to_ip(host)
         print "Initializing kerberos ticket for admin on %s" % host
         self.ipa_client_exec(
             'bash -c \"echo %s | kinit admin\" >/dev/null' %
@@ -130,11 +123,10 @@ class FreeIPA(RemoteControl):
             'klist', quiet=False)
 
     def install_rndc_config(self, host):
-        ip = self.to_ip(host)
         print 'Installing rndc config and key on %s' % host
 
-        self.remote_run('docker exec -i ipa rndc-confgen -a', ip)
-        self.remote_run('docker exec -i ipa restorecon /etc/rndc.key', ip)
+        self.remote_run('docker exec -i ipa rndc-confgen -a', host)
+        self.remote_run('docker exec -i ipa restorecon /etc/rndc.key', host)
 
     # Hardening IPA:
     # https://www.redhat.com/archives/freeipa-users/2014-April/msg00246.html
@@ -154,7 +146,6 @@ class FreeIPA(RemoteControl):
             quiet=False)
 
     def harden_ldap(self, host):
-        ip = self.to_ip(host)
         print "Restricting LDAP anonymous binds on %s" % host
         input = (
             "dn: cn=config\n"
@@ -165,10 +156,9 @@ class FreeIPA(RemoteControl):
         self.remote_run(
             'echo "%s" | docker exec -i ipa '
             'ldapmodify -c -x -D "cn=Directory Manager" -w %s' %
-            (input, self.ds_password), ip, stdin_in=input, get_pty=True)
+            (input, self.ds_password), host, stdin_in=input, get_pty=True)
 
     def ipa_fix_https_redirect(self, host):
-        ip = self.to_ip(host)
         print "Disabling IPA web UI redirect to https on %s" % host
         self.remote_docker_exec(
             host, 'ipa',
@@ -273,11 +263,10 @@ class FreeIPA(RemoteControl):
 
     def issue_cert_pem(self, host, cert_fname, key_fname, cn, svc,
                        ca_cert_fname=None, altname_ips=[]):
-        ip = self.to_ip(host)
         print "Creating pem cert on host %s for %s" % (host, svc)
         dirs = dict([(os.path.dirname(f), 1) for f in (cert_fname, key_fname)])
         for d in dirs:
-            self.remote_sudo("mkdir -p %s" % d, ip)
+            self.remote_sudo("mkdir -p %s" % d, host)
         # Request cert from certmonger
         cl = ("ipa-getcert request -w -f '%s' -k '%s' -K %s/%s -N '%s'"
               " -g 2048" + ''.join([" -A %s" for i in altname_ips]))
@@ -328,20 +317,19 @@ class FreeIPA(RemoteControl):
             "certutil -V -u V -d '%s' -n cert" % cert_db, host=host)
         
     def install_etcd_certs(self, host):
-        ip = self.to_ip(host)
         print "Installing CoreOS etcd2 certs on host %s" % host
         self.issue_cert_pem(
             host, self.serv_cert_file_path, self.serv_key_file_path,
             host, "ETCD", ca_cert_fname=self.ca_cert_file_path)
         self.remote_sudo("chown etcd %s %s" %
                          (self.serv_cert_file_path, self.serv_key_file_path),
-                         ip)
+                         host)
         self.issue_cert_pem(
             host, self.clnt_cert_file_path, self.clnt_key_file_path,
             host, "ETCD")
         self.remote_sudo("chmod a+r %s %s %s" %
                          (self.clnt_cert_file_path, self.clnt_key_file_path,
-                          self.ca_cert_file_path), ip)
+                          self.ca_cert_file_path), host)
 
     def configure_ipa_server(self, host):
         print "Configuring IPA service on %s" % host

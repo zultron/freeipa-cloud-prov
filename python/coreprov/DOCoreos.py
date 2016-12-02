@@ -245,45 +245,41 @@ class DOCoreos(RemoteControl, CA):
     
     etcd2_bootstrap_conf_fname = "40-etcd2-bootstrap.conf"
     def install_bootstrap_etcd_dropin(self, host):
-        ip = self.to_ip(host)
         print "Installing temporary bootstrap etcd dropin on %s" % host
         self.remote_sudo(
-            "install -d -o core %s" % self.dropin_path('etcd2'), ip)
+            "install -d -o core %s" % self.dropin_path('etcd2'), host)
         self.put_file(
-            ip, self.render_jinja2(host, self.etcd2_bootstrap_conf_fname),
+            host, self.render_jinja2(host, self.etcd2_bootstrap_conf_fname),
             self.dropin_path('etcd2', self.etcd2_bootstrap_conf_fname))
-        self.remote_sudo("systemctl daemon-reload", ip)
-        self.remote_sudo("systemctl restart etcd2", ip)
+        self.remote_sudo("systemctl daemon-reload", host)
+        self.remote_sudo("systemctl restart etcd2", host)
 
     def remove_bootstrap_etcd_dropin(self, host):
-        ip = self.to_ip(host)
         print "Removing temporary bootstrap etcd dropin on %s" % host
         self.remote_sudo(
             "rm -f %s" % self.dropin_path(
-                'etcd2', self.etcd2_bootstrap_conf_fname), ip)
-        self.remote_sudo("systemctl daemon-reload", ip)
-        self.remote_sudo("systemctl restart etcd2", ip)
+                'etcd2', self.etcd2_bootstrap_conf_fname), host)
+        self.remote_sudo("systemctl daemon-reload", host)
+        self.remote_sudo("systemctl restart etcd2", host)
     
     fleet_bootstrap_conf_fname = "40-fleet-bootstrap.conf"
     def install_bootstrap_fleet_dropin(self, host):
-        ip = self.to_ip(host)
         print "Installing temporary bootstrap fleet dropin on %s" % host
         self.remote_sudo(
-            "install -d -o core %s" % self.dropin_path('fleet'), ip)
+            "install -d -o core %s" % self.dropin_path('fleet'), host)
         self.put_file(
-            ip, self.render_jinja2(host, self.fleet_bootstrap_conf_fname),
+            host, self.render_jinja2(host, self.fleet_bootstrap_conf_fname),
             self.dropin_path('fleet', self.fleet_bootstrap_conf_fname))
-        self.remote_sudo("systemctl daemon-reload", ip)
-        self.remote_sudo("systemctl restart fleet", ip)
+        self.remote_sudo("systemctl daemon-reload", host)
+        self.remote_sudo("systemctl restart fleet", host)
 
     def remove_bootstrap_fleet_dropin(self, host):
-        ip = self.to_ip(host)
         print "Removing temporary bootstrap fleet dropin on %s" % host
         self.remote_sudo(
             "rm -f %s" % self.dropin_path(
-                'fleet', self.fleet_bootstrap_conf_fname), ip)
-        self.remote_sudo("systemctl daemon-reload", ip)
-        self.remote_sudo("systemctl restart fleet", ip)
+                'fleet', self.fleet_bootstrap_conf_fname), host)
+        self.remote_sudo("systemctl daemon-reload", host)
+        self.remote_sudo("systemctl restart fleet", host)
 
     def install_temp_bootstrap_config(self, host):
         if self.hosts[host].get('bootstrap_order', None) != 0:
@@ -302,9 +298,8 @@ class DOCoreos(RemoteControl, CA):
         self.pickle_config()
 
     def install_update_config(self, host):
-        ip = self.to_ip(host)
         print "Installing configuration updates on %s" % host
-        self.remote_sudo("install -d -o core /media/state/configs", ip)
+        self.remote_sudo("install -d -o core /media/state/configs", host)
         self.render_and_put(
             host, 'update-config', '/media/state/configs/update-config',
             mode=0755)
@@ -312,79 +307,58 @@ class DOCoreos(RemoteControl, CA):
             host, 'resolv.conf', '/media/state/configs/resolv.conf')
         self.render_and_put(
             host, 'hosts', '/media/state/configs/hosts')
-        self.remote_sudo("systemctl restart update-config", ip)
-
-    def install_host_certs(self, hostname):
-        ip = self.to_ip(hostname)
-        if not self.hosts[hostname].has_key('cert'):
-            self.gen_host_cert(hostname, ip)
-        print "Installing SSL certificates on %s" % hostname
-        self.remote_sudo("install -d -o core %s" % self.etcd_config_path, ip)
-        self.put_file(ip, self.hosts[hostname]['cert']['cert'],
-                      self.serv_cert_file_path, mode=0644)
-        self.put_file(ip, self.hosts[hostname]['cert']['cert'],
-                      self.clnt_cert_file_path, mode=0644)
-        self.put_file(ip, self.hosts[hostname]['cert']['key'],
-                      self.serv_key_file_path)
-        self.put_file(ip, self.hosts[hostname]['cert']['key'],
-                      self.clnt_key_file_path)
-        self.put_file(ip, self.ca_cert, self.ca_cert_file_path, mode=0644)
-        self.remote_sudo("chown -R etcd:etcd %s" % self.etcd_config_path, ip)
+        self.remote_sudo("systemctl restart update-config", host)
 
     def check_fleet_status(self, host):
-        ip = self.get_ip_addr(host)
-        out = self.remote_run_output('fleetctl list-machines', ip)
+        out = self.remote_run_output('fleetctl list-machines', host)
         if len(out) == 0:
             raise RuntimeError("Fleet status not OK")
         else:
             print "Fleet status OK"
 
     def check_etcd_status(self, host):
-        ip = self.get_ip_addr(host)
         # etcdctl and SSL are ugly
         # https://www.digitalocean.com/community/tutorials/how-to-secure-your-coreos-cluster-with-tls-ssl-and-firewall-rules
-        ssl_opts="" if self.bootstrapping else \
+        ssl_opts="" if getattr(self, 'bootstrapping', False) else \
             "--cert-file=%s --key-file=%s --ca-file=%s" % (
                 self.clnt_cert_file_path, self.clnt_key_file_path,
                 self.ca_cert_file_path)
         out = self.remote_run(
-            'etcdctl %s cluster-health' % ssl_opts, ip)
+            'etcdctl %s cluster-health' % ssl_opts, host)
 
     def init_data_volume(self, host):
         print "Initializing data volume for %s" % host
-        ip = self.get_ip_addr(host)
         vols = self.get_data_volumes(host)
         # Sanity checks
         if not vols or vols[0].name != self.volume_name(host):
             raise RuntimeError("Cannot init swap on host with no data volume")
         # Init volume label
-        self.remote_sudo('parted /dev/sda mklabel msdos', ip)
+        self.remote_sudo('parted /dev/sda mklabel msdos', host)
         # Create and format swap partition, and start service
         swap_end = self.hosts[host]['swap_size'] * 1024 * 1024 * 2
         self.remote_sudo('parted -a min /dev/sda ' \
                          'mkpart primary linux-swap 1s %ds' % swap_end,
-                         ip)
-        self.remote_sudo('mkswap /dev/sda1', ip)
-        self.remote_sudo('systemctl start dev-sda1.swap', ip)
+                         host)
+        self.remote_sudo('mkswap /dev/sda1', host)
+        self.remote_sudo('systemctl start dev-sda1.swap', host)
         # Create and format data partition, and start service
         data_end = self.hosts[host]['volume_size'] * 1024 * 1024 * 2 - 1
         self.remote_sudo('parted -a min /dev/sda ' \
                          'mkpart primary ext4 %ds %ds' % (swap_end+1, data_end),
-                         ip)
-        self.remote_sudo('mkfs.ext4 /dev/sda2', ip)
-        self.remote_sudo('systemctl start media-state.mount', ip)
-        self.remote_sudo('install -d -o core %s' % self.state_dir, ip)
+                         host)
+        self.remote_sudo('mkfs.ext4 /dev/sda2', host)
+        self.remote_sudo('systemctl start media-state.mount', host)
+        self.remote_sudo('install -d -o core %s' % self.state_dir, host)
         self.install_system_env(host)
 
     def data_volume_status(self, host):
-        ip = self.get_ip_addr(host)
         vols = self.get_data_volumes(host)
-        out = self.remote_run_output("swapon -s | awk '/^.dev/ {print $3}'", ip)
+        out = self.remote_run_output("swapon -s | awk '/^.dev/ {print $3}'", host)
         if len(out) == 1:
             print("Swap OK; size = %s" % out[0].rstrip())
         else:
             print("No swap found")
-        out = self.remote_run_output('mount | grep %s' % self.state_dir, ip)
+        out = self.remote_run_output('mount | grep %s' % self.state_dir, host)
         if len(out) == 1:
             print("Data OK")
         else:
@@ -392,7 +366,6 @@ class DOCoreos(RemoteControl, CA):
 
 
     def install_system_env(self, host):
-        ip = self.to_ip(host)
         print "Installing system environment file on %s" % host
-        self.put_file(ip, self.render_jinja2(host, 'system.env'),
-                      os.path.join(self.state_dir, 'system.env'))
+        self.render_and_put(host, 'system.env',
+                            os.path.join(self.state_dir, 'system.env'))

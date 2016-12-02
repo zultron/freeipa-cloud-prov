@@ -12,35 +12,34 @@ class RemoteControl(Config):
     conns = {}
     default_user = 'core'
 
-    def conn(self, hostname, username=default_user):
+    def conn(self, host, username=default_user):
         if not hasattr(self, '_conns'): self._conns = {}
-        if self._conns.get(hostname, {}).get(username, None) is not None:
-            return self._conns[hostname][username]
+        if self._conns.get(host, {}).get(username, None) is not None:
+            return self._conns[host][username]
 
-        print "- Creating new SSH connection for %s@%s" % (username, hostname)
+        print "- Creating new SSH connection for %s@%s" % (username, host)
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(
             paramiko.AutoAddPolicy())
-        ssh.connect(hostname, username=username)
-        self._conns.setdefault(hostname, {})[username] = ssh
+        ssh.connect(self.to_ip(host), username=username)
+        self._conns.setdefault(host, {})[username] = ssh
 
         # Cache host key
-        if not hasattr(self, 'host_keys'):  self.host_keys = {}
-        if not self.host_keys.has_key(hostname):
-            self.host_keys[hostname] = str("%s %s" % (
+        if not self.hosts[host].has_key('ssh_host_key'):
+            self.hosts[host]['ssh_host_key'] = str("%s %s" % (
                 ssh.get_transport().get_remote_server_key().get_name(),
                 ssh.get_transport().get_remote_server_key().get_base64()))
             self.pickle_config()
 
-        return self._conns[hostname][username]
+        return self._conns[host][username]
 
-    def remote_run(self, command, hostname, username=default_user,
+    def remote_run(self, command, host, username=default_user,
                    stdin_in=None, get_pty=False,
                    read_stdout=True, quiet=False, read_stderr=True):
-        conn = self.conn(hostname, username)
+        conn = self.conn(host, username)
 
         if not quiet:
-            print "- Running on %s: '%s'" % (hostname, command)
+            print "- Running on %s: '%s'" % (host, command)
         # stdin, stdout, stderr = conn.exec_command(command)
         # stdin.close()
         chan = conn.get_transport().open_session()
@@ -71,13 +70,13 @@ class RemoteControl(Config):
         elif len(res) == 2:
             return res
 
-    def remote_run_and_grep(self, command, hostname,
+    def remote_run_and_grep(self, command, host,
                             success_re=None, fail_re=None,
                             stdin_in=None, get_pty=False,
                             print_stdout=True, print_stderr=True,
                             username=default_user, timeout=None, quiet=False):
         # http://docs.paramiko.org/en/2.0/api/channel.html
-        conn = self.conn(hostname, username)
+        conn = self.conn(host, username)
         if success_re is not None:
             r_s = re.compile(success_re)
         if fail_re is not None:
@@ -85,7 +84,7 @@ class RemoteControl(Config):
         start_time = time.time()
 
         if not quiet:
-            print "- Running on %s: '%s'" % (hostname, command)
+            print "- Running on %s: '%s'" % (host, command)
         chan = conn.get_transport().open_session()
         paramiko.agent.AgentRequestHandler(chan)
         if get_pty: chan.get_pty()
@@ -137,48 +136,46 @@ class RemoteControl(Config):
                 break
         chan.close()
 
-    def remote_sudo(self, command, hostname, **kwargs):
-        return self.remote_run('sudo ' + command, hostname, **kwargs)
+    def remote_sudo(self, command, host, **kwargs):
+        return self.remote_run('sudo ' + command, host, **kwargs)
 
-    def remote_run_output(self, command, hostname, username=default_user,
+    def remote_run_output(self, command, host, username=default_user,
                           quiet=True):
-        stdout = self.remote_run(command, hostname, username,
+        stdout = self.remote_run(command, host, username,
                                  read_stdout=False, quiet=quiet)
         return stdout.readlines()
 
     def remote_docker_exec(self, host, container, command, get_pty=True,
                            **kwargs):
-        ip = self.to_ip(host)
         if get_pty:
             cmd_fmt = 'docker exec -it %s %s'
         else:
             cmd_fmt = 'docker exec -i %s %s'
         return self.remote_run(cmd_fmt % (container, command),
-                               ip, get_pty=get_pty, **kwargs)
+                               host, get_pty=get_pty, **kwargs)
 
-    def close(self, hostname, username=default_user):
-        self.conn(hostname, username).close()
+    def close(self, host, username=default_user):
+        self.conn(host, username).close()
 
-    def put_file(self, hostname, contents, remote_fname,
+    def put_file(self, host, contents, remote_fname,
                  mode=0644, owner=None, username=default_user):
-        print "- Installing file %s:%s" % (hostname, remote_fname)
-        ssh = self.conn(hostname, username)
+        print "- Installing file %s:%s" % (host, remote_fname)
+        ssh = self.conn(host, username)
         sftp = ssh.open_sftp()
         with sftp.file(remote_fname, mode='w', bufsize=1000) as f:
             f.write(contents)
         sftp.chmod(remote_fname, mode)
         if owner is not None:
             # Use sudo to change owner
-            self.remote_sudo('chown %s %s' % (owner, remote_fname), hostname)
+            self.remote_sudo('chown %s %s' % (owner, remote_fname), host)
 
-    def render_and_put(self, hostname, template, remote_fname, **kwargs):
-        ip = self.to_ip(hostname)
-        self.put_file(ip, self.render_jinja2(hostname, template),
+    def render_and_put(self, host, template, remote_fname, **kwargs):
+        self.put_file(host, self.render_jinja2(host, template),
                       remote_fname, **kwargs)
 
-    def get_file(self, hostname, remote_fname, username=default_user):
-        print "- Retrieving file %s:%s" % (hostname, remote_fname)
-        ssh = self.conn(hostname, username)
+    def get_file(self, host, remote_fname, username=default_user):
+        print "- Retrieving file %s:%s" % (host, remote_fname)
+        ssh = self.conn(host, username)
         sftp = ssh.open_sftp()
         with sftp.file(remote_fname, mode='r', bufsize=1000) as f:
             res = f.read()
@@ -188,26 +185,24 @@ class RemoteControl(Config):
         if not hosts:  hosts = self.hosts.keys()
         res = []
         for h in hosts:
-            if h in self.hosts:  h = self.to_ip(h)
-            if getattr(self, 'host_keys', {}).get(h, None) is None:  continue
-            res.append('%s,%s %s' % (h, self.to_ip(h), self.host_keys[h]))
+            if not self.hosts[h].has_key('ssh_host_key'):  continue
+            res.append('%s,%s %s' % (
+                h, self.to_ip(h), self.hosts[h]['ssh_host_key']))
         return res
 
-    def install_known_hosts(self, hostname):
-        ip = self.to_ip(hostname)
-        print "Installing %s:/home/core/.fleetctl/known_hosts" % hostname
-        self.remote_run("install -d -m 700 /home/core/.fleetctl", ip)
-        self.put_file(ip, "%s\n" % "\n".join(self.get_ssh_host_keys()),
+    def install_known_hosts(self, host):
+        print "Installing %s:/home/core/.fleetctl/known_hosts" % host
+        self.remote_run("install -d -m 700 /home/core/.fleetctl", host)
+        self.put_file(host, "%s\n" % "\n".join(self.get_ssh_host_keys()),
                       '/home/core/.fleetctl/known_hosts')
 
-    def update_etc_hosts(self, hostname):
-        ip = self.to_ip(hostname)
-        print "Updating %s:/etc/hosts" % hostname
+    def update_etc_hosts(self, host):
+        print "Updating %s:/etc/hosts" % host
         hosts_entries = ''
         for h in self.hosts:
             self.remote_run('echo "%s %s" | sudo tee -a /etc/hosts' % \
                             (self.get_ip_addr(h), h),
-                            ip, stdin_in=hosts_entries, read_stdout=False)
+                            host, stdin_in=hosts_entries, read_stdout=False)
 
-    def reboot(self, hostname, username=default_user):
-        self.remote_sudo('reboot', hostname, username)
+    def reboot(self, host, username=default_user):
+        self.remote_sudo('reboot', host, username)
