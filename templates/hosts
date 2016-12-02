@@ -1,0 +1,5 @@
+127.0.0.1 localhost
+{%- for h in hosts if hosts[h]['ip_address'] is defined %}
+{{hosts[h]['ip_address']}} {{h}}
+{%- endfor %}
+

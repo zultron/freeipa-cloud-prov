@@ -221,40 +221,47 @@ Add DNS zone:
 ### Bootstrapping
 
 - Start by bootstrapping IPA server node from start to finish
-- The `cloud-config` file represents final configuration, except for
-  `initial-cluster` static configuration params
-- Use DNS FQDN in advertised URLs
-  - Hopefully we can use `http://127.0.0.1:2379` and
-    `https://infra0.example.com:2379` so `etcdctl` can use `localhost`
-    as endpoint without mess of SSL cert/key/ca path options
-  - FreeIPA won't write certs with IP addresses in the
-    `subjectAltName`, so the usual guides ([1][coreos-etcd-ssl],
-    [2][coreos-clients-ssl], [3][do-coreos-ssl]) must be changed
-- Initial URL resolution via `/etc/hosts`
-  - Initial version can't be complete; unit file to copy from
-    `/media/state`?
-- Bring up FreeIPA server
-- Bring up FreeIPA client
-- Set up DNS
-  - CoreOS host should already point at DNS
-- Set up certs
-  - Client container `certmonger` manages certs for other containers
-- Bring up syslog container
-- Bring up HAProxy container
-  - HAProxy sidekick service installs IPTables rules
+  - The `cloud-config` file represents final configuration (except for
+	`initial-cluster` static configuration params)
+  - `etcd2` configuration:
+	- Use SSL on external interfaces
+	  - Use temporary drop-in during bootstrap to disable SSL until
+        FreeIPA is running and integrated
+	- Use DNS FQDN in advertised URLs
+	  - FreeIPA won't write certs with IP addresses in the
+		`subjectAltName`, so the usual guides' ([1][coreos-etcd-ssl],
+		[2][coreos-clients-ssl], [3][do-coreos-ssl]) suggestion to use
+		IP addresses in certs won't work
+	  - Initial URL resolution via `/etc/hosts`
+		- Initial version can't be complete; a unit file could copy from
+		  `/media/state`, or else depend on DNS
+  - Bring up FreeIPA server
+  - Bring up FreeIPA client
+  - Set up DNS
+	- CoreOS host should already point at DNS
+  - Set up certs
+	- Client container `certmonger` manages certs for other containers
+  - Bring up syslog container
+  - Bring up HAProxy container
+	- HAProxy sidekick service installs IPTables rules
 - Now ready to bring up replicas
 
 ### Flow
 For each FreeIPA server (first) and replicas (later):
 - Set up server data in config.yaml
-- Provision droplet
-  - `./provision --create-volumes --provision`
-- Create & init volume
-- Install docker network
-  - `./provision --init-docker-network`
-- For all hosts: /etc/hosts, known-hosts, iptables
-  - `./provision --init-iptables --install-known-hosts --update-etc-hosts`
-- If replica:  Add droplet to cluster
+- Basic provisioning
+  - Provision droplet and volume
+	- `./provision --create-volumes --provision`
+  - Create & init volume (swap, data, `system.env`)
+	- `./provision --init-volumes`
+  - Install docker network
+	- `./provision --init-docker-network`
+  - For all hosts: /etc/hosts, known-hosts, iptables
+	- `./provision --init-iptables --install-known-hosts --update-etc-hosts`
+  - For initial host:  Install bootstrap etcd2 config
+	- `./provision --install-temp-bootstrap-config`
+  - If replica:  Add droplet to cluster
+	- TBD; should be merged with previous
 - Install FreeIPA server/replica
   - `./provision --pull-ipa-image --install-ipa-config --init-ipa`
 - Install FreeIPA client
@@ -264,3 +271,5 @@ For each FreeIPA server (first) and replicas (later):
 - Set up FreeIPA service
 - Set up syslog service
 - Set up haproxy service
+- For initial host:  Remove bootstrap etcd2 config
+  - `./provision --remove-temp-bootstrap-config`

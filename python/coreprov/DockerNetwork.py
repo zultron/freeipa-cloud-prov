@@ -1,7 +1,8 @@
+import os
 from .RemoteControl import RemoteControl
 
 class DockerNetwork(RemoteControl):
-    iptables_rules_path = "/var/lib/iptables/rules-save"
+    iptables_rules_path = "/media/state/iptables/rules-save"
 
     def init_docker_network(self, host):
         ip = self.get_ip_addr(host)
@@ -23,10 +24,12 @@ class DockerNetwork(RemoteControl):
 
     def init_iptables(self, host):
         ip = self.get_ip_addr(host)
-        print "Copying firewall rules to %s:%s" % (host, self.iptables_rules_path)
-        self.put_file(
-            ip, self.render_iptables_config(host), 'iptables-rules-save')
+        print "Copying firewall rules to %s:%s" % \
+            (host, self.iptables_rules_path)
         self.remote_sudo(
-            'mv iptables-rules-save %s' % self.iptables_rules_path, ip)
+            "install -d -o core %s" %
+            os.path.dirname(self.iptables_rules_path), ip)
+        self.put_file(
+            ip, self.render_iptables_config(host), self.iptables_rules_path)
         self.remote_sudo(
             'systemctl restart iptables-restore.service', ip)

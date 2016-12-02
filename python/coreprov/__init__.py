@@ -39,38 +39,27 @@ class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, Syslog, HAProxy):
             self.destroy_pickle()
 
         if self._args.provision_all:
-            # Provision DigitalOcean droplets
-            for host in hosts:
-                self.create_data_volumes(host)
-            for host in hosts:
-                self.create_droplet(host, wait=True)
-            for host in hosts:
-                self.init_data_volume(host)
-            for host in hosts:
-                self.update_etc_hosts(host)
-            for host in hosts:
-                self.init_docker_network(host)
-            # Set up network security
-            for host in hosts:
-                self.install_host_certs(host)
-            for host in hosts:
-                self.init_iptables(host)
-            # IPSec in transport mode not trivially adapted to Docker
-            # networking
-            #
-            # for host in hosts:
-            #     self.install_ipsec(host)
-            for host in hosts:
-                self.install_known_hosts(host)
-            # Provision FreeIPA
-            for host in hosts:
-                self.pull_freeipa_docker_image(host)
-            for host in hosts:
-                self.install_freeipa_config(host)
+            # IPA server first, replicas second
             for host in [self.freeipa_master] + self.freeipa_replicas:
-                # IPA server first, replicas second
                 if host not in hosts:  continue
-                self.install_freeipa(host)
+
+                # DigitalOcean provisioning
+                self.create_data_volumes(host)
+                self.create_droplet(host, wait=True)
+                # Post-provisioning configuration
+                self.init_data_volume(host)
+                self.install_update_config(host)
+                self.init_docker_network(host)
+                # Bootstrap etcd2 cluster
+                self.install_temp_bootstrap_config(host)
+                #self.join_etcd2_cluster(host)
+                # Set up network security
+                self.init_iptables(host)
+                self.install_known_hosts(host)
+                # Provision FreeIPA
+                self.pull_freeipa_docker_image(host)
+                # self.install_freeipa_config(host)
+                # self.install_freeipa(host)
 
         if self._args.run:
             for host in hosts:
@@ -134,8 +123,14 @@ class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, Syslog, HAProxy):
             if self._args.install_system_env:
                 self.install_system_env(host)
 
-            if self._args.update_etc_hosts:
-                self.update_etc_hosts(host)
+            if self._args.install_temp_bootstrap_config:
+                self.install_temp_bootstrap_config(host)
+
+            if self._args.install_update_config:
+                self.install_update_config(host)
+
+            if self._args.remove_temp_bootstrap_config:
+                self.remove_temp_bootstrap_config(host)
 
             if self._args.init_docker_network:
                 self.init_docker_network(host)
@@ -246,9 +241,6 @@ class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, Syslog, HAProxy):
         if self._args.init_ipa or self._args.install_ipa:
             self.init_ipa_service(host)
 
-        if self._args.install_resolv_conf or self._args.install_ipa:
-            self.install_resolv_conf(host)
-
         if self._args.install_ipa_client or self._args.install_ipa:
             self.install_ipa_client(host)
 
@@ -262,6 +254,8 @@ class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, Syslog, HAProxy):
         if self._args.install_etcd_certs or self._args.install_ipa:
             for host in hosts:
                 self.install_etcd_certs(host)
+                self.remove_temp_bootstrap_config(host)
+                self.install_update_config(host)
 
         if self._args.ipa_client_exec:
             self.ipa_client_exec(self._args.ipa_client_exec)
@@ -414,8 +408,14 @@ class CLIArgParser(argparse.ArgumentParser):
             '--install-system-env', action='store_true',
             help='Install system environment file')
         post_group.add_argument(
-            '--update-etc-hosts', action='store_true',
-            help='Add /etc/hosts entries for droplets')
+            '--install-temp-bootstrap-config', action='store_true',
+            help='Install temporary configuration needed during bootstrap')
+        post_group.add_argument(
+            '--install-update-config', action='store_true',
+            help='Install configuration updates on host')
+        post_group.add_argument(
+            '--remove-temp-bootstrap-config', action='store_true',
+            help='Remove temporary configuration needed during bootstrap')
         post_group.add_argument(
             '--init-docker-network', action='store_true',
             help='Initialize Docker container network')
@@ -506,9 +506,6 @@ class CLIArgParser(argparse.ArgumentParser):
         freeipa_group.add_argument(
             '--init-ipa', action='store_true',
             help='Run "ipa-{server,replica}-install" on FreeIPA server/replica')
-        freeipa_group.add_argument(
-            '--install-resolv-conf', action='store_true',
-            help='Install /etc/resolv.conf pointing to IPA on host')
         freeipa_group.add_argument(
             '--install-ipa-client', action='store_true',
             help='Install IPA client container on FreeIPA server/replica')

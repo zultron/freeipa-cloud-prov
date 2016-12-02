@@ -53,20 +53,31 @@ class DOCoreos(RemoteControl, CA):
                               if k.name in self.keys]
         return self._ssh_keys
 
-    def cloud_config(self, hostname):
+    def cloud_config(self, host):
         self.get_discovery_url()
+        # YAML-format `ssh_authorized_keys` cloud-config key
         keys = yaml.dump(
             dict(ssh_authorized_keys=[
                 str(k.public_key) for k in self.ssh_keys ]),
             default_flow_style=False)
+        # cloud-config etcd2 `initial-cluster` values
+        initial_cluster = ','.join(
+            ['%s=http://127.0.0.1:2380' % host] +
+            ['%s=https://%s:2380' % (h, h) for h in self.hosts])
+        initial_cluster_state = (
+            "new" if self.hosts[host].get('bootstrap_order', 1) == 0 \
+            else "existing")
         return self.render_jinja2(
-            hostname, 'cloud-config.yaml',
+            host, 'cloud-config.yaml',
             ssh_authorized_keys = keys,
             serv_cert_file_path = self.serv_cert_file_path,
             serv_key_file_path = self.serv_key_file_path,
             clnt_cert_file_path = self.clnt_cert_file_path,
             clnt_key_file_path = self.clnt_key_file_path,
             ca_cert_file_path = self.ca_cert_file_path,
+            initial_cluster = initial_cluster,
+            initial_cluster_state = initial_cluster_state,
+            initial_cluster_token = self.realm,
             )
 
     def get_droplet(self, name, raise_error=False):
@@ -253,6 +264,80 @@ class DOCoreos(RemoteControl, CA):
             **kwargs)
         return subs
 
+    def dropin_path(self, service, fname=""):
+        return "/etc/systemd/system/%s.service.d/%s" % (service, fname)
+    
+    etcd2_bootstrap_conf_fname = "40-etcd2-bootstrap.conf"
+    def install_bootstrap_etcd_dropin(self, host):
+        ip = self.to_ip(host)
+        print "Installing temporary bootstrap etcd dropin on %s" % host
+        self.remote_sudo(
+            "install -d -o core %s" % self.dropin_path('etcd2'), ip)
+        self.put_file(
+            ip, self.render_jinja2(host, self.etcd2_bootstrap_conf_fname),
+            self.dropin_path('etcd2', self.etcd2_bootstrap_conf_fname))
+        self.remote_sudo("systemctl daemon-reload", ip)
+        self.remote_sudo("systemctl restart etcd2", ip)
+
+    def remove_bootstrap_etcd_dropin(self, host):
+        ip = self.to_ip(host)
+        print "Removing temporary bootstrap etcd dropin on %s" % host
+        self.remote_sudo(
+            "rm -f %s" % self.dropin_path(
+                'etcd2', self.etcd2_bootstrap_conf_fname), ip)
+        self.remote_sudo("systemctl daemon-reload", ip)
+        self.remote_sudo("systemctl restart etcd2", ip)
+    
+    fleet_bootstrap_conf_fname = "40-fleet-bootstrap.conf"
+    def install_bootstrap_fleet_dropin(self, host):
+        ip = self.to_ip(host)
+        print "Installing temporary bootstrap fleet dropin on %s" % host
+        self.remote_sudo(
+            "install -d -o core %s" % self.dropin_path('fleet'), ip)
+        self.put_file(
+            ip, self.render_jinja2(host, self.fleet_bootstrap_conf_fname),
+            self.dropin_path('fleet', self.fleet_bootstrap_conf_fname))
+        self.remote_sudo("systemctl daemon-reload", ip)
+        self.remote_sudo("systemctl restart fleet", ip)
+
+    def remove_bootstrap_fleet_dropin(self, host):
+        ip = self.to_ip(host)
+        print "Removing temporary bootstrap fleet dropin on %s" % host
+        self.remote_sudo(
+            "rm -f %s" % self.dropin_path(
+                'fleet', self.fleet_bootstrap_conf_fname), ip)
+        self.remote_sudo("systemctl daemon-reload", ip)
+        self.remote_sudo("systemctl restart fleet", ip)
+
+    def install_temp_bootstrap_config(self, host):
+        if self.hosts[host].get('bootstrap_order', None) != 0:
+            print "Not installing bootstrap config on %s:  " \
+                "cluster exists" % host
+            return
+        self.install_bootstrap_etcd_dropin(host)
+        self.install_bootstrap_fleet_dropin(host)
+        self.bootstrapping = True
+        self.pickle_config()
+
+    def remove_temp_bootstrap_config(self, host):
+        self.remove_bootstrap_etcd_dropin(host)
+        self.remove_bootstrap_fleet_dropin(host)
+        self.bootstrapping = False
+        self.pickle_config()
+
+    def install_update_config(self, host):
+        ip = self.to_ip(host)
+        print "Installing configuration updates on %s" % host
+        self.remote_sudo("install -d -o core /media/state/configs", ip)
+        self.render_and_put(
+            host, 'update-config', '/media/state/configs/update-config',
+            mode=0755)
+        self.render_and_put(
+            host, 'resolv.conf', '/media/state/configs/resolv.conf')
+        self.render_and_put(
+            host, 'hosts', '/media/state/configs/hosts')
+        self.remote_sudo("systemctl restart update-config", ip)
+
     def install_host_certs(self, hostname):
         ip = self.to_ip(hostname)
         if not self.hosts[hostname].has_key('cert'):
@@ -282,11 +367,12 @@ class DOCoreos(RemoteControl, CA):
         ip = self.get_ip_addr(host)
         # etcdctl and SSL are ugly
         # https://www.digitalocean.com/community/tutorials/how-to-secure-your-coreos-cluster-with-tls-ssl-and-firewall-rules
+        ssl_opts="" if self.bootstrapping else \
+            "--cert-file=%s --key-file=%s --ca-file=%s" % (
+                self.clnt_cert_file_path, self.clnt_key_file_path,
+                self.ca_cert_file_path)
         out = self.remote_run(
-            'etcdctl --endpoint="https://127.0.0.1:2379/" '
-            '--cert-file=%s --key-file=%s --ca-file=%s cluster-health' %
-            (self.clnt_cert_file_path, self.clnt_key_file_path,
-             self.ca_cert_file_path), ip)
+            'etcdctl %s cluster-health' % ssl_opts, ip)
 
     def init_data_volume(self, host):
         print "Initializing data volume for %s" % host

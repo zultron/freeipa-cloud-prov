@@ -375,17 +375,15 @@ class FreeIPA(RemoteControl):
     def install_etcd_certs(self, host):
         ip = self.to_ip(host)
         print "Installing CoreOS etcd2 certs on host %s" % host
-        # self.issue_cert_pem(
-        #     host, self.serv_cert_file_path, self.serv_key_file_path,
-        #     host, "ETCD")
-        # self.remote_sudo("chown etcd %s %s" %
-        #                  (self.serv_cert_file_path, self.serv_key_file_path),
-        #                  ip)
+        self.issue_cert_pem(
+            host, self.serv_cert_file_path, self.serv_key_file_path,
+            host, "ETCD", ca_cert_fname=self.ca_cert_file_path)
+        self.remote_sudo("chown etcd %s %s" %
+                         (self.serv_cert_file_path, self.serv_key_file_path),
+                         ip)
         self.issue_cert_pem(
             host, self.clnt_cert_file_path, self.clnt_key_file_path,
-            host, "ETCD", ca_cert_fname=self.ca_cert_file_path,
-            altname_ips=['127.0.0.1', self.hconfig(host, 'ip_address'),
-                         self.hconfig(host, 'ipa_ip')])
-        self.remote_sudo("chmod a+r %s %s" %
-                         (self.clnt_cert_file_path, self.clnt_key_file_path),
-                         ip)
+            host, "ETCD")
+        self.remote_sudo("chmod a+r %s %s %s" %
+                         (self.clnt_cert_file_path, self.clnt_key_file_path,
+                          self.ca_cert_file_path), ip)

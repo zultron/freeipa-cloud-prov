@@ -170,6 +170,11 @@ class RemoteControl(Config):
             # Use sudo to change owner
             self.remote_sudo('chown %s %s' % (owner, remote_fname), hostname)
 
+    def render_and_put(self, hostname, template, remote_fname, **kwargs):
+        ip = self.to_ip(hostname)
+        self.put_file(ip, self.render_jinja2(hostname, template),
+                      remote_fname, **kwargs)
+
     def get_file(self, hostname, remote_fname, username=default_user):
         print "- Retrieving file %s:%s" % (hostname, remote_fname)
         ssh = self.conn(hostname, username)
@@ -184,7 +189,7 @@ class RemoteControl(Config):
         for h in hosts:
             if h in self.hosts:  h = self.to_ip(h)
             if getattr(self, 'host_keys', {}).get(h, None) is None:  continue
-            res.append('%s %s' % (h, self.host_keys[h]))
+            res.append('%s,%s %s' % (h, self.to_ip(h), self.host_keys[h]))
         return res
 
     def install_known_hosts(self, hostname):

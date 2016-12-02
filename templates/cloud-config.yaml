@@ -17,42 +17,67 @@ coreos:
     # https://coreos.com/os/docs/latest/update-strategies.html
     reboot-strategy: etcd-lock
   etcd2:
-    # generate a new token for each unique cluster:
-    # curl -w "\n" "https://discovery.etcd.io/new?size=3"
+    # https://coreos.com/etcd/docs/latest/configuration.html
     #
-    discovery: {{discovery_url}}
-    # multi-region and multi-cloud deployments need to use $public_ipv4
-    # advertise-client-urls: https://$public_ipv4:2379,https://$public_ipv4:4001
-    advertise-client-urls: https://$public_ipv4:2379
-    initial-advertise-peer-urls: https://$public_ipv4:2380
-    # listen on both the official ports and the legacy ports
-    # legacy ports can be omitted if your application doesn't depend on them
-    # listen-client-urls: https://0.0.0.0:2379,https://0.0.0.0:4001
-    listen-client-urls: https://0.0.0.0:2379
-    listen-peer-urls: https://$public_ipv4:2380
-    # tune raft elections
-    # https://github.com/coreos/etcd/blob/v2.3.2/Documentation/tuning.md#time-parameters
+    # Member flags
+    #
+    # Unique name for this member
+    name: {{hostname}}
+    # Tune raft elections
+    # https://coreos.com/etcd/docs/latest/tuning.html#time-parameters
     heartbeat-interval: 300
     election-timeout: 3000
-    # SSL cert file locations
+    # URLs to listen on for peer and client traffic; use SSL on
+    # external interfaces
+    listen-peer-urls: https://$public_ipv4:2380,http://127.0.0.1:2380
+    listen-client-urls: https://$public_ipv4:2379,http://127.0.0.1:2379
+    #
+    # Clustering flags
+    #
+    # Initial flags for bootstrapping new member (not used in restarts)
+    initial-advertise-peer-urls: http://127.0.0.1:2380,https://{{hostname}}:2380
+    initial-cluster:  {{initial_cluster}}
+    initial-cluster-state: {{initial_cluster_state}}
+    initial-cluster-token: {{initial_cluster_token}}
+    # List of this member's client URLs to advertise to the rest of
+    # the cluster
+    advertise-client-urls: https://{{hostname}}:2379
+    # DNS srv domain used to bootstrap the cluster
+    #discovery-srv: {{domain_name}}
+    # Exit (don't proxy) when discovery fails
+    discovery-fallback: exit
+    # Reject reconfiguration requests that would cause quorum loss
+    strict-reconfig-check: true
+    #
+    # Security flags
+    #
+    # SSL cert file locations for client and peer servers; enable
+    # cert-based authentication
     cert_file: {{serv_cert_file_path}}
     key_file: {{serv_key_file_path}}
-    trusted_ca_file: {{ca_cert_file_path}}
     client_cert_auth: true
+    trusted_ca_file: {{ca_cert_file_path}}
     peer_cert_file: {{clnt_cert_file_path}}
     peer_key_file: {{clnt_key_file_path}}
-    peer_trusted_ca_file: {{ca_cert_file_path}}
     peer_client_cert_auth: true
+    peer_trusted_ca_file: {{ca_cert_file_path}}
+    #
+    # Logging flags
+    #
+    # Drop the default log level to DEBUG for all subpackages
+    #debug: true
+    # Set individual etcd subpackages to specific log levels
+    #log-package-levels: etcdserver=WARNING,security=DEBUG
   fleet:
     metadata: {{fleet_metadata}}
     # Use HTTPS on port 2379:
-    etcd_servers: https://$public_ipv4:2379
-    public-ip: $public_ipv4   # used for fleetctl ssh command
+    etcd_servers: https://{{hostname}}:2379
+    public-ip: {{hostname}}   # used for fleetctl ssh command
     etcd_cafile: {{ca_cert_file_path}}
     etcd_certfile: {{clnt_cert_file_path}}
     etcd_keyfile: {{clnt_key_file_path}}
   locksmith:
-    endpoint: https://$public_ipv4:2379
+    endpoint: https://{{hostname}}:2379
     etcd_cafile: {{ca_cert_file_path}}
     etcd_certfile: {{clnt_cert_file_path}}
     etcd_keyfile: {{clnt_key_file_path}}
@@ -66,6 +91,12 @@ coreos:
     - name: iptables-restore.service
       enable: true
       command: start
+      drop-ins:
+        - name: 40-iptables-restore-source.conf
+          content: |
+            [Service]
+            ExecStartPre=/usr/bin/ln -sf /media/state/iptables/rules-save \
+                /var/lib/iptables/rules-save
     # Mask legacy etcd[1] service so it doesn't accidentally start
     - name: etcd.service
       mask: true
@@ -94,6 +125,29 @@ coreos:
 
         [Install]
         WantedBy=multi-user.target
+    - name: update-config.service
+      # command: start
+      content: |
+        [Unit]
+        Description=Update configuration files from data directory
+        DefaultDependencies=no
+        After=media-state.mount
+        Before=sysinit.target
+
+        [Service]   
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStart=/media/state/configs/update-config
+    #######################################
+    # Other system units
+    #
+    - name: ntpd.service
+      enable: true
+      command: start
+    - name: ntpdate.service
+      enable: true
+      command: start
+
     # Load IPSec kernel module
     # https://coreos.com/os/docs/latest/other-settings.html#via-cloud-init
     # Also see below /etc/modules-load.d/af_key.conf
@@ -110,11 +164,11 @@ write_files:
       [Service]
       Environment="DOCKER_OPT_IPMASQ=--ip-masq=false --iptables=false --userland-proxy=false"
 
-  # Wish for a purpose-built Docker container with IPA tools, and
-  # apt-get install -y emacs-nox tcpdump ldap-utils bridge-utils psutils iptables net-tools dnsutils telnet
   - path: /home/core/.toolboxrc
+    # https://coreos.com/os/docs/latest/install-debugging-tools.html
     content: |
-      TOOLBOX_DOCKER_IMAGE=debian
+      TOOLBOX_DOCKER_IMAGE=zultron/freeipa-cloud-prov
+      TOOLBOX_DOCKER_TAG=ipaclient
       TOOLBOX_USER=root
 
   # This seems to break provisioning
