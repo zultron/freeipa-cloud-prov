@@ -10,45 +10,123 @@ hosts:
   # - volume_size:  In GB
   # - swap_size: In GB; data partition will be (volume_size -
   #   swap_size) GB
-  # - ipa_role:  Exactly one host must ba `server`, and others `replica`
   #
   # This system has been tested with three hosts.
   ipa0.example.com:
+    bootstrap_order: 0
     region: nyc1
     size: 1gb
     image: coreos-stable
     volume_size: 10
     swap_size: 2
-    ipa_role: server
-    host_id: 00
+    host_id: 0
     network:
       name: cnet
       subnet: 172.16.0.0/24
       gateway: 172.16.0.1
+    ipa_ip: 172.16.0.2
+    ipaclient_ip: 172.16.0.3
+    syslog_ip: 172.16.0.4
+    haproxy_ip: 172.16.0.5
+    services:
+      http:
+        ipa:
+          acl: "base_beg /ipa"
+          servers:
+            ipa:
+              ip: 172.16.0.2
+        mywebservice:
+          acl: "path_beg /myweb"
+          reqrep:  "^([^\\ :]*)\\ /myweb/(.*) \\1\\ /\\2"
+          servers:
+            pbx:
+              ip: 172.16.0.6
+    docker_ports:
+      172.16.0.2:
+        HTTP/HTTPS:
+          # This will be pointed at HAProxy after provisioning
+          80: tcp
+          443: tcp
+        FreeIPA DNS:
+          53: both
+        FreeIPA LDAP/LDAPS:
+          389: tcp
+          636: tcp
+        FreeIPA Kerberos:
+          88: both
+          464: both
   ipa1.example.com:
     region: nyc1
     size: 1gb
     image: coreos-stable
     volume_size: 10
     swap_size: 2
-    ipa_role: replica
     host_id: 1
     network:
       name: cnet
       subnet: 172.16.1.0/24
       gateway: 172.16.1.1
+    ipa_ip: 172.16.1.2
+    ipaclient_ip: 172.16.1.3
+    syslog_ip: 172.16.1.4
+    haproxy_ip: 172.16.1.5
+    services:
+      http:
+        ipa:
+          acl: "base_beg /ipa"
+          servers:
+            ipa:
+              ip: 172.16.1.2
+    docker_ports:
+      172.16.1.2:
+        HTTP/HTTPS:
+          # This will be pointed at HAProxy after provisioning
+          80: tcp
+          443: tcp
+        FreeIPA DNS:
+          53: both
+        FreeIPA LDAP/LDAPS:
+          389: tcp
+          636: tcp
+        FreeIPA Kerberos:
+          88: both
+          464: both
   ipa2.example.com:
     region: nyc1
     size: 1gb
     image: coreos-stable
     volume_size: 10
     swap_size: 2
-    ipa_role: replica
     host_id: 2
     network:
       name: cnet
       subnet: 172.16.2.0/24
       gateway: 172.16.2.1
+    ipa_ip: 172.16.2.2
+    ipaclient_ip: 172.16.2.3
+    syslog_ip: 172.16.2.4
+    haproxy_ip: 172.16.2.5
+    services:
+      http:
+        ipa:
+          acl: "base_beg /ipa"
+          servers:
+            ipa:
+              ip: 172.16.2.2
+    docker_ports:
+      172.16.2.2:
+        HTTP/HTTPS:
+          # This will be pointed at HAProxy after provisioning
+          80: tcp
+          443: tcp
+        FreeIPA DNS:
+          53: both
+        FreeIPA LDAP/LDAPS:
+          389: tcp
+          636: tcp
+        FreeIPA Kerberos:
+          88: both
+          464: both
 # Names of DigitalOcean SSH keys to install
 keys:
   - jdoe@example.com RSA

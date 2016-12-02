@@ -28,6 +28,11 @@ Environment=HAPROXY_DATA=/media/state/haproxy-data
 ## Directives with "=-" are allowed to fail without consequence
 ExecStartPre=-/usr/bin/docker kill haproxy
 ExecStartPre=-/usr/bin/docker rm haproxy
+ExecStartPre=/usr/bin/bash -c "/usr/bin/cat \
+	/media/state/haproxy-data/cert.pem \
+	/media/state/haproxy-data/key.pem \
+	/media/state/haproxy-data/ca.pem \
+	> /media/state/haproxy-data/combo.pem"
 ExecStart=/usr/bin/docker run --rm \
         --hostname ${HOST_NAME} \
         --name haproxy \

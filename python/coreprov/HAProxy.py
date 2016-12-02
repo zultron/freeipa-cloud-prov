@@ -1,7 +1,7 @@
 import os
-from .RemoteControl import RemoteControl
+from .FreeIPA import FreeIPA
 
-class HAProxy(RemoteControl):
+class HAProxy(FreeIPA):
     haproxy_docker_image = 'haproxy'
     haproxy_data_dir = '/media/state/haproxy-data'
 
@@ -13,12 +13,21 @@ class HAProxy(RemoteControl):
     def haproxy_file_path(self, fname):
         return os.path.join(self.haproxy_data_dir, fname)
 
+    def install_haproxy_certs(self, host):
+        print "Installing HAProxy certs on %s" % host
+
+        self.create_svc_principal(host, 'HAPROXY')
+        self.issue_cert_pem(
+            host, self.haproxy_file_path('cert.pem'),
+            self.haproxy_file_path('key.pem'),
+            host, "HAPROXY",
+            ca_cert_fname=self.haproxy_file_path('ca.pem'))
+
     def install_haproxy_config(self, host):
         ip = self.to_ip(host)
-        print "Installing HAProxy configuration on %s" % host
+        print "Installing HAProxy config file on %s" % host
 
         self.remote_sudo('install -d -o core %s' % self.haproxy_data_dir, ip)
-
         self.put_file(
             ip, self.render_jinja2(host, 'haproxy.cfg'),
                 self.haproxy_file_path('haproxy.cfg'))

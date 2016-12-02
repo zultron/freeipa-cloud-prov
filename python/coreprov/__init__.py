@@ -1,7 +1,6 @@
 from .DOCoreos import DOCoreos
 #from .IPSec import ProvisionIPSec
 from .DockerNetwork import DockerNetwork
-from .FreeIPA import FreeIPA
 from .Syslog import Syslog
 from .HAProxy import HAProxy
 
@@ -12,7 +11,7 @@ __all__ = ['CLIArgParser', 'CoreProvCLI']
 ########################################################################
 # CLI Processing
 
-class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, Syslog, HAProxy):
+class CoreProvCLI(DOCoreos, DockerNetwork, HAProxy, Syslog):
     '''
     CoreProvCLI().run()
     '''
@@ -278,11 +277,15 @@ class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, Syslog, HAProxy):
             if self._args.install_haproxy_config or self._args.install_haproxy:
                 self.install_haproxy_config(host)
 
+            if self._args.install_haproxy_certs or self._args.install_haproxy:
+                self.install_haproxy_certs(host)
+
             if self._args.start_haproxy or self._args.install_haproxy:
                 self.start_haproxy_server(host)
 
         # # Testing
-        # for host in hosts:
+        for host in hosts:
+            self.ipa_fix_https_redirect(host)
         #     self.install_ca_cert(host, self.ca_cert_file_path)
         #     self.issue_cert_pem(
         #         host, self.serv_cert_file_path, self.serv_key_file_path,
@@ -535,6 +538,9 @@ class CLIArgParser(argparse.ArgumentParser):
         haproxy_group.add_argument(
             '--install-haproxy-config', action='store_true',
             help='Install HAProxy configuration files')
+        haproxy_group.add_argument(
+            '--install-haproxy-certs', action='store_true',
+            help='Install HAProxy SSL certificates')
         haproxy_group.add_argument(
             '--start-haproxy', action='store_true',
             help='Start HAProxy containers')

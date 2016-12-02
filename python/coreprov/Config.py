@@ -80,12 +80,11 @@ class Config(object):
 
     @property
     def master_host(self):
-        # FIXME Need metadata rework, 'master=true' or something
         master_list = [h for h in self.hosts
-                       if self.hconfig(h, 'ipa_role') == 'server']
+                       if self.hconfig(h).get('bootstrap_order',1) == 0]
         if len(master_list) != 1:
             raise RuntimeError(
-                "Config should define exactly one host 'ipa_role: server'")
+                "Config should define exactly one host 'bootstrap_order: 0'")
         return master_list[0]
 
     def other_hosts(self, host):

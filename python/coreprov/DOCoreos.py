@@ -242,19 +242,21 @@ class DOCoreos(RemoteControl, CA):
         self.pickle_config()
         return a
 
+    @property
+    def initial_host(self):
+        return [ h for h in self.hosts \
+                 if self.hosts[h].get('bootstrap_order',1) == 0 ][0]
+
     def substitutions(self, host, **kwargs):
         # Add extra metadata
         fleet_metadata = "region=%s" % self.hosts[host]['region']
-        if self.hosts[host].get('ipa_role') == "server":
-            fleet_metadata += ',ipa=true,ipa_role=server'
-        if self.hosts[host].get('ipa_role') == "replica":
-            fleet_metadata += ',ipa=true,ipa_role=replica'
+        fleet_metadata += ',ipa=true'
         fleet_metadata += ',host_id=%s' % self.hosts[host]['host_id']
 
         replica_names = [n for n in self.hosts \
-                         if self.hosts[n]['ipa_role'] == 'replica' ]
+                         if n != self.initial_host ]
         replica_ips = [self.get_ip_addr(n) for n in self.hosts \
-                         if self.hosts[n]['ipa_role'] == 'replica' ]
+                         if n != self.initial_host ]
 
         subs = super(DOCoreos, self).substitutions(
             host,

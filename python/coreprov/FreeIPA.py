@@ -16,17 +16,15 @@ class FreeIPA(RemoteControl):
 
     @property
     def freeipa_master(self):
-        masters = [h for h in self.hosts \
-                   if self.hosts[h]['ipa_role'] == 'server']
+        masters = [h for h in self.hosts if h == self.initial_host]
         if len(masters) != 1:
             raise RuntimeError(
-                "Exactly one host must have 'ipa_role: replica' in config")
+                "Exactly one host must have 'bootstrap_order: 0' in config")
         return masters[0]
 
     @property
     def freeipa_replicas(self):
-        return [h for h in self.hosts \
-                if self.hosts[h]['ipa_role'] == 'replica']
+        return [h for h in self.hosts if h == self.initial_host]
 
     def is_master(self, host):
         return host == self.freeipa_master
@@ -168,6 +166,17 @@ class FreeIPA(RemoteControl):
             'echo "%s" | docker exec -i ipa '
             'ldapmodify -c -x -D "cn=Directory Manager" -w %s' %
             (input, self.ds_password), ip, stdin_in=input, get_pty=True)
+
+    def ipa_fix_https_redirect(self, host):
+        ip = self.to_ip(host)
+        print "Disabling IPA web UI redirect to https on %s" % host
+        self.remote_docker_exec(
+            host, 'ipa',
+            "sed -i /data/etc/httpd/conf.d/ipa-rewrite.conf"
+            " -e '/RewriteCond.*SERVER_PORT/,+3 s/^/#/'", quiet=False)
+        self.remote_docker_exec(
+            host, 'ipa',
+            "systemctl restart httpd.service", quiet=False)
 
     def named_disable_zone_transfers(self, host=None, domain=None):
         if domain is None:  domain = self.domain_name
@@ -341,6 +350,8 @@ class FreeIPA(RemoteControl):
         self.harden_named(host)
         # ldap config
         self.harden_ldap(host)
+        # apache config
+        self.ipa_fix_https_redirect(host)
         # IPA config
         self.kinit_admin(host)
         if host == self.freeipa_master:

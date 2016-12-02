@@ -115,6 +115,7 @@ configure FreeIPA:
 	- RHEL7 system auth guide [certmonger][certmonger]
     - [RHEL6 replication docs][rhel6-ipa-rep-docs]
 	- [NSS `certutil`][nss-certutil]
+	- [FreeIPA behind SSL proxy][freeipa-ssl-proxy]
 
 [freeipa]: http://www.freeipa.org/page/Main_Page
 [freeipa-docker]: https://github.com/adelton/docker-freeipa
@@ -129,6 +130,7 @@ configure FreeIPA:
 [certmonger]: https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/7/html/System-Level_Authentication_Guide/certmongerX.html
 [rhel6-ipa-rep-docs]: https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/6/html/Identity_Management_Guide/ipa-replica-manage.html
 [nss-certutil]: https://developer.mozilla.org/en-US/docs/Mozilla/Projects/NSS/tools/NSS_Tools_certutil
+[freeipa-ssl-proxy]: https://www.adelton.com/freeipa/freeipa-behind-ssl-proxy
 
 - [HAProxy][haproxy]:
   - [Official HAProxy Docker Hub images][haproxy-docker-hub]
