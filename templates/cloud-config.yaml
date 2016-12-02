@@ -147,7 +147,12 @@ coreos:
     - name: ntpdate.service
       enable: true
       command: start
-
+    - name: docker.service
+      drop-ins:
+        - name: no-ip-masq.conf
+          content: |
+            [Service]
+            Environment="DOCKER_OPT_IPMASQ=--ip-masq=false --iptables=false --userland-proxy=false"
     # Load IPSec kernel module
     # https://coreos.com/os/docs/latest/other-settings.html#via-cloud-init
     # Also see below /etc/modules-load.d/af_key.conf
@@ -157,12 +162,7 @@ coreos:
 write_files:
   # Load IPSec kernel module
   - path: /etc/modules-load.d/af_key.conf
-    content: af_key
-
-  - path: /run/systemd/system/docker.service.d/no-ip-masq.conf
-    content: |
-      [Service]
-      Environment="DOCKER_OPT_IPMASQ=--ip-masq=false --iptables=false --userland-proxy=false"
+    content: "af_key"
 
   - path: /home/core/.toolboxrc
     # https://coreos.com/os/docs/latest/install-debugging-tools.html
@@ -178,7 +178,6 @@ write_files:
   #     # /etc/skel/.bashrc
   #     #
   #     # Set environment so etcdctl works over SSL
-  #     export ETCDCTL_ENDPOINT=https://127.0.0.1:2379/
   #     export ETCDCTL_CERT_FILE={{clnt_cert_file_path}}
   #     export ETCDCTL_KEY_FILE={{clnt_key_file_path}}
   #     export ETCDCTL_CA_FILE={{ca_cert_file_path}}
