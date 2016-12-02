@@ -56,10 +56,13 @@ class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, Syslog, HAProxy):
                 # Set up network security
                 self.init_iptables(host)
                 self.install_known_hosts(host)
-                # Provision FreeIPA
+                # Provision FreeIPA service and client
                 self.pull_freeipa_docker_image(host)
                 self.install_freeipa_config(host)
                 self.install_ipa_service(host)
+                self.install_ipa_client(host)
+                # Configure FreeIPA and remove bootstrap config
+                self.configure_ipa_server(host)
 
         if self._args.run:
             for host in hosts:
@@ -128,9 +131,6 @@ class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, Syslog, HAProxy):
 
             if self._args.install_update_config:
                 self.install_update_config(host)
-
-            if self._args.remove_temp_bootstrap_config:
-                self.remove_temp_bootstrap_config(host)
 
             if self._args.init_docker_network:
                 self.init_docker_network(host)
@@ -244,18 +244,9 @@ class CoreProvCLI(DOCoreos, DockerNetwork, FreeIPA, Syslog, HAProxy):
         if self._args.install_ipa_client or self._args.install_ipa:
             self.install_ipa_client(host)
 
-        if self._args.ipa_client_start or self._args.install_ipa:
-            self.ipa_client_start()
-
-        if self._args.ipa_init_dns or self._args.install_ipa:
+        if self._args.configure_ipa or self._args.install_ipa:
             for host in hosts:
-                self.ipa_init_dns(host)
-
-        if self._args.install_etcd_certs or self._args.install_ipa:
-            for host in hosts:
-                self.install_etcd_certs(host)
-                self.remove_temp_bootstrap_config(host)
-                self.install_update_config(host)
+                self.configure_ipa_server(host)
 
         if self._args.ipa_client_exec:
             self.ipa_client_exec(self._args.ipa_client_exec)
@@ -414,9 +405,6 @@ class CLIArgParser(argparse.ArgumentParser):
             '--install-update-config', action='store_true',
             help='Install configuration updates on host')
         post_group.add_argument(
-            '--remove-temp-bootstrap-config', action='store_true',
-            help='Remove temporary configuration needed during bootstrap')
-        post_group.add_argument(
             '--init-docker-network', action='store_true',
             help='Initialize Docker container network')
         post_group.add_argument(
@@ -510,14 +498,8 @@ class CLIArgParser(argparse.ArgumentParser):
             '--install-ipa-client', action='store_true',
             help='Install IPA client container on FreeIPA server/replica')
         freeipa_group.add_argument(
-            '--ipa-client-start', action='store_true',
-            help='Start IPA client container on FreeIPA server and kinit admin')
-        freeipa_group.add_argument(
-            '--ipa-init-dns', action='store_true',
-            help='Initialize DNS for IPA host with zone and container records')
-        freeipa_group.add_argument(
-            '--install-etcd-certs', action='store_true',
-            help='Install etcd2 cluster server and client SSL certificates')
+            '--configure-ipa', action='store_true',
+            help='Set up DNS, LDAP and SSL')
         freeipa_group.add_argument(
             '--ipa-client-exec', action='store', metavar='COMMAND',
             help='Run command in IPA client container')

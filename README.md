@@ -174,6 +174,10 @@ Querying LDAP needs SASL auth mech explicitly defined
 
         docker exec -it ipa ldapsearch -H ldaps://h20.zultron.com -Y GSSAPI
 
+Run shell in `ipaclient` container, ready to run emacs
+
+        docker exec -it --detach-keys ctrl-^ ipaclient env TERM=screen bash
+
 ## IPA configuration TODO
 
 These should be added to automation
@@ -256,20 +260,18 @@ For each FreeIPA server (first) and replicas (later):
 	- `./provision --init-volumes`
   - Install docker network
 	- `./provision --init-docker-network`
-  - For all hosts: /etc/hosts, known-hosts, iptables
-	- `./provision --init-iptables --install-known-hosts --update-etc-hosts`
   - For initial host:  Install bootstrap etcd2 config
 	- `./provision --install-temp-bootstrap-config`
   - If replica:  Add droplet to cluster
 	- TBD; should be merged with previous
+  - For all hosts: update /etc/hosts, known-hosts, iptables
+	- `./provision --init-iptables --install-known-hosts --install-update-config`
 - Install FreeIPA server/replica
   - `./provision --pull-ipa-image --install-ipa-config --init-ipa`
 - Install FreeIPA client
-- Tweak IPA security, etc.
-- Set up IPA:  droplet DNS zone; delegations to client
-- Generate & install etcd certs from client
-- Set up FreeIPA service
+  - `./provision --install-ipa-client`
+- Configure IPA security and DNS; issue etcd2 certs for cluster;
+  remove temp. bootstrap config
+  - `./provision --configure-ipa`
 - Set up syslog service
 - Set up haproxy service
-- For initial host:  Remove bootstrap etcd2 config
-  - `./provision --remove-temp-bootstrap-config`

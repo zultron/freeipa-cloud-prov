@@ -1,0 +1,49 @@
+[Unit]
+Description=FreeIPA client service
+
+# Requirements
+Requires=etcd2.service
+Requires=docker.service
+Requires=ipa.service
+
+# Dependency ordering
+After=etcd2.service
+After=docker.service
+After=ipa.service
+
+[Service]
+# Let processes take awhile to start up (for first run Docker containers)
+TimeoutStartSec=0
+
+# Change killmode from "control-group" to "none" to let Docker remove
+# work correctly.
+KillMode=none
+
+# Get CoreOS environmental variables
+EnvironmentFile=/etc/environment
+EnvironmentFile=/media/state/system.env
+Environment="IPA_CLIENT_INSTALL_OPTS=-N --force-join --force --server=${HOST_NAME} --fixed-primary --domain=${DOMAIN_NAME}"
+
+
+# Pre-start and Start
+## Directives with "=-" are allowed to fail without consequence
+ExecStartPre=-/usr/bin/docker kill ipaclient
+ExecStartPre=-/usr/bin/docker rm ipaclient
+ExecStartPre=/usr/bin/echo IPA_CLIENT_INSTALL_OPTS=${IPA_CLIENT_INSTALL_OPTS}
+ExecStart=/usr/bin/docker run --privileged \
+        --hostname ipaclient.${REGION}.${DOMAIN_NAME} \
+        --name ipaclient \
+        --volume /media/state:/media/state \
+	--net cnet --ip ${IPACLIENT_IP} \
+        -e IPA_SERVER_IP=${HOST_IP} \
+	-e IPA_PORT_53_UDP_ADDR=${HOST_IP} \
+	-e PASSWORD=${ADMIN_PASSWORD} \
+	-e IPA_PORT_80_TCP_ADDR=${HOST_IP} \
+	-e IPA_CLIENT_INSTALL_OPTS="-N --force-join --force --server=${HOST_NAME} --fixed-primary --domain=${DOMAIN_NAME}" \
+	{{DOCKER_IMAGE}} -s
+
+# Stop
+ExecStop=/usr/bin/docker stop ipaclient
+
+[X-Fleet]
+MachineMetadata=ipa=true

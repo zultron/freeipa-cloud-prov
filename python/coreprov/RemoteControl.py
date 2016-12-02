@@ -146,14 +146,15 @@ class RemoteControl(Config):
                                  read_stdout=False, quiet=quiet)
         return stdout.readlines()
 
-    def remote_docker_exec(self, hostname, container, command, get_pty=True,
+    def remote_docker_exec(self, host, container, command, get_pty=True,
                            **kwargs):
+        ip = self.to_ip(host)
         if get_pty:
             cmd_fmt = 'docker exec -it %s %s'
         else:
             cmd_fmt = 'docker exec -i %s %s'
         return self.remote_run(cmd_fmt % (container, command),
-                               hostname, get_pty=get_pty, **kwargs)
+                               ip, get_pty=get_pty, **kwargs)
 
     def close(self, hostname, username=default_user):
         self.conn(hostname, username).close()

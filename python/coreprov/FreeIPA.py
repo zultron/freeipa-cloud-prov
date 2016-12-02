@@ -31,7 +31,7 @@ class FreeIPA(RemoteControl):
     def is_master(self, host):
         return host == self.freeipa_master
 
-    def freeipa_file_path(self, fname):
+    def freeipa_file_path(self, fname=""):
         return os.path.join(self.freeipa_data_dir, fname)
 
     def install_freeipa_config(self, host):
@@ -48,61 +48,6 @@ class FreeIPA(RemoteControl):
         self.put_file(
             ip, self.render_jinja2(host, fname), self.freeipa_file_path(fname))
 
-
-    def install_rndc_config(self, host):
-        ip = self.to_ip(host)
-        print 'Installing rndc config and key on %s' % host
-
-        self.remote_run('docker exec -i ipa rndc-confgen -a', ip)
-        self.remote_run('docker exec -i ipa restorecon /etc/rndc.key', ip)
-
-    # Hardening IPA:
-    # https://www.redhat.com/archives/freeipa-users/2014-April/msg00246.html
-    def harden_named(self, host):
-        ip = self.to_ip(host)
-        print "Restricting DNS recursion and zone transfers on %s" % host
-        acl="127.0.0.1; 10.0.0.0/8;"
-        self.remote_docker_exec(
-            ip, 'ipa',
-            "sed -i /data/etc/named.conf"
-            " -e '/allow-recursion/ s,any;,%s,'"
-            " -e '/allow-recursion/ a\        allow-transfer { none; };'" %
-            acl, quiet=False)
-
-        self.remote_docker_exec(
-            ip, 'ipa',
-            "systemctl restart named-pkcs11.service",
-            quiet=False)
-
-    def harden_ldap(self, host):
-        ip = self.to_ip(host)
-        print "Restricting LDAP anonymous binds on %s" % host
-        input = (
-            "dn: cn=config\n"
-            "changetype: modify\n"
-            "replace: nsslapd-allow-anonymous-access\n"
-            "nsslapd-allow-anonymous-access: rootdse\n"
-            "\n")
-        self.remote_run(
-            'echo "%s" | docker exec -i ipa '
-            'ldapmodify -c -x -D "cn=Directory Manager" -w %s' %
-            (input, self.ds_password), ip, stdin_in=input, get_pty=True)
-
-    def named_disable_zone_transfers(self, host, domain=None):
-        ip = self.to_ip(host)
-        if domain is None:  domain = self.domain_name
-        print "Disabling DNS zone transfers on %s" % host
-        self.remote_docker_exec(
-            ip, 'ipa',
-            "ipa dnszone-mod %s --allow-transfer='none;'" % domain,
-            quiet=False)
-
-    def ipa_set_default_login_shell(self, host):
-        ip = self.to_ip(host)
-        print "Setting default shell to /bin/bash"
-        self.remote_docker_exec(
-            ip, 'ipa', "ipa config-mod --defaultshell /bin/bash",
-            quiet=False)
 
     def install_ipa_service(self, host):
         ip = self.to_ip(host)
@@ -140,66 +85,102 @@ class FreeIPA(RemoteControl):
             ip, timeout=20*60,
             success_re=r'FreeIPA server configured\.',
             fail_re=r'Failed with result')
-        self.install_rndc_config(host)
-        self.harden_named(host)
-        self.harden_ldap(host)
-        self.kinit_admin(host)
-        self.named_disable_zone_transfers(host)
 
         # Simple functionality test
         # kinit admin
         # ipa user-find admin
 
 
-    def kinit_admin(self, host):
-        ip = self.to_ip(host)
-        print "Initializing kerberos ticket for admin on %s" % host
-        self.remote_docker_exec(
-            ip, 'ipa',
-            'bash -c \"echo %s | kinit admin\" >/dev/null' %
-            self.admin_password, quiet=False)
-
     def install_ipa_client(self, host):
         ip = self.to_ip(host)
 
-        print "Installing IPA client on host %s" % host
-        self.remote_run(
-            "docker pull %s" % self.freeipa_docker_client_image, ip)
-        install_opts = "-N --force-join --force --server=%s" \
-            " --fixed-primary --domain=zultron.com" % host
+        if host == self.freeipa_master:
+            print "Installing fleet ipaclient.service unit file"
+            self.remote_sudo(
+                "install -d -o core %s" % self.freeipa_file_path(), ip)
+            self.put_file(
+                ip, self.render_jinja2(
+                    host, 'ipaclient.service',
+                    DOCKER_IMAGE=self.freeipa_docker_client_image),
+                self.freeipa_file_path('ipaclient.service'))
+            self.remote_run(
+                'fleetctl submit %s' % \
+                self.freeipa_file_path('ipaclient.service'), ip)
+            self.remote_run('fleetctl load ipaclient.service', ip)
+
+        print 'Running FreeIPA client install on %s' % host
+        self.remote_sudo('systemctl start ipaclient.service', ip)
         self.remote_run_and_grep(
-            "docker run -it --privileged"
-            "    --name ipaclient"
-            "    -e IPA_PORT_53_UDP_ADDR=%(ip_address)s"
-            "    -e PASSWORD=%(admin_password)s"
-            "    -e IPA_PORT_80_TCP_ADDR=%(ip_address)s"
-            "    -e IPA_CLIENT_INSTALL_OPTS=\"%(install_opts)s\""
-            "    -h ipaclient.%(local_zone)s"
-            "    --net %(network_name)s --ip %(ipaclient_ip)s"
-            "    -v %(state_dir)s:%(state_dir)s"
-            "    %(image)s" %
-            self.substitutions(
-                host,
-                image=self.freeipa_docker_client_image,
-                install_opts=install_opts,
-                local_zone=self.local_zone(host)),
-            ip, success_re=r'FreeIPA-enrolled', fail_re=r'docker: Error',
-            get_pty=True)
-        self.ipa_client_start(host)
+            'journalctl -fu ipaclient.service -n 0',
+            ip, timeout=20*60,
+            success_re=r'FreeIPA-enrolled',
+            fail_re=r'(docker: Error|Failed with result)')
 
     def ipa_client_exec(self, command, host=None, **kwargs):
         if host is None:  host = self.freeipa_master
         return self.remote_docker_exec(
             host, 'ipaclient', command, **kwargs)
 
-    def ipa_client_start(self, host=None):
+    def kinit_admin(self, host=None):
         if host is None:  host = self.freeipa_master
-        print "Starting IPA client container on IPA host %s" % host
-        self.remote_run("docker start ipaclient", host)
+        ip = self.to_ip(host)
+        print "Initializing kerberos ticket for admin on %s" % host
         self.ipa_client_exec(
-            "bash -c 'echo %s | kinit admin'" % self.admin_password,
-            read_stdout=False)
-        self.ipa_client_exec("klist")
+            'bash -c \"echo %s | kinit admin\" >/dev/null' %
+            self.admin_password, quiet=False)
+        self.ipa_client_exec(
+            'klist', quiet=False)
+
+    def install_rndc_config(self, host):
+        ip = self.to_ip(host)
+        print 'Installing rndc config and key on %s' % host
+
+        self.remote_run('docker exec -i ipa rndc-confgen -a', ip)
+        self.remote_run('docker exec -i ipa restorecon /etc/rndc.key', ip)
+
+    # Hardening IPA:
+    # https://www.redhat.com/archives/freeipa-users/2014-April/msg00246.html
+    def harden_named(self, host):
+        print "Restricting DNS recursion and zone transfers on %s" % host
+        acl="127.0.0.1; 10.0.0.0/8;"
+        self.remote_docker_exec(
+            host, 'ipa',
+            "sed -i /data/etc/named.conf"
+            " -e '/allow-recursion.*any/ s,any;,%s,'"
+            " -e '/allow-recursion.*any/ a\        allow-transfer { none; };'" %
+            acl, quiet=False)
+
+        self.remote_docker_exec(
+            host, 'ipa',
+            "systemctl restart named-pkcs11.service",
+            quiet=False)
+
+    def harden_ldap(self, host):
+        ip = self.to_ip(host)
+        print "Restricting LDAP anonymous binds on %s" % host
+        input = (
+            "dn: cn=config\n"
+            "changetype: modify\n"
+            "replace: nsslapd-allow-anonymous-access\n"
+            "nsslapd-allow-anonymous-access: rootdse\n"
+            "\n")
+        self.remote_run(
+            'echo "%s" | docker exec -i ipa '
+            'ldapmodify -c -x -D "cn=Directory Manager" -w %s' %
+            (input, self.ds_password), ip, stdin_in=input, get_pty=True)
+
+    def named_disable_zone_transfers(self, host=None, domain=None):
+        if domain is None:  domain = self.domain_name
+        print "Disabling DNS zone transfers in IPA"
+        self.remote_docker_exec(
+            host, 'ipa',
+            "ipa dnszone-mod %s --allow-transfer='none;'" % domain,
+            quiet=False)
+
+    def ipa_set_default_login_shell(self, host):
+        print "Setting default shell to /bin/bash"
+        self.ipa_client_exec(
+            "ipa config-mod --defaultshell /bin/bash")
 
     def ptr_record(self, ip):
         (a,b,c,d) = ip.split('.')
@@ -273,13 +254,13 @@ class FreeIPA(RemoteControl):
 
     def create_svc_principal(self, host, svc):
         print "Creating service principal %s/%s" % (svc, host)
+        # Create service principal
+        self.ipa_client_exec(
+            "ipa service-add %s/%s" % (svc, host))
         # Delegate service admin to host
         self.ipa_client_exec(
             "ipa service-add-host --hosts=%s %s/%s" % (
                 self.local_zone(host, 'ipaclient'), svc, host))
-        # Create service principal
-        self.ipa_client_exec(
-            "ipa service-add %s/%s" % (svc, host))
 
     def issue_cert_pem(self, host, cert_fname, key_fname, cn, svc,
                        ca_cert_fname=None, altname_ips=[]):
@@ -352,3 +333,24 @@ class FreeIPA(RemoteControl):
         self.remote_sudo("chmod a+r %s %s %s" %
                          (self.clnt_cert_file_path, self.clnt_key_file_path,
                           self.ca_cert_file_path), ip)
+
+    def configure_ipa_server(self, host):
+        print "Configuring IPA service on %s" % host
+        # named config
+        self.install_rndc_config(host)
+        self.harden_named(host)
+        # ldap config
+        self.harden_ldap(host)
+        # IPA config
+        self.kinit_admin(host)
+        if host == self.freeipa_master:
+            self.named_disable_zone_transfers(host)
+            self.ipa_set_default_login_shell(host)
+        # DNS
+        self.ipa_init_dns(host)
+        # etcd certs
+        if host == self.freeipa_master:
+            self.create_svc_principal(host, 'ETCD')
+        self.install_etcd_certs(host)
+        self.remove_temp_bootstrap_config(host)
+        self.install_update_config(host)
