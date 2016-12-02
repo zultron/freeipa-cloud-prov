@@ -32,19 +32,6 @@ class DOCoreos(RemoteControl, CA):
             self._manager = digitalocean.Manager(token=self.token)
         return self._manager
 
-
-    def get_discovery_url(self):
-        if hasattr(self, 'discovery_url'):
-            return self.discovery_url
-
-        http = urllib3.PoolManager()
-        r = http.request('GET',
-                         'https://discovery.etcd.io/new?size=%s' % \
-                         len(self.hosts))
-        self.discovery_url = r.data
-        self.pickle_config()
-        return self.discovery_url
-
     @property
     def ssh_keys(self):
         if not hasattr(self, '_ssh_keys'):
@@ -54,7 +41,6 @@ class DOCoreos(RemoteControl, CA):
         return self._ssh_keys
 
     def cloud_config(self, host):
-        self.get_discovery_url()
         # YAML-format `ssh_authorized_keys` cloud-config key
         keys = yaml.dump(
             dict(ssh_authorized_keys=[
@@ -222,18 +208,6 @@ class DOCoreos(RemoteControl, CA):
             action.load()
             # Once it shows complete, droplet is up and running
             print "    ...%s" % action.status
-
-    def create_all_droplets(self):
-        self.get_discovery_url()
-        for host in self.hosts:
-            self.create_droplet(host)
-
-    def destroy_all_droplets(self):
-        for host in self.hosts:
-            try:
-                self.destroy_droplet(host)
-            except:
-                print "Failed to destroy droplet %s" % host
 
     def get_ip_addr(self, host):
         d = self.get_droplet(host, raise_error=False)
