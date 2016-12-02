@@ -62,6 +62,16 @@ class CoreProvCLI(DOCoreos, DockerNetwork, HAProxy, Syslog):
                 self.install_ipa_client(host)
                 # Configure FreeIPA and remove bootstrap config
                 self.configure_ipa_server(host)
+                # Install syslog
+                self.pull_syslog_docker_image(host)
+                self.install_syslog_config(host)
+                self.start_syslog_server()
+                # Install HAProxy
+                self.pull_haproxy_docker_image(host)
+                self.install_haproxy_config(host)
+                self.install_haproxy_certs(host)
+                self.start_haproxy_server(host)
+
 
         if self._args.run:
             for host in hosts:

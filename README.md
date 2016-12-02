@@ -276,4 +276,6 @@ For each FreeIPA server (first) and replicas (later):
   remove temp. bootstrap config
   - `./provision --configure-ipa`
 - Set up syslog service
+  - `./provision --install-syslog`
 - Set up haproxy service
+  - `./provision --install-haproxy`
