@@ -26,6 +26,11 @@ RUN pip install \
     	python-digitalocean \
 	ipcalc
 
+# Disable non-existant service
+RUN rm -f /etc/systemctl-lite-enabled/rhel-domainname.service
+# Enable certmonger service
+RUN touch /etc/systemctl-lite-enabled/certmonger.service
+
 RUN groupadd -g 500 core
 RUN useradd -M -u 500 -g 500 --shell /bin/bash core
 
