@@ -24,7 +24,7 @@ class FreeIPA(RemoteControl):
 
     @property
     def freeipa_replicas(self):
-        return [h for h in self.hosts if h == self.initial_host]
+        return [h for h in self.hosts if h != self.initial_host]
 
     def is_master(self, host):
         return host == self.freeipa_master
