@@ -35,7 +35,7 @@ coreos:
     # Clustering flags
     #
     # Initial flags for bootstrapping new member (not used in restarts)
-    initial-advertise-peer-urls: http://127.0.0.1:2380,https://{{hostname}}:2380
+    initial-advertise-peer-urls: https://{{hostname}}:2380
     initial-cluster:  {{initial_cluster}}
     initial-cluster-state: {{initial_cluster_state}}
     initial-cluster-token: {{initial_cluster_token}}
