@@ -87,7 +87,7 @@ class FreeIPA(RemoteControl):
         # ipa user-find admin
 
 
-    def install_ipa_client(self, host):
+    def install_ipaclient(self, host):
         name = 'ipaclient@%s.service'% self.hconfig(host, 'host_id')
         if host == self.freeipa_master:
             print "Installing fleet ipaclient@.service unit file"
@@ -357,16 +357,13 @@ class FreeIPA(RemoteControl):
         if self.is_bootstrapped(host):
             print "Host %s already bootstrapped" % host
             return
+        self.kinit_admin()
         if host == self.initial_host:
             # Initial cluster bootstrap
             self.install_bootstrap_etcd_dropin(host)
             self.install_bootstrap_fleet_dropin(host)
         else:
             # Add new member to cluster
-            self.kinit_admin()
-            # - Add host to IPA
-            self.ipa_host_add(
-                host, ip_addr=self.get_ip_addr(host), no_reverse=True)
             # - Generate SSL certs on existing member and copy to new member
             self.create_svc_principal(host, 'ETCD', self.initial_host,
                                       self.initial_host)

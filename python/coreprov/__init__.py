@@ -248,8 +248,8 @@ class CoreProvCLI(HAProxy, DOCoreos, DockerNetwork, Syslog):
             if self._args.init_ipa or self._args.install_ipa:
                 self.install_ipa_service(host)
 
-            if self._args.install_ipa_client or self._args.install_ipa:
-                self.install_ipa_client(host)
+            if self._args.install_ipaclient or self._args.install_ipa:
+                self.install_ipaclient(host)
 
         if self._args.configure_ipa or self._args.install_ipa:
             for host in hosts:
@@ -501,7 +501,7 @@ class CLIArgParser(argparse.ArgumentParser):
             '--init-ipa', action='store_true',
             help='Run "ipa-{server,replica}-install" on FreeIPA server/replica')
         freeipa_group.add_argument(
-            '--install-ipa-client', action='store_true',
+            '--install-ipaclient', action='store_true',
             help='Install IPA client container on FreeIPA server/replica')
         freeipa_group.add_argument(
             '--configure-ipa', action='store_true',
