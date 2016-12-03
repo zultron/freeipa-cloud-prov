@@ -258,16 +258,18 @@ class FreeIPA(RemoteControl):
                 self.local_zone(host, name),
                 self.hconfig(host, '%s_ip' % name))
 
-    def create_svc_principal(self, princ_host, svc, exec_host=None):
+    def create_svc_principal(self, princ_host, svc,
+                             exec_host=None, mgr_host=None):
         print "Creating service principal %s/%s" % (svc, princ_host)
         self.kinit_admin(exec_host)
         # Create service principal
         self.ipa_client_exec(
             "ipa service-add %s/%s" % (svc, princ_host), exec_host)
         # Delegate service admin to host
+        if mgr_host is None: mgr_host = princ_host
         self.ipa_client_exec(
             "ipa service-add-host --hosts=%s %s/%s" % (
-                self.local_zone(princ_host, 'ipaclient'), svc, princ_host),
+                self.local_zone(mgr_host, 'ipaclient'), svc, princ_host),
             exec_host)
 
     def issue_cert_pem(self, cn, svc, cert_fname, key_fname,
@@ -361,11 +363,13 @@ class FreeIPA(RemoteControl):
             self.install_bootstrap_fleet_dropin(host)
         else:
             # Add new member to cluster
+            self.kinit_admin()
             # - Add host to IPA
             self.ipa_host_add(
                 host, ip_addr=self.get_ip_addr(host), no_reverse=True)
             # - Generate SSL certs on existing member and copy to new member
-            self.create_svc_principal(host, 'ETCD')
+            self.create_svc_principal(host, 'ETCD', self.initial_host,
+                                      self.initial_host)
             cert_path = "%s/%s_etcd.pem" % (self.etcd_config_path, host)
             key_path = "%s/%s_etcd-key.pem" % (self.etcd_config_path, host)
             self.issue_cert_pem(
