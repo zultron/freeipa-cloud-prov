@@ -216,7 +216,7 @@ class DOCoreos(RemoteControl, CA):
         # Get key from DO API
         d = self.get_droplet(host, raise_error=False)
         if d is None:  return None
-        ip = self.hosts[host]['ip_address'] = d.ip_address
+        ip = self.hosts[host]['ip_address'] = str(d.ip_address)
         self.pickle_config()
         return ip
 
