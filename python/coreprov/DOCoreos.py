@@ -210,16 +210,15 @@ class DOCoreos(RemoteControl, CA):
             print "    ...%s" % action.status
 
     def get_ip_addr(self, host):
+        # If IP is cached, return it
+        if self.hosts[host].has_key('ip_address'):
+            return self.hosts[host]['ip_address']
+        # Get key from DO API
         d = self.get_droplet(host, raise_error=False)
         if d is None:  return None
-        a = self.hosts[host].get('ip_address', d.ip_address)
+        ip = self.hosts[host]['ip_address'] = d.ip_address
         self.pickle_config()
-        return a
-
-    @property
-    def initial_host(self):
-        return [ h for h in self.hosts \
-                 if self.hosts[h].get('bootstrap_order',1) == 0 ][0]
+        return ip
 
     def substitutions(self, host, **kwargs):
         # Add extra metadata
@@ -281,21 +280,30 @@ class DOCoreos(RemoteControl, CA):
         self.remote_sudo("systemctl daemon-reload", host)
         self.remote_sudo("systemctl restart fleet", host)
 
-    def install_temp_bootstrap_config(self, host):
-        if self.hosts[host].get('bootstrap_order', None) != 0:
-            print "Not installing bootstrap config on %s:  " \
-                "cluster exists" % host
-            return
-        self.install_bootstrap_etcd_dropin(host)
-        self.install_bootstrap_fleet_dropin(host)
-        self.bootstrapping = True
-        self.pickle_config()
+    def is_bootstrapped(self, host, val=None):
+        if val is None:
+            return self.hconfig(host).setdefault('bootstrapped', False)
+        else:
+            self.hconfig(host, 'bootstrapped', val)
 
     def remove_temp_bootstrap_config(self, host):
         self.remove_bootstrap_etcd_dropin(host)
         self.remove_bootstrap_fleet_dropin(host)
-        self.bootstrapping = False
+        self.is_bootstrapped(host, True)
         self.pickle_config()
+        self.etcd_update_member(host)
+
+    # dafe815f117a262c: name=h0.example.com peerURLs=http://h0.example.com:2380 clientURLs=https://h0.example.com:2379 isLeader=true
+    etcd_member_re = re.compile(r'^([0-9a-f]+): name=([^ ]+) ')
+    def etcd_update_member(self, host):
+        o = list(self.etcdctl_run("member list", read_stdout=False))
+        for line in o:
+            m = self.etcd_member_re.match(line)
+            if m.group(2) == host:
+                cid = m.group(1)
+                break
+        self.etcdctl_run("member update %s https://%s:2380" % (cid, host))
+        self.etcdctl_run("member list")
 
     def install_update_config(self, host):
         print "Installing configuration updates on %s" % host
@@ -316,15 +324,20 @@ class DOCoreos(RemoteControl, CA):
         else:
             print "Fleet status OK"
 
-    def check_etcd_status(self, host):
+    def etcdctl_run(self, cmd, host=None, **kwargs):
+        if host is None:  host = self.initial_host
         # etcdctl and SSL are ugly
         # https://www.digitalocean.com/community/tutorials/how-to-secure-your-coreos-cluster-with-tls-ssl-and-firewall-rules
-        ssl_opts="" if getattr(self, 'bootstrapping', False) else \
-            "--cert-file=%s --key-file=%s --ca-file=%s" % (
+        ssl_opts="--cert-file=%s --key-file=%s --ca-file=%s " \
+            "--endpoints=https://%s:2379" % (
                 self.clnt_cert_file_path, self.clnt_key_file_path,
-                self.ca_cert_file_path)
-        out = self.remote_run(
-            'etcdctl %s cluster-health' % ssl_opts, host)
+                self.ca_cert_file_path, host) \
+            if self.is_bootstrapped(host) else ""
+        return self.remote_run(
+            'etcdctl %s %s' % (ssl_opts, cmd), host, **kwargs)
+
+    def check_etcd_status(self, host=None):
+        return self.etcdctl_run('cluster-health', host)
 
     def init_data_volume(self, host):
         print "Initializing data volume for %s" % host

@@ -24,11 +24,13 @@ class Syslog(RemoteControl):
                 self.syslog_file_path('rsyslog.conf'))
 
     def start_syslog_server(self):
-        print 'Starting syslog services (on %s)' % self.master_host
+        print 'Starting syslog services (on %s)' % self.initial_host
         self.put_file(
-            host, self.render_jinja2(self.master_host, 'syslog.service'),
+            self.initial_host,
+            self.render_jinja2(self.initial_host, 'syslog.service'),
             self.syslog_file_path('syslog.service'))
         self.remote_run(
-            'fleetctl submit %s' % self.syslog_file_path('syslog.service'), host)
+            'fleetctl submit %s' % self.syslog_file_path('syslog.service'),
+            self.initial_host)
         self.remote_run(
-            'fleetctl start syslog.service', host)
+            'fleetctl start syslog.service', self.initial_host)

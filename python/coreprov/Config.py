@@ -79,7 +79,7 @@ class Config(object):
         return ip
 
     @property
-    def master_host(self):
+    def initial_host(self):
         master_list = [h for h in self.hosts
                        if self.hconfig(h).get('bootstrap_order',1) == 0]
         if len(master_list) != 1:

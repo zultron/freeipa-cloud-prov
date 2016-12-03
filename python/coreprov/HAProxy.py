@@ -17,10 +17,11 @@ class HAProxy(FreeIPA):
 
         self.create_svc_principal(host, 'HAPROXY')
         self.issue_cert_pem(
-            host, self.haproxy_file_path('cert.pem'),
-            self.haproxy_file_path('key.pem'),
             host, "HAPROXY",
-            ca_cert_fname=self.haproxy_file_path('ca.pem'))
+            self.haproxy_file_path('cert.pem'),
+            self.haproxy_file_path('key.pem'),
+            ca_cert_fname=self.haproxy_file_path('ca.pem'),
+            exec_host=host)
 
     def install_haproxy_config(self, host):
         print "Installing HAProxy config file on %s" % host
@@ -31,17 +32,17 @@ class HAProxy(FreeIPA):
                 self.haproxy_file_path('haproxy.cfg'))
 
     def start_haproxy_server(self, host=None):
-        if host is None:  host=self.master_host
+        if host is None:  host=self.initial_host
 
-        if host == self.master_host:
+        if host == self.initial_host:
             print 'Installing HAProxy (and sidekick) service'
             self.put_file(
                 host, self.render_jinja2(
-                    self.master_host, 'haproxy.service'),
+                    self.initial_host, 'haproxy.service'),
                 self.haproxy_file_path('haproxy.service'))
             self.put_file(
                 host, self.render_jinja2(
-                    self.master_host, 'haproxy-iptables.service'),
+                    self.initial_host, 'haproxy-iptables.service'),
                 self.haproxy_file_path('haproxy-iptables.service'))
             self.remote_run(
                 'fleetctl submit %s' %
@@ -53,5 +54,5 @@ class HAProxy(FreeIPA):
             self.remote_run('fleetctl load haproxy-iptables.service', host)
 
         print 'Starting HAProxy service on %s' % host
-        self.remote_sudo(
-            'systemctl start haproxy.service', host)
+        self.remote_run(
+            'fleetctl start haproxy.service', host)

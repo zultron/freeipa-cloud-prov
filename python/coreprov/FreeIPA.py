@@ -45,19 +45,19 @@ class FreeIPA(RemoteControl):
 
 
     def install_ipa_service(self, host):
-        if host == self.freeipa_master:
-            print "Installing fleet ipa.service unit file"
+        name = 'ipa@%s.service'% self.hconfig(host, 'host_id')
+        if host == self.initial_host:
+            print "Installing fleet ipa@.service unit file"
             self.put_file(
-                host, self.render_jinja2(host, 'ipa.service'),
-                self.freeipa_file_path('ipa.service'))
+                host, self.render_jinja2(host, 'ipa@.service'),
+                self.freeipa_file_path('ipa@.service'))
             self.remote_run(
                 'fleetctl submit %s' % \
-                self.freeipa_file_path('ipa.service'), host)
-            self.remote_run('fleetctl load ipa.service', host)
+                self.freeipa_file_path('ipa@.service'), host)
 
         else:
             replica_ip = self.to_ip(host)
-            server_ip = self.to_ip(self.freeipa_master)
+            server_ip = self.to_ip(self.initial_host)
             fname = 'replica-info-%s.gpg' % host
             src = '%s/var/lib/ipa/%s' % (self.freeipa_data_dir, fname)
             dst = '%s/%s' % (self.freeipa_data_dir, fname)
@@ -65,20 +65,22 @@ class FreeIPA(RemoteControl):
             print 'Preparing FreeIPA replica info for %s' % host
             self.remote_run(
                 'docker exec -i ipa ipa-replica-prepare %s'
-                ' --ip-address %s --no-reverse' % (host, replica_ip), server_ip,
+                ' --ip-address %s --no-reverse' % (host, replica_ip),
+                self.initial_host,
                 stdin_in='%s\n' % self.ds_password, read_stdout=False)
-            self.remote_sudo('mv %s %s' % (src, dst), server_ip)
-            self.remote_sudo('chown core %s' % dst, server_ip)
-            replica_info = self.get_file(server_ip, dst)
+            self.remote_sudo('mv %s %s' % (src, dst), self.initial_host)
+            self.remote_sudo('chown core %s' % dst, self.initial_host)
+            replica_info = self.get_file(self.initial_host, dst)
             self.put_file(host, replica_info, dst)
 
         print 'Running FreeIPA install on %s' % host
-        self.remote_sudo('systemctl start ipa.service', host)
+        self.remote_run('fleetctl load %s'% name, host)
+        self.remote_sudo('systemctl start --no-block %s' % name, host)
         self.remote_run_and_grep(
-            'journalctl -fu ipa.service -n 0',
+            'journalctl -fu %s -n 0' % name,
             host, timeout=20*60,
             success_re=r'FreeIPA server configured\.',
-            fail_re=r'Failed with result')
+            fail_re=r'(Failed with result|FreeIPA server configuration failed)')
 
         # Simple functionality test
         # kinit admin
@@ -86,24 +88,25 @@ class FreeIPA(RemoteControl):
 
 
     def install_ipa_client(self, host):
+        name = 'ipaclient@%s.service'% self.hconfig(host, 'host_id')
         if host == self.freeipa_master:
-            print "Installing fleet ipaclient.service unit file"
+            print "Installing fleet ipaclient@.service unit file"
             self.remote_sudo(
                 "install -d -o core %s" % self.freeipa_file_path(), host)
             self.put_file(
                 host, self.render_jinja2(
-                    host, 'ipaclient.service',
+                    host, 'ipaclient@.service',
                     DOCKER_IMAGE=self.freeipa_docker_client_image),
-                self.freeipa_file_path('ipaclient.service'))
+                self.freeipa_file_path('ipaclient@.service'))
             self.remote_run(
                 'fleetctl submit %s' % \
-                self.freeipa_file_path('ipaclient.service'), host)
-            self.remote_run('fleetctl load ipaclient.service', host)
+                self.freeipa_file_path('ipaclient@.service'), host)
+            self.remote_run('fleetctl load %s' % name, host)
 
         print 'Running FreeIPA client install on %s' % host
-        self.remote_sudo('systemctl start ipaclient.service', host)
+        self.remote_run('fleetctl start %s' % name, host)
         self.remote_run_and_grep(
-            'journalctl -fu ipaclient.service -n 0',
+            'journalctl -fu %s -n 0' % name,
             host, timeout=20*60,
             success_re=r'FreeIPA-enrolled',
             fail_re=r'(docker: Error|Failed with result)')
@@ -171,10 +174,8 @@ class FreeIPA(RemoteControl):
     def named_disable_zone_transfers(self, host=None, domain=None):
         if domain is None:  domain = self.domain_name
         print "Disabling DNS zone transfers in IPA"
-        self.remote_docker_exec(
-            host, 'ipa',
-            "ipa dnszone-mod %s --allow-transfer='none;'" % domain,
-            quiet=False)
+        self.ipa_client_exec(
+            "ipa dnszone-mod %s --allow-transfer='none;'" % domain)
 
     def ipa_set_default_login_shell(self, host):
         print "Setting default shell to /bin/bash"
@@ -226,6 +227,7 @@ class FreeIPA(RemoteControl):
             (zone, short, ip, reverse_arg))
 
     def local_zone(self, host, name=None):
+        if host is None: host = self.freeipa_master
         if name is not None:
             return '%s.%s' % (name, self.local_zone(host))
         else:
@@ -233,8 +235,13 @@ class FreeIPA(RemoteControl):
 
     def ipa_init_dns(self, host):
         self.dns_local_zone_add(self.local_zone(host))
-        # Clear auto-added IPA local reverse IP entry
-        self.dns_ptr_record_del(self.hconfig(host, 'ipa_ip'), host)
+        if host == self.initial_host:
+            # IPA server:  Clear auto-added IPA local reverse IP entry
+            self.dns_ptr_record_del(self.hconfig(host, 'ipa_ip'), host)
+        else:
+            # IPA replicas:  Add reverse zone
+            rev_local_zone = self.ptr_record(self.hconfig(host, 'ipa_ip'))[1]
+            self.dns_local_zone_add(rev_local_zone)
         # Fix auto-added `ipa-ca` entry
         self.dns_a_record_del('ipa-ca.%s' % self.domain_name,
                               self.hconfig(host, 'ipa_ip'))
@@ -251,36 +258,39 @@ class FreeIPA(RemoteControl):
                 self.local_zone(host, name),
                 self.hconfig(host, '%s_ip' % name))
 
-    def create_svc_principal(self, host, svc):
-        print "Creating service principal %s/%s" % (svc, host)
+    def create_svc_principal(self, princ_host, svc, exec_host=None):
+        print "Creating service principal %s/%s" % (svc, princ_host)
+        self.kinit_admin(exec_host)
         # Create service principal
         self.ipa_client_exec(
-            "ipa service-add %s/%s" % (svc, host))
+            "ipa service-add %s/%s" % (svc, princ_host), exec_host)
         # Delegate service admin to host
         self.ipa_client_exec(
             "ipa service-add-host --hosts=%s %s/%s" % (
-                self.local_zone(host, 'ipaclient'), svc, host))
+                self.local_zone(princ_host, 'ipaclient'), svc, princ_host),
+            exec_host)
 
-    def issue_cert_pem(self, host, cert_fname, key_fname, cn, svc,
-                       ca_cert_fname=None, altname_ips=[]):
-        print "Creating pem cert on host %s for %s" % (host, svc)
+    def issue_cert_pem(self, cn, svc, cert_fname, key_fname,
+                       ca_cert_fname=None, exec_host=None, altname_ips=[]):
+        if exec_host is None: exec_host = cn
+        print "Creating pem cert on host %s for %s/%s" % (exec_host, svc, cn)
         dirs = dict([(os.path.dirname(f), 1) for f in (cert_fname, key_fname)])
         for d in dirs:
-            self.remote_sudo("mkdir -p %s" % d, host)
+            self.remote_sudo("mkdir -p %s" % d, exec_host)
         # Request cert from certmonger
         cl = ("ipa-getcert request -w -f '%s' -k '%s' -K %s/%s -N '%s'"
               " -g 2048" + ''.join([" -A %s" for i in altname_ips]))
-        vals = [cert_fname, key_fname, svc, host, host] + altname_ips
+        vals = [cert_fname, key_fname, svc, cn, cn] + altname_ips
         if ca_cert_fname is not None:
             cl += " -F '%s'"
             vals.append(ca_cert_fname)
-        self.ipa_client_exec(cl % tuple(vals), host=host)
+        self.ipa_client_exec(cl % tuple(vals), host=exec_host)
         # Check cert request
         self.ipa_client_exec(
-            "ipa-getcert list -f '%s'" % cert_fname, host=host)
+            "ipa-getcert list -f '%s'" % cert_fname, host=exec_host)
         # Check cert status
         # self.ipa_client_exec(
-        #     "openssl x509 -in '%s' -noout -text" % cert_fname, host=host)
+        #     "openssl x509 -in '%s' -noout -text" % cert_fname, host=exec_host)
 
     def issue_cert_nss(self, host, cert_db, cn, svc):
         subject = "CN=%s,OU=%s,O=%s" % (cn, svc, self.realm)
@@ -319,17 +329,68 @@ class FreeIPA(RemoteControl):
     def install_etcd_certs(self, host):
         print "Installing CoreOS etcd2 certs on host %s" % host
         self.issue_cert_pem(
-            host, self.serv_cert_file_path, self.serv_key_file_path,
-            host, "ETCD", ca_cert_fname=self.ca_cert_file_path)
+            host, "ETCD",
+            self.serv_cert_file_path,
+            self.serv_key_file_path,
+             ca_cert_fname=self.ca_cert_file_path)
         self.remote_sudo("chown etcd %s %s" %
                          (self.serv_cert_file_path, self.serv_key_file_path),
                          host)
         self.issue_cert_pem(
-            host, self.clnt_cert_file_path, self.clnt_key_file_path,
-            host, "ETCD")
+            host, "ETCD",
+            self.clnt_cert_file_path,
+            self.clnt_key_file_path)
         self.remote_sudo("chmod a+r %s %s %s" %
                          (self.clnt_cert_file_path, self.clnt_key_file_path,
                           self.ca_cert_file_path), host)
+
+    def ipa_host_add(self, host, ip_addr=None, no_reverse=False, ipa_host=None):
+        ip_args="" if ip_addr is None \
+            else "--force --ip-address=%s" % ip_addr
+        if no_reverse:  ip_args+=" --no-reverse"
+        self.ipa_client_exec(
+            "ipa host-add %s %s" % (ip_args, host), host=ipa_host)
+
+    def early_bootstrap(self, host):
+        if self.is_bootstrapped(host):
+            print "Host %s already bootstrapped" % host
+            return
+        if host == self.initial_host:
+            # Initial cluster bootstrap
+            self.install_bootstrap_etcd_dropin(host)
+            self.install_bootstrap_fleet_dropin(host)
+        else:
+            # Add new member to cluster
+            # - Add host to IPA
+            self.ipa_host_add(
+                host, ip_addr=self.get_ip_addr(host), no_reverse=True)
+            # - Generate SSL certs on existing member and copy to new member
+            self.create_svc_principal(host, 'ETCD')
+            cert_path = "%s/%s_etcd.pem" % (self.etcd_config_path, host)
+            key_path = "%s/%s_etcd-key.pem" % (self.etcd_config_path, host)
+            self.issue_cert_pem(
+                host, 'ETCD',
+                cert_path, key_path, exec_host=self.freeipa_master)
+            self.remote_sudo(
+                "chown core %s/%s_etcd*.pem" % (self.etcd_config_path, host),
+                self.freeipa_master)
+            cert = self.get_file(self.freeipa_master, cert_path)
+            key = self.get_file(self.freeipa_master, key_path)
+            ca = self.get_file(self.freeipa_master, self.ca_cert_file_path)
+            self.remote_sudo(
+                "install -d -o core %s" % self.etcd_config_path, host)
+            self.put_file(host, cert, self.serv_cert_file_path)
+            self.put_file(host, key, self.serv_key_file_path)
+            self.put_file(host, ca, self.ca_cert_file_path)
+            self.put_file(host, cert, self.clnt_cert_file_path)
+            self.put_file(host, key, self.clnt_key_file_path)
+            # - Be sure iptables & /etc/hosts etc. are all current on master
+            self.init_iptables(self.initial_host)
+            self.install_update_config(self.initial_host)
+            # - Add member to cluster
+            self.etcdctl_run("member add %s https://%s:2380" % (host, host))
+        self.is_bootstrapped(host, False)
+        self.pickle_config()
 
     def configure_ipa_server(self, host):
         print "Configuring IPA service on %s" % host

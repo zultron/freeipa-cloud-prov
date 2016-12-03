@@ -33,9 +33,11 @@ ExecStart=/usr/bin/docker run --rm \
 	--net cnet --ip ${SERVER_IP_ipa} \
         -e IPA_SERVER_IP=${COREOS_PUBLIC_IPV4} \
         adelton/freeipa-server:centos-7
-
+ExecStartPost=/bin/bash -c "while ! \
+	/usr/bin/dig +time=2 +tries=1 @${SERVER_IP_ipa} ${DOMAIN_NAME} >&/dev/null; \
+	do : ; done"
 # Stop
 ExecStop=/usr/bin/docker stop ipa
 
 [X-Fleet]
-MachineMetadata=ipa=true
+MachineMetadata=host_id=%i

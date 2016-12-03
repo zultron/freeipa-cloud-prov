@@ -29,8 +29,8 @@ coreos:
     election-timeout: 3000
     # URLs to listen on for peer and client traffic; use SSL on
     # external interfaces
-    listen-peer-urls: https://$public_ipv4:2380,http://127.0.0.1:2380
-    listen-client-urls: https://$public_ipv4:2379,http://127.0.0.1:2379
+    listen-peer-urls: https://$public_ipv4:2380
+    listen-client-urls: https://$public_ipv4:2379
     #
     # Clustering flags
     #
@@ -94,6 +94,9 @@ coreos:
       drop-ins:
         - name: 40-iptables-restore-source.conf
           content: |
+            [Unit]
+            Requires=media-state.mount
+            After=media-state.mount
             [Service]
             ExecStartPre=/usr/bin/ln -sf /media/state/iptables/rules-save \
                 /var/lib/iptables/rules-save
@@ -126,13 +129,17 @@ coreos:
         [Install]
         WantedBy=multi-user.target
     - name: update-config.service
-      # command: start
+      enable: true
+      command: start
       content: |
         [Unit]
         Description=Update configuration files from data directory
         DefaultDependencies=no
         After=media-state.mount
         Before=sysinit.target
+
+        [Install]
+        WantedBy=sysinit.target
 
         [Service]   
         Type=oneshot

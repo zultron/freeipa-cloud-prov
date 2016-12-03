@@ -3,6 +3,7 @@ from .DOCoreos import DOCoreos
 from .DockerNetwork import DockerNetwork
 from .Syslog import Syslog
 from .HAProxy import HAProxy
+import time
 
 import argparse
 
@@ -11,7 +12,7 @@ __all__ = ['CLIArgParser', 'CoreProvCLI']
 ########################################################################
 # CLI Processing
 
-class CoreProvCLI(DOCoreos, DockerNetwork, HAProxy, Syslog):
+class CoreProvCLI(HAProxy, DOCoreos, DockerNetwork, Syslog):
     '''
     CoreProvCLI().run()
     '''
@@ -27,30 +28,34 @@ class CoreProvCLI(DOCoreos, DockerNetwork, HAProxy, Syslog):
     def run(self):
 
         # Canonicalize host list
-        hosts = [ self.canon_hostname(h) for h in self._args.hosts ] \
-                if self._args.hosts else self.hosts.keys()
+        hosts_unordered = [ self.canon_hostname(h) for h in self._args.hosts ] \
+                          if self._args.hosts else self.hosts.keys()
+        hosts = [ h for h in ([self.freeipa_master] + self.freeipa_replicas)
+                  if h in hosts_unordered ]
 
         if self._args.destroy_all:
-            for host in hosts:
+            for host in reversed(hosts):
+                if host not in hosts:  continue
+
                 self.destroy_droplet(host)
                 self.destroy_host_volumes(host)
                 self.destroy_pickle(host)
 
         if self._args.provision_all:
             # IPA server first, replicas second
-            for host in [self.freeipa_master] + self.freeipa_replicas:
+            for host in hosts:
                 if host not in hosts:  continue
 
                 # DigitalOcean provisioning
                 self.create_data_volumes(host)
                 self.create_droplet(host, wait=True)
+                time.sleep(30)  # Wait a little for droplet to boot
                 # Post-provisioning configuration
                 self.init_data_volume(host)
                 self.install_update_config(host)
                 self.init_docker_network(host)
                 # Bootstrap etcd2 cluster
-                self.install_temp_bootstrap_config(host)
-                #self.join_etcd2_cluster(host)
+                self.early_bootstrap(host)
                 # Set up network security
                 self.init_iptables(host)
                 self.install_known_hosts(host)
@@ -74,7 +79,7 @@ class CoreProvCLI(DOCoreos, DockerNetwork, HAProxy, Syslog):
 
         if self._args.run:
             for host in hosts:
-                self.remote_run(self._args.run, self.get_ip_addr(host))
+                self.remote_run(self._args.run, host)
 
         if self._args.docker_exec:
             for host in hosts:
@@ -134,8 +139,8 @@ class CoreProvCLI(DOCoreos, DockerNetwork, HAProxy, Syslog):
             if self._args.install_system_env:
                 self.install_system_env(host)
 
-            if self._args.install_temp_bootstrap_config:
-                self.install_temp_bootstrap_config(host)
+            if self._args.early_bootstrap:
+                self.early_bootstrap(host)
 
             if self._args.install_update_config:
                 self.install_update_config(host)
@@ -230,7 +235,7 @@ class CoreProvCLI(DOCoreos, DockerNetwork, HAProxy, Syslog):
         ########################
         # - Provision IPA hosts
 
-        for host in [self.freeipa_master] + self.freeipa_replicas:
+        for host in hosts:
             # IPA server first, replicas second
             if host not in hosts:  continue
 
@@ -240,11 +245,11 @@ class CoreProvCLI(DOCoreos, DockerNetwork, HAProxy, Syslog):
             if self._args.install_ipa_config or self._args.install_ipa:
                 self.install_freeipa_config(host)
 
-        if self._args.init_ipa or self._args.install_ipa:
-            self.install_ipa_service(host)
+            if self._args.init_ipa or self._args.install_ipa:
+                self.install_ipa_service(host)
 
-        if self._args.install_ipa_client or self._args.install_ipa:
-            self.install_ipa_client(host)
+            if self._args.install_ipa_client or self._args.install_ipa:
+                self.install_ipa_client(host)
 
         if self._args.configure_ipa or self._args.install_ipa:
             for host in hosts:
@@ -288,6 +293,7 @@ class CoreProvCLI(DOCoreos, DockerNetwork, HAProxy, Syslog):
 
         # # Testing
         # for host in hosts:
+        #     self.etcd_update_member(host)
         #     self.ipa_fix_https_redirect(host)
         #     self.install_ca_cert(host, self.ca_cert_file_path)
         #     self.issue_cert_pem(
@@ -402,8 +408,8 @@ class CLIArgParser(argparse.ArgumentParser):
             '--install-system-env', action='store_true',
             help='Install system environment file')
         post_group.add_argument(
-            '--install-temp-bootstrap-config', action='store_true',
-            help='Install temporary configuration needed during bootstrap')
+            '--early-bootstrap', action='store_true',
+            help='Install early-stage bootstrap configuration')
         post_group.add_argument(
             '--install-update-config', action='store_true',
             help='Install configuration updates on host')

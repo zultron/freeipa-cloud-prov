@@ -219,10 +219,12 @@ Add DNS zone:
 - [Manage CoreOS with Ansible][CoreOS-ansible]
 - [Bootstrap CoreOS with Ansible][CoreOS-ansible-bootstrap]
 - [Manage Docker with Ansible][Docker-ansible]
+- [DigitalOcean API with Ansible][DO-ansible]
 
 [CoreOS-ansible]: https://coreos.com/blog/managing-coreos-with-ansible/
 [CoreOS-ansible-bootstrap]: https://github.com/defunctzombie/ansible-coreos-bootstrap
 [Docker-ansible]: http://docs.ansible.com/ansible/guide_docker.html
+[DO-ansible]: https://www.digitalocean.com/community/tutorials/how-to-use-the-digitalocean-api-v2-with-ansible-2-0-on-ubuntu-16-04
 
 ### Bootstrapping
 
@@ -231,26 +233,29 @@ Add DNS zone:
 	`initial-cluster` static configuration params)
   - `etcd2` configuration:
 	- Use SSL on external interfaces
-	  - Use temporary drop-in during bootstrap to disable SSL until
-        FreeIPA is running and integrated
+	  - On initial bootstrap host, use temporary drop-in during
+        bootstrap to disable SSL until FreeIPA is running and
+        integrated
+	  - On replicas, install temp SSL certs, run `etcdctl member add`,
+        create `etcd2` drop-in, restart etcd2
 	- Use DNS FQDN in advertised URLs
 	  - FreeIPA won't write certs with IP addresses in the
 		`subjectAltName`, so the usual guides' ([1][coreos-etcd-ssl],
 		[2][coreos-clients-ssl], [3][do-coreos-ssl]) suggestion to use
 		IP addresses in certs won't work
 	  - Initial URL resolution via `/etc/hosts`
-		- Initial version can't be complete; a unit file could copy from
-		  `/media/state`, or else depend on DNS
+		- Initial version can't be complete; use systemd service to
+		  copy files from `/media/state`
   - Bring up FreeIPA server
   - Bring up FreeIPA client
   - Set up DNS
-	- CoreOS host should already point at DNS
+	- Systemd service copies files like `/etc/hosts`
   - Set up certs
 	- Client container `certmonger` manages certs for other containers
   - Bring up syslog container
   - Bring up HAProxy container
 	- HAProxy sidekick service installs IPTables rules
-- Now ready to bring up replicas
+- Repeat process for replicas
 
 ### Flow
 For each FreeIPA server (first) and replicas (later):
@@ -262,10 +267,8 @@ For each FreeIPA server (first) and replicas (later):
 	- `./provision --init-volumes`
   - Install docker network
 	- `./provision --init-docker-network`
-  - For initial host:  Install bootstrap etcd2 config
-	- `./provision --install-temp-bootstrap-config`
-  - If replica:  Add droplet to cluster
-	- TBD; should be merged with previous
+  - Install bootstrap config
+	- `./provision --install-bootstrap-config`
   - For all hosts: update /etc/hosts, known-hosts, iptables
 	- `./provision --init-iptables --install-known-hosts --install-update-config`
 - Install FreeIPA server/replica

@@ -9,6 +9,8 @@ Requires=docker.service
 After=etcd2.service
 After=docker.service
 
+Wants=haproxy-iptables.service
+
 [Service]
 # Let processes take awhile to start up (for first run Docker containers)
 TimeoutStartSec=0
