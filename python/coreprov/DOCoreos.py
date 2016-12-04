@@ -48,7 +48,6 @@ class DOCoreos(RemoteControl, CA):
             default_flow_style=False)
         # cloud-config etcd2 `initial-cluster` values
         initial_cluster = ','.join(
-            ['%s=http://127.0.0.1:2380' % host] +
             ['%s=https://%s:2380' % (h, h) for h in self.hosts])
         initial_cluster_state = (
             "new" if self.hosts[host].get('bootstrap_order', 1) == 0 \
