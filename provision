@@ -3,6 +3,7 @@
 NAME="coreos-util"
 DIR="$(readlink -f $(dirname $0))"
 UID_GID=`id -u`:`id -g`
+DOCKER_IMG="zultron/freeipa-cloud-prov:master"
 
 cd "$DIR"
 
@@ -22,7 +23,7 @@ elif test "$1" = "shell"; then
 	-v $PWD:/data \
 	-u $UID_GID \
 	--entrypoint /bin/bash \
-	coreos-util "$@"
+	${DOCKER_IMG} "$@"
 
 else
     set -x
@@ -30,5 +31,5 @@ else
 	-v $HOME:/home/user \
 	-v $PWD:/data \
 	-u $UID_GID \
-	coreos-util "$@"
+	${DOCKER_IMG} "$@"
 fi
