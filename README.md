@@ -271,6 +271,8 @@ These should be added to automation
 
         ipa-replica-manage connect h10.zultron.com h20.zultron.com
 
+- Create ipa sidekick `/etc/resolv.conf` service to install
+  FreeIPA/Google DNS servers at start/stop
 
 ## DNS
 
