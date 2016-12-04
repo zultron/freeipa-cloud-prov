@@ -151,9 +151,9 @@ coreos:
     - name: ntpd.service
       enable: true
       command: start
-    - name: ntpdate.service
-      enable: true
-      command: start
+    # - name: ntpdate.service
+    #   enable: true
+    #   command: start
     - name: docker.service
       drop-ins:
         - name: no-ip-masq.conf
