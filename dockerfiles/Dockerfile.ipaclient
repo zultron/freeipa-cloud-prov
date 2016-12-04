@@ -26,6 +26,7 @@ RUN pip install \
     	python-digitalocean \
 	ipcalc
 
+RUN mkdir -p /etc/systemctl-lite-enabled
 # Disable non-existant service
 RUN rm -f /etc/systemctl-lite-enabled/rhel-domainname.service
 # Enable certmonger service
