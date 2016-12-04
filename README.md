@@ -13,17 +13,16 @@ and configuring a CoreOS cluster on DigitalOcean, and bringing up a
 FreeIPA server and replicas in Docker containers.
 
 This is experimental work, and there are known, unresolved security
-issues in the result.  **Readers should be aware of risks using this
-work.**
+issues in the result, if any final result is even produced.  **Readers
+should be aware of risks using this work.**
 
 
 ## Usage
 
-The `provision` script handles building a Docker container with the
-needed tools, and running the Python utilities within it.
+The `provision` script runs these python utilities in a Docker
+container with the needed support tools.
 
-	./provision build  # build the Docker container
-	./provision -h     # run the utility
+	./provision -h     # Show usage
 
 To provision a new cluster, copy `config.yaml.example` to
 `config.yaml` and edit it.  Then, on a good day, the following command
