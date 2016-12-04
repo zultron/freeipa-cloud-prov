@@ -33,6 +33,90 @@ configure FreeIPA:
     ./provision --provision-all
 
 
+## Bootstrapping
+
+### Plan and theory
+
+- The initial IPA server node will be bootstrapped from start to finish
+  before bootstrapping replicas
+- The `cloud-config` file represents final configuration (except for
+  `initial-cluster` static configuration params)
+  - DO runs `cloud-config` at each boot, so direct changes not allowed
+  - CoreOS update untested, so any changes will be in the persistent
+    data volume so that the OS stays stateless and can be wiped
+- `etcd2` configuration
+  - Manual provisioning
+	- Use DNS names:  IPA won't issue certs with IP addresses in
+      `subjectAltName`
+	- Initial URL resolution via `/etc/hosts`
+	  - Initial IP addresses can't be known in advance; use systemd service to
+		copy files from `/media/state` at boot
+  - SSL on external interfaces
+	- Initial bootstrap host needs temporary drop-in during bootstrap
+	  to disable SSL until FreeIPA is running and integrated
+	- Certs are generated with certmonger within an IPA client
+      container, simplifying generation and automating updates, and
+      good for all SSL services
+	- Replicas are completely configured with SSL certs before running
+      `etcdctl member add`
+  - Iptables restricts `etcd2` communication to nodes only
+- FreeIPA installation
+  - Initial server bootstrap and replica bootstrap + replication
+  - DNS zones set up for each location and container records added for
+    record-keeping purposes
+  - Host principals only set up for host (to generate certs with
+    correct CN) and IPA client (to manage cert generation)
+  - Hardened according to recommendations on FreeIPA wiki
+	- No public DNS recursion
+	- No DNS AXFR
+	- No LDAP anonymous bind
+	- Only HTTPS, no HTTP
+  - IPA client container used to run IPA commands, generate certs, and
+    run certmonger to monitor SSL cert expiration
+- Other configuration
+  - Systemd service copies files like `/etc/hosts` from data volume to
+    system at boot time
+  - Iptables and other config stored in data volume
+- Bring up syslog container
+- Bring up HAProxy container
+  - HAProxy sidekick service installs/uninstalls IPTables rules to
+    redirect port 80/443 traffic
+- Repeat process for replicas
+
+### Flow
+For each FreeIPA server (first) and replicas (later):
+- Set up server data in config.yaml
+- `./provision --provision-all` does all the following in one command:
+- CoreOS cluster provisioning
+  - Provision droplet and volume
+	- `./provision --create-volumes --provision`
+  - Initialize data and swap volume, and install `system.env`
+    configuration file
+	- `./provision --init-volumes`
+  - Install /etc/hosts, etc.
+	- `./provision --install-update-config`
+  - Install docker network
+	- `./provision --init-docker-network`
+  - On other hosts: install iptables, known-hosts;
+	- `./provision --init-iptables --install-known-hosts --install-update-config`
+  - Install config needed to bootstrap initial member or add later
+    members
+	- `./provision --early-bootstrap`
+- FreeIPA provisioning
+  - Install FreeIPA server/replica
+	- `./provision --pull-ipa-image --install-ipa-config --init-ipa`
+  - Install FreeIPA client
+	- `./provision --install-ipa-client`
+  - Configure IPA security and DNS; issue etcd2 certs for cluster;
+	remove temp. bootstrap config
+	- `./provision --configure-ipa`
+- Other services
+  - Set up syslog service
+	- `./provision --install-syslog`
+  - Set up haproxy service
+	- `./provision --install-haproxy`
+
+
 ## Documentation used to develop this system
 
 - [DigitalOcean][digitalocean]:
@@ -232,87 +316,4 @@ This system ended up reimplimenting what Ansible already does.  D'oh!
 - [Let's Encrypt][letsencrypt]
 
 [letsencrypt]: https://letsencrypt.org/
-
-## Bootstrapping
-
-### Plan and theory
-
-- The initial IPA server node will be bootstrapped from start to finish
-  before bootstrapping replicas
-- The `cloud-config` file represents final configuration (except for
-  `initial-cluster` static configuration params)
-  - DO runs `cloud-config` at each boot, so direct changes not allowed
-  - CoreOS update untested, so any changes will be in the persistent
-    data volume so that the OS stays stateless and can be wiped
-- `etcd2` configuration
-  - Manual provisioning
-	- Use DNS names:  IPA won't issue certs with IP addresses in
-      `subjectAltName`
-	- Initial URL resolution via `/etc/hosts`
-	  - Initial IP addresses can't be known in advance; use systemd service to
-		copy files from `/media/state` at boot
-  - SSL on external interfaces
-	- Initial bootstrap host needs temporary drop-in during bootstrap
-	  to disable SSL until FreeIPA is running and integrated
-	- Certs are generated with certmonger within an IPA client
-      container, simplifying generation and automating updates, and
-      good for all SSL services
-	- Replicas are completely configured with SSL certs before running
-      `etcdctl member add`
-  - Iptables restricts `etcd2` communication to nodes only
-- FreeIPA installation
-  - Initial server bootstrap and replica bootstrap + replication
-  - DNS zones set up for each location and container records added for
-    record-keeping purposes
-  - Host principals only set up for host (to generate certs with
-    correct CN) and IPA client (to manage cert generation)
-  - Hardened according to recommendations on FreeIPA wiki
-	- No public DNS recursion
-	- No DNS AXFR
-	- No LDAP anonymous bind
-	- Only HTTPS, no HTTP
-  - IPA client container used to run IPA commands, generate certs, and
-    run certmonger to monitor SSL cert expiration
-- Other configuration
-  - Systemd service copies files like `/etc/hosts` from data volume to
-    system at boot time
-  - Iptables and other config stored in data volume
-- Bring up syslog container
-- Bring up HAProxy container
-  - HAProxy sidekick service installs/uninstalls IPTables rules to
-    redirect port 80/443 traffic
-- Repeat process for replicas
-
-### Flow
-For each FreeIPA server (first) and replicas (later):
-- Set up server data in config.yaml
-- `./provision --provision-all` does all the following in one command:
-- CoreOS cluster provisioning
-  - Provision droplet and volume
-	- `./provision --create-volumes --provision`
-  - Initialize data and swap volume, and install `system.env`
-    configuration file
-	- `./provision --init-volumes`
-  - Install /etc/hosts, etc.
-	- `./provision --install-update-config`
-  - Install docker network
-	- `./provision --init-docker-network`
-  - On other hosts: install iptables, known-hosts;
-	- `./provision --init-iptables --install-known-hosts --install-update-config`
-  - Install config needed to bootstrap initial member or add later
-    members
-	- `./provision --early-bootstrap`
-- FreeIPA provisioning
-  - Install FreeIPA server/replica
-	- `./provision --pull-ipa-image --install-ipa-config --init-ipa`
-  - Install FreeIPA client
-	- `./provision --install-ipa-client`
-  - Configure IPA security and DNS; issue etcd2 certs for cluster;
-	remove temp. bootstrap config
-	- `./provision --configure-ipa`
-- Other services
-  - Set up syslog service
-	- `./provision --install-syslog`
-  - Set up haproxy service
-	- `./provision --install-haproxy`
 
