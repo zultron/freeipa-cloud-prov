@@ -52,13 +52,15 @@ class CoreProvCLI(HAProxy, DOCoreos, DockerNetwork, Syslog):
                 time.sleep(30)  # Wait a little for droplet to boot
                 # Post-provisioning configuration
                 self.init_data_volume(host)
-                self.install_update_config(host)
                 self.init_docker_network(host)
+                # Update config on all members with updated info about
+                # this host
+                for other_host in hosts:
+                    self.install_update_config(other_host)
+                    self.init_iptables(other_host)
+                    self.install_known_hosts(other_host)
                 # Bootstrap etcd2 cluster
                 self.early_bootstrap(host)
-                # Set up network security
-                self.init_iptables(host)
-                self.install_known_hosts(host)
                 # Provision FreeIPA service and client
                 self.pull_freeipa_docker_image(host)
                 self.install_freeipa_config(host)
