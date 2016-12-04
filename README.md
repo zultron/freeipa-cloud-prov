@@ -212,10 +212,11 @@ Add DNS zone:
     [root@h00 /]# ipa dnszone-add fra1.zultron.com \
         --forward-policy=none --admin-email=hostmaster@zultron.com
 
-## Redo stuff
+## TODO
 
 ### Ansible
 
+This system ended up reimplimenting what Ansible already does.  D'oh!
 - [Manage CoreOS with Ansible][CoreOS-ansible]
 - [Bootstrap CoreOS with Ansible][CoreOS-ansible-bootstrap]
 - [Manage Docker with Ansible][Docker-ansible]
@@ -225,6 +226,12 @@ Add DNS zone:
 [CoreOS-ansible-bootstrap]: https://github.com/defunctzombie/ansible-coreos-bootstrap
 [Docker-ansible]: http://docs.ansible.com/ansible/guide_docker.html
 [DO-ansible]: https://www.digitalocean.com/community/tutorials/how-to-use-the-digitalocean-api-v2-with-ansible-2-0-on-ubuntu-16-04
+
+### Public SSL Certs
+
+- [Let's Encrypt][letsencrypt]
+
+[letsencrypt]: https://letsencrypt.org/
 
 ### Bootstrapping
 
