@@ -30,7 +30,7 @@ ExecStart=/usr/bin/docker run --rm \
         --name ipa \
         --volume /media/state/ipa-data:/data \
         --volume /sys/fs/cgroup:/sys/fs/cgroup:ro \
-	--net cnet --ip ${SERVER_IP_ipa} \
+	--net cnet --ip ${IPA_IP} \
         -e IPA_SERVER_IP=${COREOS_PUBLIC_IPV4} \
         adelton/freeipa-server:centos-7
 # Wait for DNS to come online; this takes a minute normally, or about
