@@ -241,9 +241,16 @@ class FreeIPA(RemoteControl):
             # IPA server:  Clear auto-added IPA local reverse IP entry
             self.dns_ptr_record_del(self.hconfig(host, 'ipa_ip'), host)
         else:
-            # IPA replicas:  Add reverse zone
+            # IPA replicas:  Remove auto-added IPA local IP and add
+            # reverse zone
+            self.dns_a_record_del(host, self.hconfig(host, 'ipa_ip'))
             rev_local_zone = self.ptr_record(self.hconfig(host, 'ipa_ip'))[1]
             self.dns_local_zone_add(rev_local_zone)
+        # Clear auto-added IPA client in base zone
+        self.ipa_client_exec(
+            "ipa dnsrecord-del %s ipaclient.%s --a-rec=%s" % (
+                self.domain_name, self.hconfig(host, 'region'),
+                self.hconfig(host, 'ipaclient_ip')))
         # Fix auto-added `ipa-ca` entry
         self.dns_a_record_del('ipa-ca.%s' % self.domain_name,
                               self.hconfig(host, 'ipa_ip'))
