@@ -169,9 +169,12 @@ class RemoteControl(Config):
             # Use sudo to change owner
             self.remote_sudo('chown %s %s' % (owner, remote_fname), host)
 
-    def render_and_put(self, host, template, remote_fname, **kwargs):
-        self.put_file(host, self.render_jinja2(host, template),
-                      remote_fname, **kwargs)
+    def render_and_put(self, host, template, remote_fname, raw=False, **kwargs):
+        if raw:
+            contents = self.render_raw(template)
+        else:
+            contents = self.render_jinja2(host, template, **kwargs)
+        self.put_file(host, contents, remote_fname, **kwargs)
 
     def get_file(self, host, remote_fname, username=default_user):
         print "- Retrieving file %s:%s" % (host, remote_fname)

@@ -109,6 +109,11 @@ class Config(object):
         # pprint(subs)
         return subs
 
+    def render_raw(self, fname):
+        with open(os.path.join(self.template_dir, fname), 'r') as f:
+            contents = ''.join(f.readlines())
+        return contents
+
     def render_jinja2(self, host, fname, **kwargs):
         subs = self.substitutions(host, **kwargs)
         tmpl = self._jenv.get_template(fname)
