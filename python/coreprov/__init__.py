@@ -188,28 +188,6 @@ class CoreProvCLI(HAProxy, FusionPBX, DOCoreos, DockerNetwork, Syslog):
         if self._args.etcd_status:
             self.check_etcd_status(host)
 
-        #############
-        # - Certificate authority commands
-        if self._args.show_ca_cert:
-            print self.get_ca_cert()
-
-        if self._args.show_ca_config:
-            self.print_ca_config()
-
-        if self._args.show_ca_csr:
-            self.print_ca_csr()
-
-
-        for host in hosts:
-            if self._args.gen_host_certs:
-                cert = self.gen_host_cert(host)
-
-            if self._args.show_host_certs:
-                print self.gen_host_cert(host)['cert']
-
-            if self._args.show_host_keys:
-                print self.gen_host_cert(host)['key']
-
 
         # ##############################
         # # - IPSec commands
@@ -321,7 +299,6 @@ class CoreProvCLI(HAProxy, FusionPBX, DOCoreos, DockerNetwork, Syslog):
         # for host in hosts:
         #     self.etcd_update_member(host)
         #     self.ipa_fix_https_redirect(host)
-        #     self.install_ca_cert(host, self.ca_cert_file_path)
         #     self.issue_cert_pem(
         #         host, self.serv_cert_file_path, self.serv_key_file_path,
         #         host, "ETCD")
@@ -463,28 +440,6 @@ class CLIArgParser(argparse.ArgumentParser):
         post_group.add_argument(
             '--fleet-status', action='store_true',
             help='Show fleet status')
-
-        # - Certificate authority commands
-        ca_group = self.add_argument_group(
-            "Bootstrap certificate authority")
-        ca_group.add_argument(
-            '--show-ca-cert', action='store_true',
-            help='Print CA certificate')
-        ca_group.add_argument(
-            '--show-ca-config', action='store_true',
-            help='Print CA configuration')
-        ca_group.add_argument(
-            '--show-ca-csr', action='store_true',
-            help='Print CA CSR')
-        ca_group.add_argument(
-            '--gen-host-certs', action='store_true',
-            help='Generate host certificates')
-        ca_group.add_argument(
-            '--show-host-certs', action='store_true',
-            help='Print host certificates')
-        ca_group.add_argument(
-            '--show-host-keys', action='store_true',
-            help='Print host keys ***INSECURE***')
 
         # # - IPSec commands
         # ipsec_group = self.add_argument_group(
