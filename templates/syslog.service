@@ -2,12 +2,12 @@
 Description=Syslog service
 
 # Requirements
-Requires=etcd2.service
 Requires=docker.service
+Wants=etcd2.service
 
 # Dependency ordering
-After=etcd2.service
 After=docker.service
+After=etcd2.service
 
 [Service]
 # Let processes take awhile to start up (for first run Docker containers)

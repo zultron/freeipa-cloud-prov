@@ -2,7 +2,7 @@
 Description=FreeIPA service
 
 # Requirements
-Requires=etcd2.service
+Wants=etcd2.service
 Requires=docker.service
 
 # Dependency ordering

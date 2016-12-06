@@ -2,14 +2,14 @@
 Description=HAProxy service
 
 # Requirements
-Requires=etcd2.service
+Wants=etcd2.service
 Requires=docker.service
+Wants=haproxy-iptables.service
 
 # Dependency ordering
 After=etcd2.service
 After=docker.service
 
-Wants=haproxy-iptables.service
 
 [Service]
 # Let processes take awhile to start up (for first run Docker containers)

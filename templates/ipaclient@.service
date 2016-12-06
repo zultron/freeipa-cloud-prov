@@ -2,9 +2,9 @@
 Description=FreeIPA client service
 
 # Requirements
-Requires=etcd2.service
 Requires=docker.service
-Requires=ipa@%i.service
+Wants=etcd2.service
+Wants=ipa@%i.service
 
 # Dependency ordering
 After=etcd2.service
@@ -22,7 +22,6 @@ KillMode=none
 # Get CoreOS environmental variables
 EnvironmentFile=/etc/environment
 EnvironmentFile=/media/state/system.env
-Environment="IPA_CLIENT_INSTALL_OPTS=-N --force-join --force --server=${HOST_NAME} --fixed-primary --domain=${DOMAIN_NAME}"
 
 
 # Pre-start and Start

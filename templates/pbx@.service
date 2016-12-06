@@ -2,9 +2,13 @@
 Description=FusionPBX service
 
 # Requirements
-Requires=ipa@%i.service
+Requires=docker.service
+Wants=etcd2.service
+Wants=ipa@%i.service
 
 # Dependency ordering
+After=docker.service
+After=etcd2.service
 After=ipa@%i.service
 
 [Service]
