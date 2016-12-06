@@ -3,6 +3,7 @@ from .DOCoreos import DOCoreos
 from .DockerNetwork import DockerNetwork
 from .Syslog import Syslog
 from .HAProxy import HAProxy
+from .FusionPBX import FusionPBX
 import time
 
 import argparse
@@ -12,7 +13,7 @@ __all__ = ['CLIArgParser', 'CoreProvCLI']
 ########################################################################
 # CLI Processing
 
-class CoreProvCLI(HAProxy, DOCoreos, DockerNetwork, Syslog):
+class CoreProvCLI(HAProxy, FusionPBX, DOCoreos, DockerNetwork, Syslog):
     '''
     CoreProvCLI().run()
     '''
@@ -77,6 +78,11 @@ class CoreProvCLI(HAProxy, DOCoreos, DockerNetwork, Syslog):
                 self.install_haproxy_config(host)
                 self.install_haproxy_certs(host)
                 self.start_haproxy_server(host)
+                # Install FusionPBX
+                self.pull_fusionpbx_docker_image(host)
+                self.install_fusionpbx_certs(host)
+                self.install_fusionpbx_config(host)
+                self.start_fusionpbx_server(host)
 
 
         if self._args.run:
@@ -292,6 +298,24 @@ class CoreProvCLI(HAProxy, DOCoreos, DockerNetwork, Syslog):
 
             if self._args.start_haproxy or self._args.install_haproxy:
                 self.start_haproxy_server(host)
+
+        ########################
+        # - Provision FusionPBX containers
+
+        for host in hosts:
+            if self._args.pull_fusionpbx_image or self._args.install_fusionpbx:
+                self.pull_fusionpbx_docker_image(host)
+
+            if self._args.install_fusionpbx_certs or \
+               self._args.install_fusionpbx:
+                self.install_fusionpbx_certs(host)
+
+            if self._args.install_fusionpbx_config or \
+               self._args.install_fusionpbx:
+                self.install_fusionpbx_config(host)
+
+            if self._args.start_fusionpbx or self._args.install_fusionpbx:
+                self.start_fusionpbx_server(host)
 
         # # Testing
         # for host in hosts:
@@ -549,6 +573,25 @@ class CLIArgParser(argparse.ArgumentParser):
         haproxy_group.add_argument(
             '--start-haproxy', action='store_true',
             help='Start HAProxy containers')
+
+        # - FusionPBX commands
+        fusionpbx_group = self.add_argument_group(
+            "FusionPBX configuration")
+        fusionpbx_group.add_argument(
+            '--install-fusionpbx', action='store_true',
+            help='Install FusionPBX servers in one command')
+        fusionpbx_group.add_argument(
+            '--pull-fusionpbx-image', action='store_true',
+            help='Pull FusionPBX Docker image')
+        fusionpbx_group.add_argument(
+            '--install-fusionpbx-certs', action='store_true',
+            help='Install FusionPBX SSL certificates')
+        fusionpbx_group.add_argument(
+            '--install-fusionpbx-config', action='store_true',
+            help='Install FusionPBX configuration files')
+        fusionpbx_group.add_argument(
+            '--start-fusionpbx', action='store_true',
+            help='Start FusionPBX containers')
 
         return super(CLIArgParser, self).parse_args(*args, **kwargs)
 

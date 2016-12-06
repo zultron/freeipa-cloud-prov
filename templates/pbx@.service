@@ -1,0 +1,39 @@
+[Unit]
+Description=FusionPBX service
+
+# Requirements
+Requires=ipa@%i.service
+
+# Dependency ordering
+After=ipa@%i.service
+
+[Service]
+# Let processes take awhile to start up (for first run Docker containers)
+TimeoutStartSec=0
+
+# Change killmode from "control-group" to "none" to let Docker remove
+# work correctly.
+KillMode=none
+
+# Get CoreOS environmental variables
+EnvironmentFile=/etc/environment
+EnvironmentFile=/media/state/system.env
+
+# Pre-start and Start
+## Directives with "=-" are allowed to fail without consequence
+ExecStartPre=-/usr/bin/docker kill pbx
+ExecStartPre=-/usr/bin/docker rm pbx
+ExecStart=/usr/bin/docker run --rm \
+        --hostname ${HOST_NAME} \
+        --name pbx \
+        --volume /media/state/fusionpbx-data:/data \
+	--net cnet --ip ${PBX_IP} \
+        -e FUSIONPBX_PASS=${PBX_DB_PASS} \
+        zultron/fusionpbx-docker
+ExecStartPost=/bin/bash -e /media/state/fusionpbx-data/pbx-start-helper.sh %i
+
+# Stop
+ExecStop=/usr/bin/docker stop pbx
+
+[X-Fleet]
+MachineMetadata=host_id=%i
