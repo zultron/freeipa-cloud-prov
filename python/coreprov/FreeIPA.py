@@ -48,6 +48,8 @@ class FreeIPA(RemoteControl):
         name = 'ipa@%s.service'% self.hconfig(host, 'host_id')
         if host == self.initial_host:
             print "Installing fleet ipa@.service unit file"
+            self.remote_sudo(
+                "install -d -o core %s" % self.freeipa_file_path(), host)
             self.put_file(
                 host, self.render_jinja2(host, 'ipa@.service'),
                 self.freeipa_file_path('ipa@.service'))
