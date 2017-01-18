@@ -274,6 +274,13 @@ These should be added to automation
 - Create ipa sidekick `/etc/resolv.conf` service to install
   FreeIPA/Google DNS servers at start/stop
 
+- Create `~/.docker/config.json` with contents:
+
+		{
+		  "detachKeys": "ctrl-^"
+		}
+
+
 ## DNS
 
 	[root@h00 /]# ipa help dns
