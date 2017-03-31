@@ -19,7 +19,8 @@ RUN yum install -y \
 # EPEL packages
 RUN yum install -y \
     	python-pip \
-	python2-paramiko
+	python2-paramiko \
+	certbot
 	
 # PIP packages
 RUN pip install \

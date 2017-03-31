@@ -8,6 +8,7 @@ class FreeIPA(RemoteControl):
     freeipa_docker_client_image = 'zultron/freeipa-cloud-prov:ipaclient'
     freeipa_data_dir = os.path.join(RemoteControl.state_dir, 'ipa-data')
     cert_db_dir = os.path.join(freeipa_data_dir, 'root')
+    certbot_data_dir = os.path.join(RemoteControl.state_dir, 'certbot')
 
     def pull_freeipa_docker_image(self, host):
         print "Pulling docker image on host %s" % host
@@ -424,3 +425,8 @@ class FreeIPA(RemoteControl):
         self.install_etcd_certs(host)
         self.remove_temp_bootstrap_config(host)
         self.install_update_config(host)
+
+    def configure_certbot(self, host):
+        print "Configuring certbot on %s" % host
+        self.remote_sudo(
+            "install -d -o core %s" % self.certbot_data_dir, host)
