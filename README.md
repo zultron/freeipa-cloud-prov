@@ -120,10 +120,12 @@ For each FreeIPA server (first) and replicas (later):
 
 - [DigitalOcean][digitalocean]:
   - [DigitalOcean API][do-api]
+  - [DigitalOcean API on Ansible tutorial][do-api-ansible-tut]
   - [Python DigitalOcean API][py-do]
 
 [digitalocean]: https://cloud.digitalocean.com/
 [do-api]: https://developers.digitalocean.com/documentation/v2/
+[do-api-ansible-tut]: https://www.digitalocean.com/community/tutorials/how-to-use-the-digitalocean-api-v2-with-ansible-2-0-on-ubuntu-14-04
 [py-do]: https://github.com/koalalorenzo/python-digitalocean
 
 - [Paramiko][paramiko] Python SSH client

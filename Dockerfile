@@ -22,6 +22,10 @@ RUN pip install Jinja2
 # https://pypi.python.org/pypi/ipcalc/
 RUN pip install ipcalc
 RUN pip install ansible
+# dopy > 0.3.5 broken, according to DO Ansible tutorial
+RUN pip install 'dopy>=0.3.5,<=0.3.5'
+RUN apt-get install -y \
+    openssh-client
 
 RUN useradd -s /bin/bash user
 

@@ -1,0 +1,20 @@
+---
+core:
+  children:
+    host1:
+      hosts:
+        host1.example.com
+      vars:
+        region_id:  nyc1
+  vars:
+    size_id: 1gb
+    image_id: coreos-stable
+    swap_size: 2
+    volume_size: 10
+
+
+digitalocean:
+  hosts:
+    localhost
+  vars:
+    ansible_connection: local

@@ -3,6 +3,8 @@
 DIR="$(readlink -f $(dirname $0))"
 UID_GID=`id -u`:`id -g`
 DOCKER_IMG="zultron/freeipa-cloud-prov:master"
+DO_API_KEY=$(awk '/^token:/ {print $2}' config.yaml)
+
 
 cd "$DIR"
 
@@ -22,6 +24,7 @@ elif test "$1" = "shell"; then
 	-v $PWD:/data \
 	-u $UID_GID \
 	--entrypoint /bin/bash \
+	-e DO_API_KEY=${DO_API_KEY} \
 	${DOCKER_IMG} "$@"
 
 else
@@ -30,5 +33,6 @@ else
 	-v $HOME:/home/user \
 	-v $PWD:/data \
 	-u $UID_GID \
+	-e DO_API_KEY=${DO_API_KEY} \
 	${DOCKER_IMG} "$@"
 fi
