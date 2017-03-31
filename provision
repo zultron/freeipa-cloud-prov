@@ -1,6 +1,5 @@
 #!/bin/bash
 
-NAME="coreos-util"
 DIR="$(readlink -f $(dirname $0))"
 UID_GID=`id -u`:`id -g`
 DOCKER_IMG="zultron/freeipa-cloud-prov:master"
@@ -13,7 +12,7 @@ fi
 
 if test "$1" = "build"; then
     set -x
-    docker build -t "$NAME" .
+    docker build -t ${DOCKER_IMG} .
 
 elif test "$1" = "shell"; then
     shift
