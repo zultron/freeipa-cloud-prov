@@ -1,7 +1,7 @@
-FROM cfssl/cfssl
+FROM debian:jessie
 MAINTAINER John Morris <john@zultron.com>
 
-# Docker image with cfssl and scripts for initializing coreos cluster
+# Docker image with ansible and scripts for initializing coreos cluster
 # communicating over SSL
 
 RUN apt-get update
@@ -21,6 +21,7 @@ RUN pip install paramiko
 RUN pip install Jinja2
 # https://pypi.python.org/pypi/ipcalc/
 RUN pip install ipcalc
+RUN pip install ansible
 
 RUN useradd -s /bin/bash user
 
