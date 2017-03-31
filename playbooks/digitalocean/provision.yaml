@@ -1,0 +1,93 @@
+---
+- hosts: localhost
+
+  vars:
+    do_token: "{{ lookup('env', 'DO_API_KEY') }}"
+    initial_cluster:
+      "{{groups.coreos|mapformat('{0}=https://{0}:2380',',')}}"
+    initial_cluster_state:
+      "{{ ('coreos_master' in hostvars[item].group_names)|ternary('new','existing') }}"
+    serv_cert_file_path: /media/state/etcd/etcd.pem
+    serv_key_file_path: /media/state/etcd/etcd-key.pem
+    clnt_cert_file_path: /media/state/etcd/client.pem
+    clnt_key_file_path: /media/state/etcd/client-key.pem
+    ca_cert_file_path: /media/state/etcd/ca.pem
+    host_id:
+      "{{ item | regex_replace('\\..*','') }}"
+
+  tasks:
+
+    - name:  debug DigitalOcean token
+      debug:
+        msg: "Token is {{ do_token }}"
+        verbosity: 1
+
+    # Copied from https://www.digitalocean.com/community/tutorials/how-to-use-the-digitalocean-api-v2-with-ansible-2-0-on-ubuntu-14-04
+    - name: ensure ssh key exists at ~/.ssh/id_rsa
+      user:
+        name: "{{ ansible_user_id }}"
+        generate_ssh_key: yes
+        ssh_key_file: .ssh/id_rsa
+
+    - name: ensure SSH key exists at DigitalOcean
+      digital_ocean:
+        state: present
+        command: ssh
+        name: my_rsa_ssh_key
+        ssh_pub_key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+        api_token:  "{{ do_token }}"
+      register: my_rsa_ssh_key
+
+    - debug:
+        msg: "SSH key ID is {{ my_rsa_ssh_key.ssh_key.id }}"
+        verbosity: 1
+
+    - name:  debug hostvars
+      debug:
+        var: "hostvars[item]"
+        verbosity: 3
+      with_items: "{{ groups.coreos }}"
+
+    - name:  ensure tags exist at DigitalOcean
+      digital_ocean_tag:
+        name: "{{ hostvars[item]['digitalocean_cluster_tag'] }}"
+        state: present
+        api_token: "{{ do_token }}"
+      # All hosts in `coreos` group should have the same tag
+      with_random_choice: "{{ groups['coreos'] }}"
+
+    - name:  debug cloud-config
+      debug:
+        msg: "{{ lookup('template', 'files/cloud-config.yaml.j2') }}"
+        verbosity: 3
+      with_items: "{{ groups.coreos_master }}"
+
+    # - debug:
+    #     var: "hostvars"
+
+    - name: provision cluster master
+      digital_ocean:
+        state: present
+        command: droplet
+        ssh_key_ids: "{{ my_rsa_ssh_key.ssh_key.id }}"
+        name: "{{ item }}"
+        api_token:  "{{ do_token }}"
+        size_id: "{{ hostvars[item].size_id }}"
+        region_id: "{{ hostvars[item].region_id }}"
+        image_id: "{{ hostvars[item].image_id }}"
+        user_data: "{{ lookup('template', 'files/cloud-config.yaml.j2') }}"
+        unique_name: yes
+        wait_timeout: 500
+      with_items: "{{ groups.coreos_master }}"
+      register:  "coreos_master"
+
+    - name:  debug provisioning
+      debug:
+        var: "coreos_master"
+        verbosity: 2
+
+    # - debug:
+    #     msg: "ID is {{ droplet_h01.droplet.id }}"
+
+    # - debug:
+    #     msg: "IP is {{ droplet_h01.droplet.ip_address }}"

@@ -1,2 +1,2 @@
 ---
-- include: roles/digitalocean.yaml
+- include: playbooks/digitalocean/provision.yaml

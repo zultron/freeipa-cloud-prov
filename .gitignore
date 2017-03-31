@@ -2,3 +2,4 @@
 /state.yaml
 *.pyc
 /hosts.yaml
+/cache/

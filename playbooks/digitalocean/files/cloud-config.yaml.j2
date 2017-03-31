@@ -1,0 +1,191 @@
+#cloud-config
+
+# Docs:
+#    https://coreos.com/os/docs/latest/cloud-config.html
+# Validate:  use either of these:
+#    https://coreos.com/validate/
+#    coreos-cloudinit -validate
+# `drop-ins`:
+#   https://coreos.com/os/docs/latest/using-systemd-drop-in-units.html
+
+hostname: {{item}}
+
+ssh_authorized_keys:
+  - "{{ my_rsa_ssh_key.ssh_key.public_key }}"
+
+coreos:
+  update:
+    # https://coreos.com/os/docs/latest/update-strategies.html
+    reboot-strategy: etcd-lock
+  etcd2:
+    # https://coreos.com/etcd/docs/latest/configuration.html
+    #
+    # Member flags
+    #
+    # Unique name for this member
+    name: {{item}}
+    # Tune raft elections
+    # https://coreos.com/etcd/docs/latest/tuning.html#time-parameters
+    heartbeat-interval: 300
+    election-timeout: 3000
+    # URLs to listen on for peer and client traffic; use SSL on
+    # external interfaces
+    listen-peer-urls: https://$public_ipv4:2380
+    listen-client-urls: https://$public_ipv4:2379
+    #
+    # Clustering flags
+    #
+    # Initial flags for bootstrapping new member (not used in restarts)
+    initial-advertise-peer-urls: https://{{item}}:2380
+    initial-cluster:  {{initial_cluster}}
+    initial-cluster-state: {{initial_cluster_state}}
+    initial-cluster-token: cluster_{{hostvars[item]['digitalocean_cluster_tag']}}
+    # List of this member's client URLs to advertise to the rest of
+    # the cluster
+    advertise-client-urls: https://{{item}}:2379
+    # DNS srv domain used to bootstrap the cluster
+    #discovery-srv: {{domain_name}}
+    # Exit (don't proxy) when discovery fails
+    discovery-fallback: exit
+    # Reject reconfiguration requests that would cause quorum loss
+    strict-reconfig-check: true
+    #
+    # Security flags
+    #
+    # SSL cert file locations for client and peer servers; enable
+    # cert-based authentication
+    cert_file: {{serv_cert_file_path}}
+    key_file: {{serv_key_file_path}}
+    client_cert_auth: true
+    trusted_ca_file: {{ca_cert_file_path}}
+    peer_cert_file: {{clnt_cert_file_path}}
+    peer_key_file: {{clnt_key_file_path}}
+    peer_client_cert_auth: true
+    peer_trusted_ca_file: {{ca_cert_file_path}}
+    #
+    # Logging flags
+    #
+    # Drop the default log level to DEBUG for all subpackages
+    #debug: true
+    # Set individual etcd subpackages to specific log levels
+    #log-package-levels: etcdserver=WARNING,security=DEBUG
+  fleet:
+    metadata: region={{hostvars[item].region_id}},host_id={{host_id}}
+    # Use HTTPS on port 2379:
+    etcd_servers: https://{{item}}:2379
+    public-ip: {{item}}   # used for fleetctl ssh command
+    etcd_cafile: {{ca_cert_file_path}}
+    etcd_certfile: {{clnt_cert_file_path}}
+    etcd_keyfile: {{clnt_key_file_path}}
+  locksmith:
+    endpoint: https://{{item}}:2379
+    etcd_cafile: {{ca_cert_file_path}}
+    etcd_certfile: {{clnt_cert_file_path}}
+    etcd_keyfile: {{clnt_key_file_path}}
+  units:
+    #######################################
+    # base daemons
+    - name: etcd2.service
+      command: start
+    - name: fleet.service
+      command: start
+    - name: iptables-restore.service
+      enable: true
+      command: start
+      drop-ins:
+        - name: 40-iptables-restore-source.conf
+          content: |
+            [Unit]
+            Requires=media-state.mount
+            After=media-state.mount
+            [Service]
+            ExecStartPre=/usr/bin/ln -sf /media/state/iptables/rules-save \
+                /var/lib/iptables/rules-save
+    # Mask legacy etcd[1] service so it doesn't accidentally start
+    - name: etcd.service
+      mask: true
+      # Remote API access?
+        # https://coreos.com/os/docs/latest/customizing-docker.html#enable-the-remote-api-on-a-new-socket
+    #######################################
+    # disk
+    #
+    # This requires a DO volume with two partitions, swap and ext4
+    # filesystem
+    - name: dev-sda1.swap
+      command: start
+      content: |
+        [Swap]
+        What=/dev/sda1
+
+        [Install]
+        WantedBy=multi-user.target
+    - name: media-state.mount
+      command: start
+      content: |
+        [Mount]
+        What=/dev/sda2
+        Where=/media/state
+        Type=ext4
+
+        [Install]
+        WantedBy=multi-user.target
+    - name: update-config.service
+      enable: true
+      command: start
+      content: |
+        [Unit]
+        Description=Update configuration files from data directory
+        DefaultDependencies=no
+        After=media-state.mount
+        Before=sysinit.target
+
+        [Install]
+        WantedBy=sysinit.target
+
+        [Service]   
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStart=/media/state/configs/update-config
+    #######################################
+    # Other system units
+    #
+    - name: ntpd.service
+      enable: true
+      command: start
+    # - name: ntpdate.service
+    #   enable: true
+    #   command: start
+    - name: docker.service
+      drop-ins:
+        - name: no-ip-masq.conf
+          content: |
+            [Service]
+            Environment="DOCKER_OPT_IPMASQ=--ip-masq=false --iptables=false --userland-proxy=false"
+    # Load IPSec kernel module
+    # https://coreos.com/os/docs/latest/other-settings.html#via-cloud-init
+    # Also see below /etc/modules-load.d/af_key.conf
+    - name: systemd-modules-load.service
+      command: restart
+
+write_files:
+  # Load IPSec kernel module
+  - path: /etc/modules-load.d/af_key.conf
+    content: "af_key"
+
+  - path: /home/core/.toolboxrc
+    # https://coreos.com/os/docs/latest/install-debugging-tools.html
+    content: |
+      TOOLBOX_DOCKER_IMAGE=zultron/freeipa-cloud-prov
+      TOOLBOX_DOCKER_TAG=ipaclient
+      TOOLBOX_USER=root
+
+  # This seems to break provisioning
+  # - path: /usr/share/skel/.bashrc
+  #   permissions: 0644
+  #   content: |
+  #     # /etc/skel/.bashrc
+  #     #
+  #     # Set environment so etcdctl works over SSL
+  #     export ETCDCTL_CERT_FILE={{clnt_cert_file_path}}
+  #     export ETCDCTL_KEY_FILE={{clnt_key_file_path}}
+  #     export ETCDCTL_CA_FILE={{ca_cert_file_path}}

@@ -27,6 +27,10 @@ RUN pip install 'dopy>=0.3.5,<=0.3.5'
 RUN apt-get install -y \
     openssh-client
 
+RUN apt-get install -y \
+    redis-server
+RUN pip install redis
+
 RUN useradd -s /bin/bash user
 
 ENV PYTHONPATH=/data/python
