@@ -1,7 +1,7 @@
 ---
-# Provision and configure CoreOS cluster hosts
+# Provision and destroy DigitalOcean hosts
 
-- name: provision CoreOS hosts
+- name: provision and destroy DigitalOcean hosts
   hosts: localhost
 
   vars_prompt:
