@@ -40,16 +40,3 @@
 # - name:  debug droplet facts
 #   debug:
 #     var: "droplet_ids"
-
-# - name: save droplet facts
-#   # This plugin pulls stuff out of `droplet_provisioning`; could
-#   # `set_fact` with `extract` and `combine` filters also work?
-#   # http://docs.ansible.com/ansible/playbooks_filters.html
-#   droplet_facts: 
-#     droplets : "{{ droplet_provisioning }}"
-#   register:  droplet_facts
-
-# - name:  debug droplet facts
-#   debug:
-#     var: droplets
-#     verbosity: 3
