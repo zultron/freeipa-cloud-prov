@@ -6,10 +6,10 @@
 #   debug:
 #     var: hostvars[hostname]
 
-# - name:  debug cloud-config
-#   debug:
-#     msg: "{{ lookup('template', 'files/cloud-config.yaml.j2') }}"
-#     verbosity: 3
+- name:  debug cloud-config
+  debug:
+    msg: "{{ lookup('template', 'cloud-config.yaml.j2') }}"
+    # verbosity: 3
 
 - name: create cluster droplet
   digital_ocean:

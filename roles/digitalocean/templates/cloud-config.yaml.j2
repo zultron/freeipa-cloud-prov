@@ -38,7 +38,7 @@ coreos:
     # Initial flags for bootstrapping new member (not used in restarts)
     initial-advertise-peer-urls: https://{{fqdn}}:2380
     initial-cluster:  {{initial_cluster}}
-    initial-cluster-state: {{initial_cluster_state|default('existing')}}
+    initial-cluster-state: {{initial_cluster_state}}
     initial-cluster-token: cluster_{{etcd2_cluster_token}}
     # List of member client URLs to advertise to the rest of the
     # cluster

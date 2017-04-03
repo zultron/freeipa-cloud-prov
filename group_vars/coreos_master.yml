@@ -1,6 +1,0 @@
----
-# Group vars for coreos_master group
-
-# The etcd2 bootstrap machine `initial-cluster-state` is `new`,
-# otherwise `existing`
-initial_cluster_state: new
