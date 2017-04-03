@@ -39,13 +39,13 @@ coreos:
     initial-advertise-peer-urls: https://{{item}}:2380
     initial-cluster:  {{initial_cluster}}
     initial-cluster-state: {{initial_cluster_state}}
-    initial-cluster-token: cluster_{{hostvars[item]['digitalocean_cluster_tag']}}
-    # List of this member's client URLs to advertise to the rest of
-    # the cluster
+    initial-cluster-token: cluster_{{digitalocean_cluster_tag}}
+    # List of member client URLs to advertise to the rest of the
+    # cluster
     advertise-client-urls: https://{{item}}:2379
     # DNS srv domain used to bootstrap the cluster
     #discovery-srv: {{domain_name}}
-    # Exit (don't proxy) when discovery fails
+    # Exit (do not proxy) when discovery fails
     discovery-fallback: exit
     # Reject reconfiguration requests that would cause quorum loss
     strict-reconfig-check: true
@@ -101,7 +101,7 @@ coreos:
             [Service]
             ExecStartPre=/usr/bin/ln -sf /media/state/iptables/rules-save \
                 /var/lib/iptables/rules-save
-    # Mask legacy etcd[1] service so it doesn't accidentally start
+    # Mask legacy etcd[1] service so it does not accidentally start
     - name: etcd.service
       mask: true
       # Remote API access?

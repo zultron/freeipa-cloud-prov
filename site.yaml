@@ -1,2 +1,3 @@
 ---
-- include: playbooks/digitalocean/provision.yaml
+- include: playbooks/digitalocean/droplet.yaml
+- include: playbooks/digitalocean/block_storage.yaml

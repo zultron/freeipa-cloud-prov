@@ -1,5 +1,11 @@
 ---
-- hosts: localhost
+- include: ssh_keys.yaml
+  when: my_rsa_ssh_key is not defined
+
+- name: DigitalOcean droplets--Create
+  hosts: localhost
+  roles:
+    - coreos
 
   vars:
     do_token: "{{ lookup('env', 'DO_API_KEY') }}"
@@ -17,55 +23,13 @@
 
   tasks:
 
-    - name:  debug DigitalOcean token
-      debug:
-        msg: "Token is {{ do_token }}"
-        verbosity: 1
+    # - name:  debug cloud-config
+    #   debug:
+    #     msg: "{{ lookup('template', 'files/cloud-config.yaml.j2') }}"
+    #     verbosity: 3
+    #   with_items: "{{ groups.coreos_master }}"
 
-    # Copied from https://www.digitalocean.com/community/tutorials/how-to-use-the-digitalocean-api-v2-with-ansible-2-0-on-ubuntu-14-04
-    - name: ensure ssh key exists at ~/.ssh/id_rsa
-      user:
-        name: "{{ ansible_user_id }}"
-        generate_ssh_key: yes
-        ssh_key_file: .ssh/id_rsa
-
-    - name: ensure SSH key exists at DigitalOcean
-      digital_ocean:
-        state: present
-        command: ssh
-        name: my_rsa_ssh_key
-        ssh_pub_key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
-        api_token:  "{{ do_token }}"
-      register: my_rsa_ssh_key
-
-    - debug:
-        msg: "SSH key ID is {{ my_rsa_ssh_key.ssh_key.id }}"
-        verbosity: 1
-
-    - name:  debug hostvars
-      debug:
-        var: "hostvars[item]"
-        verbosity: 3
-      with_items: "{{ groups.coreos }}"
-
-    - name:  ensure tags exist at DigitalOcean
-      digital_ocean_tag:
-        name: "{{ hostvars[item]['digitalocean_cluster_tag'] }}"
-        state: present
-        api_token: "{{ do_token }}"
-      # All hosts in `coreos` group should have the same tag
-      with_random_choice: "{{ groups['coreos'] }}"
-
-    - name:  debug cloud-config
-      debug:
-        msg: "{{ lookup('template', 'files/cloud-config.yaml.j2') }}"
-        verbosity: 3
-      with_items: "{{ groups.coreos_master }}"
-
-    # - debug:
-    #     var: "hostvars"
-
-    - name: provision cluster master
+    - name: provision cluster droplets
       digital_ocean:
         state: present
         command: droplet
@@ -78,16 +42,20 @@
         user_data: "{{ lookup('template', 'files/cloud-config.yaml.j2') }}"
         unique_name: yes
         wait_timeout: 500
-      with_items: "{{ groups.coreos_master }}"
-      register:  "coreos_master"
+      with_items: "{{ groups.coreos }}"
+      register:  "droplet_provisioning"
 
-    - name:  debug provisioning
-      debug:
-        var: "coreos_master"
-        verbosity: 2
+    # - name:  debug provisioning
+    #   debug:
+    #     var: "droplet_provisioning"
+    #     verbosity: 2
 
-    # - debug:
-    #     msg: "ID is {{ droplet_h01.droplet.id }}"
+    - name: save droplet facts
+      droplet_facts: 
+        droplets : "{{ droplet_provisioning }}"
+      register:  droplet_facts
 
-    # - debug:
-    #     msg: "IP is {{ droplet_h01.droplet.ip_address }}"
+    # - name:  debug droplet facts
+    #   debug:
+    #     var: droplets
+    #     verbosity: 3
