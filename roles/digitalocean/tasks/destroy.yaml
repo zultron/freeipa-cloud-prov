@@ -11,7 +11,7 @@
   digital_ocean:
     state: absent
     command: droplet
-    name: "{{ hostname }}"
+    name: "{{ fqdn }}"
     unique_name: yes
     api_token:  "{{ do_token }}"
 

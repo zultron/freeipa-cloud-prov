@@ -1,7 +1,8 @@
 ---
-# DigitalOcean tasks
+# CoreOS tasks
 
-# Requires `hostname` and `operation` to be set
+# Requires `hostname` to be set
+
 
 - name: Show operation
   debug:

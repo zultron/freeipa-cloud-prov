@@ -1,0 +1,7 @@
+---
+# Generate cloud-config
+
+- name: generate cloud-config
+  set_fact:
+    user_data: "{{ lookup('template', 'cloud-config.yaml.j2') }}"
+

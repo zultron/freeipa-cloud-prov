@@ -1,0 +1,4 @@
+---
+# CoreOS provisioning tasks
+
+- include: gen_cloud_config.yaml

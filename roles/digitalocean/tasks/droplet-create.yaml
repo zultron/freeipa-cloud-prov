@@ -6,22 +6,22 @@
 #   debug:
 #     var: hostvars[hostname]
 
-# - name:  debug cloud-config
-#   debug:
-#     msg: "{{ lookup('template', 'cloud-config.yaml.j2') }}"
-#     # verbosity: 3
+- name:  debug user_data
+  debug:
+    msg: "{{ user_data }}"
+    # verbosity: 3
 
 - name: create cluster droplet
   digital_ocean:
     state: present
     command: droplet
     ssh_key_ids: "{{ digitalocean_ssh_key_id }}"
-    name: "{{ hostname }}"
+    name: "{{ fqdn }}"
     api_token:  "{{ do_token }}"
     size_id: "{{ size_id }}"
     region_id: "{{ region_id }}"
     image_id: "{{ image_id }}"
-    user_data: "{{ lookup('template', 'cloud-config.yaml.j2') }}"
+    user_data: "{{ user_data }}"
     unique_name: yes
     wait_timeout: 500
   register: do_create

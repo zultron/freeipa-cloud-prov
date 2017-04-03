@@ -1,18 +1,12 @@
 ---
 # DigitalOcean:  SSH key creation tasks
 
-- name: ensure SSH key exists at ~/.ssh/id_rsa
-  user:
-    name: "{{ ansible_user_id }}"
-    generate_ssh_key: yes
-    ssh_key_file: .ssh/id_rsa
-
 - name: ensure SSH key exists at DigitalOcean
   digital_ocean:
     state: present
     command: ssh
     name: my_rsa_ssh_key
-    ssh_pub_key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+    ssh_pub_key: "{{ ssh_pub_key }}"
     api_token:  "{{ do_token }}"
   register: DO_ssh_key
 

@@ -1,0 +1,12 @@
+---
+# Basic tasks for everything
+
+- name: ensure SSH key exists at ~/.ssh/id_rsa
+  user:
+    name: "{{ ansible_user_id }}"
+    generate_ssh_key: yes
+    ssh_key_file: .ssh/id_rsa
+
+- name: store SSH key value
+  set_fact:
+    ssh_pub_key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
