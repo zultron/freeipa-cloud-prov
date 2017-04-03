@@ -1,0 +1,6 @@
+---
+# Provision DigitalOcean droplet and block storage
+
+- include: ssh-keys.yaml
+- include: droplet-create.yaml
+- include: block-storage-create-attach.yaml

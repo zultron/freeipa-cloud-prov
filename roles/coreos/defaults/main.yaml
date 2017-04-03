@@ -1,0 +1,21 @@
+---
+# Default settings for DigitalOcean droplets
+# These may be overridden in the inventory and other files
+
+# Droplet creation settings
+default_size_id: 1gb
+default_image_id: coreos-stable
+default_region_id: nyc1
+default_volume_size: 10
+
+# etcd2 configuration
+etcd2_config_path: /media/state/etcd
+serv_cert_file_path: "{{ etcd2_config_path }}/etcd.pem"
+serv_key_file_path: "{{ etcd2_config_path }}/etcd-key.pem"
+clnt_cert_file_path: "{{ etcd2_config_path }}/client.pem"
+clnt_key_file_path: "{{ etcd2_config_path }}/client-key.pem"
+ca_cert_file_path: "{{ etcd2_config_path }}/ca.pem"
+
+# Cluster configuration
+initial_cluster:
+  "{{groups.coreos|mapformat('{0}=https://{0}:2380',',')}}"

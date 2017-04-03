@@ -1,20 +1,30 @@
+#                                                              -*-yaml-*-
 ---
-core:
+all:
+  vars:
+    # Top-level domain name of cluster
+    domain_name: example.com
+    # etcd2 "initial cluster token" must be unique
+    etcd2_cluster_token: c1
+
+# Define CoreOS cluster hosts
+coreos:
   children:
-    host1:
+    # Hosts in DigitalOcean
+    digitalocean:
+      children:
+        # The coreos_master group must contain one host where the etcd2
+        # cluster will be bootstrapped.
+        coreos_master:
+          hosts:
+            host1:
+              region_id: nyc1
+
+      # Other DigitalOcean CoreOS cluster nodes here
       hosts:
-        host1.example.com
-      vars:
-        region_id:  nyc1
-  vars:
-    size_id: 1gb
-    image_id: coreos-stable
-    swap_size: 2
-    volume_size: 10
-
-
-digitalocean:
-  hosts:
-    localhost
-  vars:
-    ansible_connection: local
+        host2:
+          region_id: sfo2
+        host3:
+          region_id: fra1
+          # Override default 1gb
+          size_id: 2gb

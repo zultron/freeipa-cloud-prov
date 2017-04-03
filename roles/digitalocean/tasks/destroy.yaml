@@ -1,0 +1,24 @@
+---
+# DigitalOcean:  droplet destruction tasks
+
+
+- block:
+    - name:  Check 'confirm' is set for 'destroy' operations
+      command: /bin/false
+  when: not confirm|default(False)
+
+- name:  destroy droplet
+  digital_ocean:
+    state: absent
+    command: droplet
+    name: "{{ hostname }}"
+    unique_name: yes
+    api_token:  "{{ do_token }}"
+
+- name:  destroy block storage
+  digital_ocean_block_storage:
+    state: absent
+    command: create
+    volume_name: "{{ data_volume_name }}"
+    region: "{{ region_id }}"
+    api_token:  "{{ do_token }}"

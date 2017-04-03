@@ -1,0 +1,15 @@
+---
+# Provision and configure CoreOS cluster hosts
+
+- name: provision CoreOS hosts
+  hosts: localhost
+
+  vars_prompt:
+    # Prompt for hostname if not already defined
+    - name: hostname
+      prompt: "DigitalOcean hostname (or '-e hostname=host1')"
+      private: no
+
+  roles:
+    - digitalocean
+    - coreos

@@ -1,3 +1,8 @@
+# Ansible notes
+(Clean this up later)
+
+- Password file in `password`
+
 # FreeIPA in Docker on CoreOS on DigitalOcean
 
 FreeIPA integrates LDAP, Kerberos, DNS and SSL CA services and exposes

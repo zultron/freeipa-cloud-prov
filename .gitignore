@@ -1,5 +1,10 @@
 /config.yaml
 /state.yaml
 *.pyc
+# User's config files
 /hosts.yaml
+/vault_password_file
+# Ansible-generated files
 /cache/
+*.retry
+/ansible.log

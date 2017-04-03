@@ -1,0 +1,55 @@
+---
+# DigitalOcean:  droplet creation tasks
+
+
+# - name: debug hostvars[hostname]
+#   debug:
+#     var: hostvars[hostname]
+
+# - name:  debug cloud-config
+#   debug:
+#     msg: "{{ lookup('template', 'files/cloud-config.yaml.j2') }}"
+#     verbosity: 3
+
+- name: create cluster droplet
+  digital_ocean:
+    state: present
+    command: droplet
+    ssh_key_ids: "{{ digitalocean_ssh_key_id }}"
+    name: "{{ hostname }}"
+    api_token:  "{{ do_token }}"
+    size_id: "{{ size_id }}"
+    region_id: "{{ region_id }}"
+    image_id: "{{ image_id }}"
+    user_data: "{{ lookup('template', 'cloud-config.yaml.j2') }}"
+    unique_name: yes
+    wait_timeout: 500
+  register: do_create
+
+# - name:  debug create droplet
+#   debug:
+#     var: "do_create"
+#     # verbosity: 2
+
+- name: save droplet facts
+  set_fact:
+    droplet_ids:
+      # add hostname -> droplet.id; don't clobber whole dict
+      "{{ {hostname:do_create.droplet.id}|combine(droplet_ids|default({})) }}"
+
+# - name:  debug droplet facts
+#   debug:
+#     var: "droplet_ids"
+
+# - name: save droplet facts
+#   # This plugin pulls stuff out of `droplet_provisioning`; could
+#   # `set_fact` with `extract` and `combine` filters also work?
+#   # http://docs.ansible.com/ansible/playbooks_filters.html
+#   droplet_facts: 
+#     droplets : "{{ droplet_provisioning }}"
+#   register:  droplet_facts
+
+# - name:  debug droplet facts
+#   debug:
+#     var: droplets
+#     verbosity: 3
