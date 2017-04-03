@@ -2,10 +2,11 @@
 
 - name:  DigitalOcean droplets--Destroy
   hosts: localhost
+  gather_facts: no
 
   vars:
     do_token: "{{ lookup('env', 'DO_API_KEY') }}"
-    volume_name: "{{ item|hostname() }}-data"
+    volume_name: "{{ item }}-data"
 
   tasks:
 

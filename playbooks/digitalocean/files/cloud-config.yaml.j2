@@ -8,7 +8,7 @@
 # `drop-ins`:
 #   https://coreos.com/os/docs/latest/using-systemd-drop-in-units.html
 
-hostname: {{item}}
+hostname: {{item}}.{{domain_name}}
 
 ssh_authorized_keys:
   - "{{ my_rsa_ssh_key.ssh_key.public_key }}"
@@ -36,13 +36,13 @@ coreos:
     # Clustering flags
     #
     # Initial flags for bootstrapping new member (not used in restarts)
-    initial-advertise-peer-urls: https://{{item}}:2380
+    initial-advertise-peer-urls: https://{{item}}.{{domain_name}}:2380
     initial-cluster:  {{initial_cluster}}
-    initial-cluster-state: {{initial_cluster_state}}
-    initial-cluster-token: cluster_{{digitalocean_cluster_tag}}
+    initial-cluster-state: {{initial_cluster_state|default('existing')}}
+    initial-cluster-token: cluster_{{etcd2_cluster_token}}
     # List of member client URLs to advertise to the rest of the
     # cluster
-    advertise-client-urls: https://{{item}}:2379
+    advertise-client-urls: https://{{item}}.{{domain_name}}:2379
     # DNS srv domain used to bootstrap the cluster
     #discovery-srv: {{domain_name}}
     # Exit (do not proxy) when discovery fails
@@ -70,15 +70,15 @@ coreos:
     # Set individual etcd subpackages to specific log levels
     #log-package-levels: etcdserver=WARNING,security=DEBUG
   fleet:
-    metadata: region={{hostvars[item].region_id}},host_id={{host_id}}
+    metadata: region={{hostvars[item].region_id}},host_id={{item}}
     # Use HTTPS on port 2379:
-    etcd_servers: https://{{item}}:2379
-    public-ip: {{item}}   # used for fleetctl ssh command
+    etcd_servers: https://{{item}}.{{domain_name}}:2379
+    public-ip: {{item}}.{{domain_name}}   # used for fleetctl ssh command
     etcd_cafile: {{ca_cert_file_path}}
     etcd_certfile: {{clnt_cert_file_path}}
     etcd_keyfile: {{clnt_key_file_path}}
   locksmith:
-    endpoint: https://{{item}}:2379
+    endpoint: https://{{item}}.{{domain_name}}:2379
     etcd_cafile: {{ca_cert_file_path}}
     etcd_certfile: {{clnt_cert_file_path}}
     etcd_keyfile: {{clnt_key_file_path}}
