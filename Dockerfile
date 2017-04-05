@@ -31,6 +31,12 @@ RUN apt-get install -y \
     redis-server
 RUN pip install redis
 
+# Install and configure sudo, passwordless for everyone
+RUN apt-get -y install sudo
+RUN echo "ALL	ALL=(ALL:ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+RUN apt-get -y install ed
+
 RUN useradd -s /bin/bash user
 
 ENV PYTHONPATH=/data/python

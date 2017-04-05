@@ -1,0 +1,13 @@
+---
+# Configure CoreOS cluster nodes
+
+- name: Configure CoreOS cluster nodes
+  hosts: coreos
+
+  roles:
+    - digitalocean
+    - { role: data_disk, volume_name: data_volume_name, mount_point: data_path }
+    - coreos
+
+
+

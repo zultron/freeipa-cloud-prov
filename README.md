@@ -6,9 +6,9 @@
 - Commands:
 
         # Provision host1
-        ansible-playbook coreos.yaml -e hostname=host1
+        ansible-playbook digitalocean.yaml -e hostname=host1
         # Destroy host1
-        ansible-playbook coreos.yaml -e hostname=host1 \
+        ansible-playbook digitalocean.yaml -e hostname=host1 \
 		    -e operation=destroy -e confirm=true
 
 # FreeIPA in Docker on CoreOS on DigitalOcean

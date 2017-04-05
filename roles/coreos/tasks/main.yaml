@@ -3,11 +3,6 @@
 
 # Requires `hostname` to be set
 
-
-- name: Show operation
-  debug:
-    msg:  "Operation: {{ operation|default('provision') }} {{ hostname }}"
-
 # Check that hostname in inventory
 - name:  Check hostname is in digitalocean group
   command: /bin/false

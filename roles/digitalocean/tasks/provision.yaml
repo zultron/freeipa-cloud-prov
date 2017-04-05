@@ -3,4 +3,5 @@
 
 - include: ssh-keys.yaml
 - include: droplet-create.yaml
+- include: update-etc-hosts.yaml
 - include: block-storage-create-attach.yaml

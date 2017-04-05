@@ -1,5 +1,8 @@
 ---
-# Settings for DigitalOcean droplets
+# Settings for CoreOS hosts
+
+# CoreOS user
+ansible_ssh_user: core
 
 # Droplet creation
 size_id: "{{hostvars[hostname].size_id|default(default_size_id)}}"
@@ -9,3 +12,6 @@ volume_size: "{{hostvars[hostname].volume_size|default(default_volume_size)}}"
 
 # FQDN
 fqdn: "{{hostname}}.{{domain_name}}"
+
+# Where to find python
+ansible_python_interpreter: "PATH=/home/core/bin:$PATH python"

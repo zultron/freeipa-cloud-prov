@@ -1,0 +1,17 @@
+---
+# DigitalOcean:  Update /etc/hosts after machine
+
+# In Docker, /etc/hosts may be edited but not replaced; use the
+# `command` module with `ed` to get around this
+
+- name: "Add/update host IP in /etc/hosts"
+  shell: "echo '/ {{fqdn}}/d\n$a\n{{droplet_ips[hostname]}} {{hostname}} {{fqdn}}\n.\nw\nq' | ed /etc/hosts"
+  become: true
+
+# - name: "Add host to /etc/hosts"
+#   lineinfile:
+#     dest: /etc/hosts
+#     regexp: " {{ fqdn }}"
+#     line: "{{ droplet_ips[hostname] }} {{hostname}} {{fqdn}}"
+#     state: present
+#   become: true

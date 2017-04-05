@@ -1,12 +1,9 @@
 ---
 # Basic tasks for everything
 
-- name: ensure SSH key exists at ~/.ssh/id_rsa
-  user:
-    name: "{{ ansible_user_id }}"
-    generate_ssh_key: yes
-    ssh_key_file: .ssh/id_rsa
+- name: Show operation
+  debug:
+    msg:  "Operation: {{ operation|default('provision') }}"
 
-- name: store SSH key value
-  set_fact:
-    ssh_pub_key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+# Include appropriate tasks
+- include: "{{operation|default('provision')}}.yaml"

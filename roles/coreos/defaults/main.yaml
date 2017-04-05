@@ -22,3 +22,9 @@ initial_cluster:
   '{0}=https://{0}.%s:2380' % domain_name,',')}}"
 initial_cluster_state:
   "{{ (hostname==groups.coreos_master[0])|ternary('new','existing') }}"
+
+# Volume names
+data_volume_name: "{{ hostname|default(ansible_nodename) }}-data"
+
+# Volume mount point
+data_path: /media/state
