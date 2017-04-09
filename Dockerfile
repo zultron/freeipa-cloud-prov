@@ -39,6 +39,9 @@ RUN apt-get -y install ed
 
 RUN useradd -s /bin/bash user
 
+COPY requirements.yaml /tmp
+RUN ansible-galaxy install -r /tmp/requirements.yaml
+
 ENV PYTHONPATH=/data/python
 
 VOLUME /data

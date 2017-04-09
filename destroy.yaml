@@ -1,0 +1,16 @@
+---
+# Destroy DigitalOcean hosts
+
+- name: Destroy DigitalOcean hosts
+  hosts: coreos
+  # This all runs on localhost regardless of whether hosts exist;
+  # don't run setup
+  gather_facts: False
+  connection: local
+
+  vars:
+    operation: destroy
+
+  roles:
+    - base
+    - digitalocean

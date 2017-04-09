@@ -1,12 +1,5 @@
 ---
 # CoreOS tasks
 
-# Requires `hostname` to be set
-
-# Check that hostname in inventory
-- name:  Check hostname is in digitalocean group
-  command: /bin/false
-  when: hostname not in groups.digitalocean
-
 # Include appropriate tasks
-- include: "{{operation|default('provision')}}.yaml"
+- include: "{{operation}}.yaml"

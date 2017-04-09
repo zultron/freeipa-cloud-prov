@@ -5,11 +5,23 @@
 
 - Commands:
 
+        # Install required roles from Ansible Galaxy, if not running
+        # Docker container
+        ansible-galaxy install -p ./roles -r requirements.yaml
+
         # Provision host1
-        ansible-playbook digitalocean.yaml -e hostname=host1
+        ansible-playbook provision.yaml -l host1
         # Destroy host1
-        ansible-playbook digitalocean.yaml -e hostname=host1 \
-		    -e operation=destroy -e confirm=true
+        ansible-playbook destroy.yaml -l host1 -e confirm=true
+		# CoreOS on host1
+        ansible-playbook coreos.yaml -l host1
+
+
+        # List all variables for a host
+        ansible h01 -m debug -a "var=hostvars.h01"
+        # Also vars, environment, group_names, groups
+
+- Depends on `defunctzombie.coreos-bootstrap`, installed in Docker
 
 # FreeIPA in Docker on CoreOS on DigitalOcean
 
@@ -35,7 +47,7 @@ should be aware of risks using this work.**
 The `provision` script runs these python utilities in a Docker
 container with the needed support tools.
 
-	./provision -h     # Show usage
+    ./provision -h     # Show usage
 
 To provision a new cluster, copy `config.yaml.example` to
 `config.yaml` and edit it.  Then, on a good day, the following command
@@ -58,18 +70,18 @@ configure FreeIPA:
     data volume so that the OS stays stateless and can be wiped
 - `etcd2` configuration
   - Manual provisioning
-	- Use DNS names:  IPA won't issue certs with IP addresses in
+    - Use DNS names:  IPA won't issue certs with IP addresses in
       `subjectAltName`
-	- Initial URL resolution via `/etc/hosts`
-	  - Initial IP addresses can't be known in advance; use systemd service to
-		copy files from `/media/state` at boot
+    - Initial URL resolution via `/etc/hosts`
+      - Initial IP addresses can't be known in advance; use systemd service to
+        copy files from `/media/state` at boot
   - SSL on external interfaces
-	- Initial bootstrap host needs temporary drop-in during bootstrap
-	  to disable SSL until FreeIPA is running and integrated
-	- Certs are generated with certmonger within an IPA client
+    - Initial bootstrap host needs temporary drop-in during bootstrap
+      to disable SSL until FreeIPA is running and integrated
+    - Certs are generated with certmonger within an IPA client
       container, simplifying generation and automating updates, and
       good for all SSL services
-	- Replicas are completely configured with SSL certs before running
+    - Replicas are completely configured with SSL certs before running
       `etcdctl member add`
   - Iptables restricts `etcd2` communication to nodes only
 - FreeIPA installation
@@ -79,10 +91,10 @@ configure FreeIPA:
   - Host principals only set up for host (to generate certs with
     correct CN) and IPA client (to manage cert generation)
   - Hardened according to recommendations on FreeIPA wiki
-	- No public DNS recursion
-	- No DNS AXFR
-	- No LDAP anonymous bind
-	- Only HTTPS, no HTTP
+    - No public DNS recursion
+    - No DNS AXFR
+    - No LDAP anonymous bind
+    - Only HTTPS, no HTTP
   - IPA client container used to run IPA commands, generate certs, and
     run certmonger to monitor SSL cert expiration
 - Other configuration
@@ -101,32 +113,32 @@ For each FreeIPA server (first) and replicas (later):
 - `./provision --provision-all` does all the following in one command:
 - CoreOS cluster provisioning
   - Provision droplet and volume
-	- `./provision --create-volumes --provision`
+    - `./provision --create-volumes --provision`
   - Initialize data and swap volume, and install `system.env`
     configuration file
-	- `./provision --init-volumes`
+    - `./provision --init-volumes`
   - Install /etc/hosts, etc.
-	- `./provision --install-update-config`
+    - `./provision --install-update-config`
   - Install docker network
-	- `./provision --init-docker-network`
+    - `./provision --init-docker-network`
   - On other hosts: install iptables, known-hosts;
-	- `./provision --init-iptables --install-known-hosts --install-update-config`
+    - `./provision --init-iptables --install-known-hosts --install-update-config`
   - Install config needed to bootstrap initial member or add later
     members
-	- `./provision --early-bootstrap`
+    - `./provision --early-bootstrap`
 - FreeIPA provisioning
   - Install FreeIPA server/replica
-	- `./provision --pull-ipa-image --install-ipa-config --init-ipa`
+    - `./provision --pull-ipa-image --install-ipa-config --init-ipa`
   - Install FreeIPA client
-	- `./provision --install-ipa-client`
+    - `./provision --install-ipa-client`
   - Configure IPA security and DNS; issue etcd2 certs for cluster;
-	remove temp. bootstrap config
-	- `./provision --configure-ipa`
+    remove temp. bootstrap config
+    - `./provision --configure-ipa`
 - Other services
   - Set up syslog service
-	- `./provision --install-syslog`
+    - `./provision --install-syslog`
   - Set up haproxy service
-	- `./provision --install-haproxy`
+    - `./provision --install-haproxy`
 
 
 ## Documentation used to develop this system
@@ -151,24 +163,24 @@ For each FreeIPA server (first) and replicas (later):
 
 - [CoreOS][coreos]:
   - Basic configuration:
-	- [Running CoreOS on DigitalOcean tutorial][coreos-do]
-	- [CoreOS `cloud-config`][cloud-config] and
-	  [validator][coreos-cloud-config-validate]
-	- [`etcd2` options][etcd2-options]
-	- [CoreOS clustering][coreos-clustering]:  "static" section
-	- [CoreOS cluster reconfiguration][coreos-cluster-reconfig]
+    - [Running CoreOS on DigitalOcean tutorial][coreos-do]
+    - [CoreOS `cloud-config`][cloud-config] and
+      [validator][coreos-cloud-config-validate]
+    - [`etcd2` options][etcd2-options]
+    - [CoreOS clustering][coreos-clustering]:  "static" section
+    - [CoreOS cluster reconfiguration][coreos-cluster-reconfig]
   - SSL on CoreOS:
-	- [SSL Certificate Authority][coreos-ca]
+    - [SSL Certificate Authority][coreos-ca]
     - [`etcd2` SSL][coreos-etcd-ssl]
     - [CoreOS client ssl][coreos-clients-ssl]
-	- [CoreOS SSL and iptables on DigitalOcean][do-coreos-ssl]
+    - [CoreOS SSL and iptables on DigitalOcean][do-coreos-ssl]
       (somewhat outdated)
-	- [`cfssl` CA utility][cfssl]
+    - [`cfssl` CA utility][cfssl]
   - Launching containers in CoreOS:
-	- [Launching containers with fleet][fleet]
-	- [Unit files][unit-files]
+    - [Launching containers with fleet][fleet]
+    - [Unit files][unit-files]
   - IPA integration
-	- [CoreOS SSSD integration][coreos-sssd]
+    - [CoreOS SSSD integration][coreos-sssd]
   
 
 [coreos]: https://coreos.com/
@@ -190,8 +202,8 @@ For each FreeIPA server (first) and replicas (later):
 - [StrongSwan][strongswan]:
   - [StrongSwan in Docker][docker-strongswan]
   - Configuration:
-	- [`ipsec.conf`][ss-ipsec-conf]
-	- [StrongSwan host-to-host config example][ss-host2host]
+    - [`ipsec.conf`][ss-ipsec-conf]
+    - [StrongSwan host-to-host config example][ss-host2host]
 
 [strongswan]: https://strongswan.org/
 [docker-strongswan]: https://github.com/philpl/docker-strongswan
@@ -202,18 +214,18 @@ For each FreeIPA server (first) and replicas (later):
   - [FreeIPA in Docker][freeipa-docker]
   - [FreeIPA client in Docker][freeipa-docker-client]
   - Man-pages:
-	- [ipa-server-install][ipa-server-install-man]
-	- [ipa-replica-prepare][ipa-replica-prepare-man]
-	- [ipa-replica-install][ipa-replica-install-man]
-	- [ipa-client-install][ipa-client-install-man]
-	- [getcert-request][getcert-request-man]
+    - [ipa-server-install][ipa-server-install-man]
+    - [ipa-replica-prepare][ipa-replica-prepare-man]
+    - [ipa-replica-install][ipa-replica-install-man]
+    - [ipa-client-install][ipa-client-install-man]
+    - [getcert-request][getcert-request-man]
 
   - Docs:
     - [RHEL7 IdM Guide][idm-guide]
-	- RHEL7 system auth guide [certmonger][certmonger]
+    - RHEL7 system auth guide [certmonger][certmonger]
     - [RHEL6 replication docs][rhel6-ipa-rep-docs]
-	- [NSS `certutil`][nss-certutil]
-	- [FreeIPA behind SSL proxy][freeipa-ssl-proxy]
+    - [NSS `certutil`][nss-certutil]
+    - [FreeIPA behind SSL proxy][freeipa-ssl-proxy]
 
 [freeipa]: http://www.freeipa.org/page/Main_Page
 [freeipa-docker]: https://github.com/adelton/docker-freeipa
@@ -255,13 +267,13 @@ Run shell in running container:
 
 Other `fleetctl` commands:
 
-	ssh core@$HOST0 fleetctl stop ipa.service  # stop the service
-	ssh core@$HOST0 fleetctl list-unit-files   # show file exists
-	ssh core@$HOST0 fleetctl cat ipa.service   # show file contents
-	ssh core@$HOST0 fleetctl list-units        # show service status
-	ssh core@$HOST0 fleetctl journal ipa.service
-	ssh core@$HOST0 fleetctl unload ipa.service
-	ssh core@$HOST0 fleetctl destroy ipa.service
+    ssh core@$HOST0 fleetctl stop ipa.service  # stop the service
+    ssh core@$HOST0 fleetctl list-unit-files   # show file exists
+    ssh core@$HOST0 fleetctl cat ipa.service   # show file contents
+    ssh core@$HOST0 fleetctl list-units        # show service status
+    ssh core@$HOST0 fleetctl journal ipa.service
+    ssh core@$HOST0 fleetctl unload ipa.service
+    ssh core@$HOST0 fleetctl destroy ipa.service
 
 FreeIPA information commands
 
@@ -291,23 +303,23 @@ These should be added to automation
 
 - Create `~/.docker/config.json` with contents:
 
-		{
-		  "detachKeys": "ctrl-^"
-		}
+        {
+          "detachKeys": "ctrl-^"
+        }
 
 
 ## DNS
 
-	[root@h00 /]# ipa help dns
+    [root@h00 /]# ipa help dns
 
-	[root@h00 /]# ipa dnszone-show zultron.com --all
+    [root@h00 /]# ipa dnszone-show zultron.com --all
 
-	[root@h00 /]# ipa dnszone-find zultron.com --forward-only --all
+    [root@h00 /]# ipa dnszone-find zultron.com --forward-only --all
 
-	[root@h00 /]# ipa dnsrecord-show zultron.com @ --all
+    [root@h00 /]# ipa dnsrecord-show zultron.com @ --all
 
-	[root@h00 /]# ipa dnszone-add nyc1.zultron.com --forward-policy=none \
-	  --admin-email=hostmaster@zultron.com --name-from-ip=10.26.0.0/24
+    [root@h00 /]# ipa dnszone-add nyc1.zultron.com --forward-policy=none \
+      --admin-email=hostmaster@zultron.com --name-from-ip=10.26.0.0/24
 
 Add DNS zone:
 

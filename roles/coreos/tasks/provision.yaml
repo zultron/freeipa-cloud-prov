@@ -1,4 +1,12 @@
 ---
 # CoreOS provisioning tasks
 
-- include: gen_cloud_config.yaml
+# CoreOS needs cloud-config for DigitalOcean user_data
+- name: generate cloud-config
+  set_fact:
+    user_data: "{{ lookup('template', 'cloud-config.yaml.j2') }}"
+
+# - name: debug cloud-config
+#   debug:
+#     var: user_data
+#     verbosity: 2

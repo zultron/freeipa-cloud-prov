@@ -3,7 +3,8 @@
 
 - name: Show operation
   debug:
-    msg:  "Operation: {{ operation|default('provision') }}"
+    msg:  "Operation: {{ operation }}"
+  run_once: true
 
 # Include appropriate tasks
-- include: "{{operation|default('provision')}}.yaml"
+- include: "{{operation}}.yaml"

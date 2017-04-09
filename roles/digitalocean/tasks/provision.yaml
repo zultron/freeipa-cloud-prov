@@ -1,7 +1,108 @@
 ---
-# Provision DigitalOcean droplet and block storage
+# DigitalOcean provisioning tasks
 
-- include: ssh-keys.yaml
-- include: droplet-create.yaml
-- include: update-etc-hosts.yaml
-- include: block-storage-create-attach.yaml
+##############################################
+# Upload SSH key
+
+- name: ensure SSH key exists at DigitalOcean
+  digital_ocean:
+    state: present
+    command: ssh
+    name: my_rsa_ssh_key
+    ssh_pub_key: "{{ ssh_pub_key }}"
+    api_token:  "{{ do_token }}"
+  register: DO_ssh_key
+  delegate_to: localhost
+  delegate_facts: true
+  run_once: true
+
+- name: save DigitalOcean SSH key ID
+  set_fact:
+    digitalocean_ssh_key_id: "{{ DO_ssh_key.ssh_key.id }}"
+    digitalocean_ssh_public_key: "{{ DO_ssh_key.ssh_key.public_key }}"
+
+# - name: debug SSH key ID
+#   debug:
+#     msg: "SSH key ID is {{ digitalocean_ssh_key_id }};
+#               pubkey is {{ digitalocean_ssh_public_key }}"
+#     verbosity: 1
+
+##############################################
+# Create droplet
+
+- name: create cluster droplet
+  digital_ocean:
+    state: present
+    command: droplet
+    ssh_key_ids: "{{ digitalocean_ssh_key_id }}"
+    name: "{{ fqdn }}"
+    api_token:  "{{ do_token }}"
+    size_id: "{{ size_id }}"
+    region_id: "{{ region_id }}"
+    image_id: "{{ image_id }}"
+    user_data: "{{ user_data|default('') }}"
+    unique_name: yes
+    wait_timeout: 500
+  register: do_create
+
+# - name:  debug create droplet
+#   debug:
+#     var: "do_create"
+#     # verbosity: 2
+
+- name: save droplet facts
+  set_fact:
+    droplet_id: "{{ do_create.droplet.id }}"
+    droplet_ip: "{{ do_create.droplet.ip_address }}"
+
+- name:  debug droplet facts
+  debug:
+    msg: "{{hostname}} IP={{hostvars[hostname].droplet_ip}};
+         ID={{hostvars[hostname].droplet_id}}"
+
+##############################################
+# Update /etc/hosts in Docker container
+
+# In Docker, /etc/hosts may be edited but not replaced, so the
+# `lineinfile` module won't work; use the `command` module with `ed`
+# to get around this
+
+- name: "Add/update host IP in /etc/hosts"
+  shell: "echo '/ {{fqdn}}/d\n$a\n{{droplet_ip}} {{hostname}} {{fqdn}}\n.\nw\nq'
+          | ed /etc/hosts || true"
+  become: true
+  delegate_to: localhost
+
+##############################################
+# Create and attach block storage
+
+- name: ensure block storage volume <host>_data exists
+  digital_ocean_block_storage:
+    volume_name: "{{ data_volume_name }}"
+    description: "data volume for {{ hostname }}"
+    state: present
+    command: create
+    api_token:  "{{ do_token }}"
+    region: "{{ region_id }}"
+    block_size: "{{ volume_size }}"
+  register: block_storage_volumes
+
+# - name: debug block storage volume creation
+#   debug:
+#     var: block_storage_volumes
+#     verbosity: 3
+
+- name: attach block storage volume <host>_data to droplet
+  digital_ocean_block_storage:
+    volume_name: "{{ data_volume_name }}"
+    state: present
+    command: attach
+    droplet_id: "{{ droplet_id }}"
+    region: "{{ region_id }}"
+    api_token:  "{{ do_token }}"
+  register: block_storage_attach
+
+# - name: debug block storage volume attach
+#   debug:
+#     var: block_storage_attach
+#     verbosity: 3
