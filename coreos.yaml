@@ -3,9 +3,32 @@
 
 - name: Configure CoreOS cluster nodes
   hosts: coreos
-  gather_facts: False
+
+  vars:
+    operation: configure
+    ansible_python_interpreter: /home/core/bin/python
+
+  environment:
+    # Path for python
+    PATH: "/usr/sbin:/usr/bin:/home/core/bin"
+
   roles:
-    - defunctzombie.coreos-bootstrap
-    # - digitalocean
-    # - { role: data_disk, volume_name: data_volume_name, mount_point: data_path }
-    # - coreos
+    # Partition attached disks
+    - role: disk-label
+      volume_name: data
+      device: "{{data_volume_block_device}}"
+      partitions:
+        - number: 1
+          fs_type:  linux-swap
+          part_end:  "{{ swap_size }}GiB"
+        - number: 2
+          part_start:  "{{ swap_size }}GiB"
+      # when:
+
+    # Set up swap on `swap_device`
+    - swap
+
+    # Set up ext4 fs on data partition
+    - role: mkfs-ext4
+      device: "{{data_volume_device}}"
+      volume_name: data

@@ -1,0 +1,21 @@
+---
+# Set up ext4 fs on partition
+
+# Example playbook entry
+#
+# - role: mkfs-ext4
+#   device:  /dev/disk/by-id/myvol
+#   volume_name: myvol
+
+- name:  Create ext4 fs
+  filesystem:
+    dev: "{{ device }}"
+    fstype: ext4
+  become: true
+  register: mkfs_ext4
+
+- name:  Debug create ext4 fs
+  debug:
+    var: mkfs_ext4
+
+

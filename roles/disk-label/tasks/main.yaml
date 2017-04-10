@@ -1,0 +1,63 @@
+---
+# Label and partition disk
+
+# Example playbook entry
+#
+# - role: disk-label
+#   volume_name: myvol
+#   device:  /dev/disk/by-id/myvol
+#   # label default gpt
+#   # align default optimal
+#   partitions:
+#     - number: 1
+#       fs_type:  linux-swap
+#       # part_start default 0
+#       part_end:  1GiB
+#     - number: 2
+#       # fs_type default ext4
+#       part_start:  1GiB
+#       # part_end default 100%
+
+##############################
+# Label volume
+
+- name: Collect volume info
+  parted:
+    device: "{{ device }}"
+    state: info
+    unit: GiB
+  become: true
+  register: parted_info
+
+# - name: debug volume info
+#   debug:
+#     var: parted_info
+
+- name: Create volume label
+  parted:
+    device: "{{ device }}"
+    label: "{{ label|default('gpt') }}"
+    state: present
+    unit: GiB
+  become: true
+  register: parted_label
+  when: parted_info.disk.table == 'unknown'
+
+# - name: debug data volume label
+#   debug:
+#     var: parted_label
+
+
+##############################
+# Create partitions
+
+- name: Init partition_map facts
+  set_fact:
+    partition_map: {}
+
+- include: partition.yaml
+  with_items:  "{{ partitions }}"
+
+# - name: debug partition map
+#   debug:
+#     var: partition_map

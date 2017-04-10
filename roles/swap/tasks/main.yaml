@@ -1,0 +1,73 @@
+---
+# Swap tasks
+#
+# Requires `swap_device` variable
+
+##############################
+# Check swap status
+
+- name:  Get canonical device path
+  shell: "readlink -f {{ swap_device|quote }}"
+  register: swap_device_canon_cmd
+  # Never report "changed"
+  changed_when: False  
+
+# - name: Debug canonical device path
+#   debug:
+#     var: swap_device_canon_cmd
+
+- name:  Set swap_device_canon fact
+  set_fact:
+    swap_device_canon:  "{{ swap_device_canon_cmd.stdout }}"
+
+- name:  Check if already swapping to device
+  shell:  "swapon -s | grep -q '{{ swap_device_canon|quote }}'
+            && echo 'swapping' || echo 'not swapping'"
+  register:  swap_status_cmd
+  changed_when: False  
+
+# - name: Debug swap status
+#   debug:
+#     var: swap_status_cmd
+
+- name:  Set is_swapping fact
+  set_fact:
+    is_swapping:  "{{ swap_status_cmd.stdout == 'swapping' }}"
+
+- name: Debug swap facts
+  debug:
+    msg: "Swap device = {{swap_device_canon}}; is_swapping = {{is_swapping}}"
+
+- block:
+    # Stuff to do if the swap device isn't swapping
+
+    - name:  Format swap partition
+      command: "mkswap {{ swap_device_canon }}"
+      become: true
+      register:  mkswap_cmd
+
+    # - name:  Debug mkswap_cmd
+    #   debug:
+    #     var:  mkswap_cmd
+
+    - name:  Swap on swap partition
+      command:  "swapon {{ swap_device_canon }}"
+      become: true
+      register:  swapon_cmd
+
+    # - name:  Debug swapon_cmd
+    #   debug:
+    #     var:  swapon_cmd
+
+    - name:  Verify swapon status
+      shell:  "swapon -s | grep -q '{{ swap_device_canon|quote }}'
+                && echo 'swapping' || echo 'not swapping'"
+      register:  verify_swap_status_cmd
+      failed_when: verify_swap_status_cmd.stderr == 'not swapping'
+      changed_when:  False
+
+    # - name: Debug verify swap status
+    #   debug:
+    #     var: verify_swap_status_cmd
+
+  when:  not is_swapping

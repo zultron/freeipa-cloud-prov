@@ -3,3 +3,19 @@
 
 # CoreOS login ID
 ansible_ssh_user: core
+
+# Where dropins live
+dropin_path_pat: "/etc/systemd/system/%s.service.d/%s"
+
+# Swap partition size, GiB
+swap_size:  2
+
+
+# Data volume block device
+data_volume_block_device:  "{{ block_device_path_pat % data_volume_name }}"
+
+# Data volume partition
+data_volume_device: "{{ data_volume_block_device }}-part2"
+
+# Swap partition
+swap_device:  "{{ data_volume_block_device }}-part1"
