@@ -1,9 +1,0 @@
----
-# Settings for CoreOS hosts
-
-# # CoreOS user
-# - Moved to group_vars
-# ansible_ssh_user: core
-
-# # Where to find python
-# ansible_python_interpreter: "PATH=/home/core/bin:$PATH python"

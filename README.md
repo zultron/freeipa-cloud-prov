@@ -7,7 +7,7 @@
 
         # Install required roles from Ansible Galaxy, if not running
         # Docker container
-        ansible-galaxy install -p ./roles -r requirements.yaml
+        ansible-galaxy install -p ./roles -r misc/requirements.yaml
 
         # Provision host1
         ansible-playbook provision.yaml -l host1
@@ -18,7 +18,7 @@
 
 
         # List all variables for a host
-        ansible h01 -m debug -a "var=hostvars.h01"
+        ansible h01 -m debug -a "var=hostvars.host1"
         # Also vars, environment, group_names, groups
 
 - Depends on `defunctzombie.coreos-bootstrap`, installed in Docker

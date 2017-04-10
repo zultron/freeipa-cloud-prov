@@ -1,0 +1,4 @@
+---
+
+# DigitalOcean disk device path
+block_device_path_pat: "/dev/disk/by-id/scsi-0DO_Volume_%s"

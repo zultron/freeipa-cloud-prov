@@ -2,9 +2,8 @@
 # DigitalOcean:  droplet destruction tasks
 
 
-- block:
-    - name:  Check 'confirm' is set for 'destroy' operations
-      command: /bin/false
+- name: Refuse to destroy droplet if 'confirm' is not set
+  fail: msg="Please set '-e confirm=1' to destroy droplet"
   when: not confirm|default(False)
 
 - name:  destroy droplet

@@ -16,3 +16,4 @@
     # coreos must come first to generate cloud-config
     - coreos
     - digitalocean
+    - defunctzombie.coreos-bootstrap
