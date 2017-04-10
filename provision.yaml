@@ -1,7 +1,8 @@
 ---
 # Provision DigitalOcean hosts
 
-- name: Provision DigitalOcean hosts
+############################################
+- name: Create DigitalOcean droplets and block storage
   hosts: coreos
   # This all runs on localhost regardless of whether hosts exist;
   # don't run setup
@@ -17,12 +18,46 @@
     - coreos
     - digitalocean
 
+############################################
 - name: Bootstrap ansible on CoreOS
   hosts: coreos
   # No python on host yet; don't run setup
   gather_facts: False
   vars:
-    ansible_python_interpreter: /home/core/bin/python
+     ansible_python_interpreter: /home/core/bin/python
 
   roles:
     - defunctzombie.coreos-bootstrap
+
+############################################
+- name: Configure CoreOS block storage
+  hosts: coreos
+
+  vars:
+    operation: configure
+    ansible_python_interpreter: /home/core/bin/python
+
+  environment:
+    # Path for python
+    PATH: "/usr/sbin:/usr/bin:/home/core/bin"
+
+  roles:
+    # Partition attached disks
+    - role: disk-label
+      volume_name: data
+      device: "{{data_volume_block_device}}"
+      partitions:
+        - number: 1
+          fs_type:  linux-swap
+          part_end:  "{{ swap_size }}GiB"
+        - number: 2
+          part_start:  "{{ swap_size }}GiB"
+      # when:
+
+    # Set up swap on `swap_device`
+    - swap
+
+    # Set up ext4 fs on data partition
+    - role: mkfs-ext4
+      device: "{{data_volume_device}}"
+      mount_path: "{{data_volume_path}}"
