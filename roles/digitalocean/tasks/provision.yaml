@@ -71,6 +71,7 @@
           | ed /etc/hosts || true"
   become: true
   delegate_to: localhost
+  when: do_create.changed
 
 ##############################################
 # Create and attach block storage
