@@ -57,8 +57,7 @@
 
 - name:  debug droplet facts
   debug:
-    msg: "{{hostname}} IP={{hostvars[hostname].droplet_ip}};
-         ID={{hostvars[hostname].droplet_id}}"
+    msg: "{{hostname}} IP={{droplet_ip}}; ID={{droplet_id}}"
 
 ##############################################
 # Update /etc/hosts in Docker container
@@ -106,3 +105,8 @@
 #   debug:
 #     var: block_storage_attach
 #     verbosity: 3
+
+- name: Wait for host to come up
+  wait_for:
+    host: "{{hostname}}"
+    port: 22

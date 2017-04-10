@@ -16,4 +16,13 @@
     # coreos must come first to generate cloud-config
     - coreos
     - digitalocean
+
+- name: Bootstrap ansible on CoreOS
+  hosts: coreos
+  # No python on host yet; don't run setup
+  gather_facts: False
+  vars:
+    ansible_python_interpreter: /home/core/bin/python
+
+  roles:
     - defunctzombie.coreos-bootstrap
