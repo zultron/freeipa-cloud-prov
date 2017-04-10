@@ -11,11 +11,17 @@ dropin_path_pat: "/etc/systemd/system/%s.service.d/%s"
 swap_size:  2
 
 
+##################################
+# Data volume
+#
+# Used for swap and etcd2 state
+
 # Data volume block device
 data_volume_block_device:  "{{ block_device_path_pat % data_volume_name }}"
 
 # Data volume partition
 data_volume_device: "{{ data_volume_block_device }}-part2"
+data_volume_path: "/media/state"
 
 # Swap partition
 swap_device:  "{{ data_volume_block_device }}-part1"

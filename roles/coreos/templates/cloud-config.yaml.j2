@@ -96,10 +96,11 @@ coreos:
         - name: 40-iptables-restore-source.conf
           content: |
             [Unit]
-            Requires=media-state.mount
-            After=media-state.mount
+            Requires={{data_volume_systemd_unit}}
+            After={{data_volume_systemd_unit}}
             [Service]
-            ExecStartPre=/usr/bin/ln -sf /media/state/iptables/rules-save \
+            ExecStartPre=/usr/bin/ln -sf \
+                {{data_volume_path}}/iptables/rules-save \
                 /var/lib/iptables/rules-save
     # Mask legacy etcd[1] service so it does not accidentally start
     - name: etcd.service
@@ -111,20 +112,20 @@ coreos:
     #
     # This requires a DO volume with two partitions, swap and ext4
     # filesystem
-    - name: dev-sda1.swap
+    - name: {{swap_device_systemd_unit}}
       command: start
       content: |
         [Swap]
-        What=/dev/sda1
+        What={{swap_device}}
 
         [Install]
         WantedBy=multi-user.target
-    - name: media-state.mount
+    - name: {{data_volume_systemd_unit}}
       command: start
       content: |
         [Mount]
-        What=/dev/sda2
-        Where=/media/state
+        What={{data_volume_device}}
+        Where={{data_volume_path}}
         Type=ext4
 
         [Install]
@@ -136,7 +137,7 @@ coreos:
         [Unit]
         Description=Update configuration files from data directory
         DefaultDependencies=no
-        After=media-state.mount
+        After={{data_volume_systemd_unit}}
         Before=sysinit.target
 
         [Install]
@@ -145,7 +146,7 @@ coreos:
         [Service]   
         Type=oneshot
         RemainAfterExit=yes
-        ExecStart=/media/state/configs/update-config
+        ExecStart={{data_volume_path}}/configs/update-config
     #######################################
     # Other system units
     #

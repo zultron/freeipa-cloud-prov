@@ -10,7 +10,7 @@
 
 - name: Show partition data
   debug:
-    msg: "Partition number {{item.number}}"
+    msg: "Partition number {{partition.number}}"
 
 # - name: Debug create partition inputs
 #   debug:
@@ -20,12 +20,12 @@
   parted:
     align: "{{ align|default('optimal') }}"
     device: "{{ device }}"
-    number: "{{ item.number }}"
+    number: "{{ partition.number }}"
     state: present
-    part_type: "{{ item.part_type|default('primary') }}"
-    fs_type: "{{ item.fs_type|default('ext4') }}"
-    part_start: "{{ item.part_start|default('0%') }}"
-    part_end: "{{ item.part_end|default('100%') }}"
+    part_type: "{{ partition.part_type|default('primary') }}"
+    fs_type: "{{ partition.fs_type|default('ext4') }}"
+    part_start: "{{ partition.part_start|default('0%') }}"
+    part_end: "{{ partition.part_end|default('100%') }}"
     unit: GiB
   become: true
   register: create_partition
@@ -33,7 +33,7 @@
 - name: Gather facts
   set_fact:
     partition_map: "{{partition_map|combine(
-                         { '%s_%d'%(volume_name, item.number):create_partition })}}"
+                { '%s_%d'%(volume_name, partition.number):create_partition })}}"
 
 # - name: debug create partition
 #   debug:

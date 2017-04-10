@@ -5,7 +5,7 @@
 #
 # - role: mkfs-ext4
 #   device:  /dev/disk/by-id/myvol
-#   volume_name: myvol
+#   mount_path: /media/myvol (optional)
 
 - name:  Create ext4 fs
   filesystem:
@@ -13,9 +13,8 @@
     fstype: ext4
   become: true
   register: mkfs_ext4
+  notify: Mount filesystem
 
 - name:  Debug create ext4 fs
   debug:
     var: mkfs_ext4
-
-

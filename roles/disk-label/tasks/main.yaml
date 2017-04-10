@@ -55,7 +55,7 @@
   set_fact:
     partition_map: {}
 
-- include: partition.yaml
+- include: partition.yaml partition="{{item}}"
   with_items:  "{{ partitions }}"
 
 # - name: debug partition map

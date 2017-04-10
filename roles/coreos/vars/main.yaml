@@ -1,0 +1,6 @@
+---
+# CoreOS role variables
+
+# Systemd unit file names for paths
+swap_device_systemd_unit: "{{swap_device|systemd_escape}}.swap"
+data_volume_systemd_unit: "{{data_volume_path|systemd_escape}}.mount"

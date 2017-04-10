@@ -31,4 +31,4 @@
     # Set up ext4 fs on data partition
     - role: mkfs-ext4
       device: "{{data_volume_device}}"
-      volume_name: data
+      mount_path: "{{data_volume_path}}"
