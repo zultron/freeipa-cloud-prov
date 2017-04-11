@@ -27,6 +27,9 @@
 
 - Depends on `defunctzombie.coreos-bootstrap`, installed in Docker
 
+- Interesting ansible examples incl. etcd2, docker in kubernetes
+  - https://github.com/kubernetes/contrib/tree/master/ansible/roles
+
 # FreeIPA in Docker on CoreOS on DigitalOcean
 
 FreeIPA integrates LDAP, Kerberos, DNS and SSL CA services and exposes
