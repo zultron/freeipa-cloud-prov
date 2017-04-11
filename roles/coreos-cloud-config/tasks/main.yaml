@@ -1,5 +1,5 @@
 ---
-# CoreOS provisioning tasks
+# CoreOS cloud-config tasks
 
 # CoreOS needs cloud-config for DigitalOcean user_data
 - name: generate cloud-config

@@ -14,8 +14,7 @@
 
   roles:
     - base
-    # coreos must come first to generate cloud-config
-    - coreos
+    - coreos-cloud-config
     - digitalocean
 
 ############################################

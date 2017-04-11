@@ -1,6 +1,12 @@
 ---
 # coreos group vars
 
+# Droplet creation settings
+size_id: 1gb
+image_id: coreos-stable
+region_id: nyc1
+volume_size: 10
+
 # CoreOS login ID
 ansible_ssh_user: core
 
@@ -25,3 +31,27 @@ data_volume_path: "/media/state"
 
 # Swap partition
 swap_device:  "{{ data_volume_block_device }}-part1"
+
+# Systemd unit file names for paths
+swap_device_systemd_unit: "{{swap_device|systemd_escape}}.swap"
+data_volume_systemd_unit: "{{data_volume_path|systemd_escape}}.mount"
+
+
+#################################
+# Cluster configuration
+
+# etcd2 configuration
+etcd2_config_path: "{{ data_volume_path }}/etcd"
+serv_cert_file_path: "{{ etcd2_config_path }}/etcd.pem"
+serv_key_file_path: "{{ etcd2_config_path }}/etcd-key.pem"
+clnt_cert_file_path: "{{ etcd2_config_path }}/client.pem"
+clnt_key_file_path: "{{ etcd2_config_path }}/client-key.pem"
+ca_cert_file_path: "{{ etcd2_config_path }}/ca.pem"
+
+# Cluster configuration
+initial_cluster:
+  "{{[groups.coreos_master[0],hostname]|mapformat(
+  '{0}=https://{0}.%s:2380' % domain_name,',')}}"
+initial_cluster_state:
+  "{{ (hostname==groups.coreos_master[0])|ternary('new','existing') }}"
+
