@@ -1,0 +1,38 @@
+---
+# Install update-config on CoreOS machines
+
+- name: Install configs directory
+  file:
+    path: "{{configs_path}}"
+    state: directory
+    mode: 0755
+  become: true
+
+- name: Install update-config script
+  copy:
+    src: update-config
+    dest: "{{configs_path}}/update-config"
+    mode: 0755
+  become: true
+
+- name: Install /etc/resolv.conf config
+  template:
+    dest: "{{configs_path}}/resolv.conf"
+    src: "resolv.conf.j2"
+  register: install_resolv_conf
+  become: true
+
+- name: Install /etc/hosts config
+  template:
+    dest: "{{configs_path}}/hosts"
+    src: "hosts.j2"
+  register: install_hosts
+  become: true
+
+- name: Run update-config script
+  systemd:
+    name: update-config
+    daemon_reload: yes
+    state: restarted
+  when:  install_resolv_conf.changed or install_hosts.changed
+  become: true

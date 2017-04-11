@@ -13,6 +13,14 @@
     PATH: "/usr/sbin:/usr/bin:/home/core/bin"
 
   roles:
+    # Install update-config etc.
+    - role: update-config
+      bootstrapping: True
+
     # Install temporary etcd2 bootstrap config
     - role: etcd2-bootstrap
       operation: bootstrap
+
+    # # Remove temporary etcd2 bootstrap config
+    # - role: etcd2-bootstrap
+    #   operation: debootstrap

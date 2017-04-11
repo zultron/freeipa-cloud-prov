@@ -1,0 +1,36 @@
+---
+# Uninstall temporary etcd2 bootstrap config on CoreOS master
+
+- name:  Remove temporary bootstrap etcd2 service dropin
+  file:
+    path: "{{ dropin_dir_pat % 'etcd2' }}/40-etcd2-bootstrap.conf"
+    state: absent
+  become: true
+  register: debootstrap_etcd2_dropin
+
+- name:  Remove temporary bootstrap fleet service dropin
+  file:
+    path: "{{ dropin_dir_pat % 'fleet' }}/40-fleet-bootstrap.conf"
+    state: absent
+  become: true
+  register: debootstrap_fleet_dropin
+
+- name:  Reload systemd and restart etcd2
+  systemd:
+    name: etcd2
+    daemon_reload: yes
+    state: restarted
+  when:  debootstrap_etcd_dropin.changed
+  become: true
+
+- name:  Reload systemd and restart fleet
+  systemd:
+    name: fleet
+    daemon_reload: yes
+    state: restarted
+  when:  debootstrap_fleet_dropin.changed
+  become: true
+
+- name:  Update member with etcd SSL address
+  command:  "member update {{hostname}} https://{{fqdn}}:2380"
+  when:  debootstrap_etcd_dropin.changed

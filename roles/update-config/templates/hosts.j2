@@ -1,0 +1,5 @@
+127.0.0.1 localhost
+{% for h in hostvars if hostvars[h]['ansible_default_ipv4'] is defined %}
+{{hostvars[h].ansible_default_ipv4.address}} {{h}} {{h}}.{{domain_name}}
+{%- endfor %}
+

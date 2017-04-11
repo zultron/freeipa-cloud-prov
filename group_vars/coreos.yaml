@@ -28,6 +28,7 @@ data_volume_block_device:  "{{ block_device_path_pat % data_volume_name }}"
 # Data volume partition
 data_volume_device: "{{ data_volume_block_device }}-part2"
 data_volume_path: "/media/state"
+configs_path: "{{data_volume_path}}/configs"
 
 # Swap partition
 swap_device:  "{{ data_volume_block_device }}-part1"

@@ -1,0 +1,25 @@
+#!/bin/bash -e
+
+FILES="
+    /etc/hosts
+    /etc/resolv.conf
+"
+
+SRCDIR=$(readlink -f $(dirname $0))
+cd $SRCDIR
+
+install_file () {
+    local DST=$1
+    local SRC=$(basename $DST)
+
+    if ! test -f $SRC; then
+        echo "Skipping install of absent file ${SRC} <- ${DST}" >&2
+        return
+    fi
+    bash -xec "cp ${SRC} ${DST}"
+}
+
+for f in $FILES; do
+    install_file $f
+done
+
