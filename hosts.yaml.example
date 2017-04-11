@@ -8,23 +8,27 @@ all:
     etcd2_cluster_token: c1
 
 # Define CoreOS cluster hosts
-coreos:
-  children:
-    # Hosts in DigitalOcean
-    digitalocean:
-      children:
-        # The coreos_master group must contain one host where the etcd2
-        # cluster will be bootstrapped.
-        coreos_master:
-          hosts:
-            host1:
-              region_id: nyc1
+coreos_master:
+  hosts:
+    # Exactly one host must be in the `coreos_master` group
+    host1: region_id=nyc1
 
-      # Other DigitalOcean CoreOS cluster nodes here
-      hosts:
-        host2:
-          region_id: sfo2
-        host3:
-          region_id: fra1
-          # Override default 1gb
-          size_id: 2gb
+coreos:
+  # Other CoreOS cluster nodes here
+  hosts:
+    host2: region_id=sfo2
+    host3:
+      region_id: fra1
+      # Override default 1gb
+      size_id: 2gb
+
+# DigitalOcean hosts must be defined here
+digitalocean:
+  hosts:
+    host1:
+    host2:
+    host3:
+# If all CoreOS hosts are on DigitalOcean, alternatively
+# digitalocean:
+#   children:
+#     coreos:
