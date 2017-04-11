@@ -11,7 +11,7 @@ volume_size: 10
 ansible_ssh_user: core
 
 # Where dropins live
-dropin_path_pat: "/etc/systemd/system/%s.service.d/%s"
+dropin_dir_pat: "/etc/systemd/system/%s.service.d"
 
 # Swap partition size, GiB
 swap_size:  2

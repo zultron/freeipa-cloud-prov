@@ -16,6 +16,10 @@
 		# CoreOS on host1
         ansible-playbook coreos.yaml -l host1
 
+		# Re-collect facts about host
+		ansible h01 -m setup \
+			-e ansible_python_interpreter=/home/core/bin/python \
+			-e ansible_ssh_user=core
 
         # List all variables for a host
         ansible h01 -m debug -a "var=hostvars.host1"

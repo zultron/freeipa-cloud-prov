@@ -11,3 +11,6 @@ data_volume_name: "{{ hostname }}-data"
 
 # Volume mount points
 data_volume_path: "/media/data"
+
+# Main IP address:  shortcut
+ip_addr: "{{ansible_default_ipv4.address}}"

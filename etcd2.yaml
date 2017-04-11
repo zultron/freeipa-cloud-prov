@@ -1,0 +1,18 @@
+---
+# Set up etcd2 on CoreOS hosts
+
+############################################
+- name: Configure etcd2 on CoreOS master node
+  hosts: coreos_master
+
+  vars:
+    ansible_python_interpreter: /home/core/bin/python
+
+  environment:
+    # Path for python
+    PATH: "/usr/sbin:/usr/bin:/home/core/bin"
+
+  roles:
+    # Install temporary etcd2 bootstrap config
+    - role: etcd2-bootstrap
+      operation: bootstrap

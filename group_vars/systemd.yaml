@@ -1,0 +1,6 @@
+---
+# Vars for systemd hosts
+
+# Pattern for dropin filenames
+# {{ dropin_path_pat % (service, fname) }}
+dropin_path_pat: "/etc/systemd/system/%s.service.d/%s"

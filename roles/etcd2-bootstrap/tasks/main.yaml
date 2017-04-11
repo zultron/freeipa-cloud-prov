@@ -1,0 +1,24 @@
+---
+# Configure etcd2 on CoreOS
+
+- name:  Check if etcd2 is bootstrapped
+  shell:  "test -f ~/.etcd2-bootstrapped && echo yes || echo no"
+  # shell:  "etcdctl member list | grep -q '{{fqdn|quote}}' && echo yes || echo no"
+  register:  etcd2_check
+  changed_when:  False
+
+- name:  Set etcd2 fact
+  set_fact:
+    etcd2_configured:  "{{ etcd2_check.stdout == 'yes' }}"
+
+- name:  Check if fleet is running
+  shell:  "fleetctl list-machines && echo yes || echo no"
+  register:  fleet_check
+  changed_when:  False
+  when:  etcd2_check
+
+- name:  Set fleet fact
+  set_fact:
+    fleet_configured:  "{{ etcd2_check and fleet_check.stdout == 'yes' }}"
+
+- include: "{{ operation }}.yaml"
