@@ -62,6 +62,11 @@
 ##############################################
 # Update /etc/hosts in Docker container
 
+- name: "Check host IP in /etc/hosts"
+  shell: "grep -q '{{fqdn}}.*{{droplet_ip}}' /etc/hosts && echo yes || echo no"
+  changed_when: false
+  register: check_ip
+
 # In Docker, /etc/hosts may be edited but not replaced, so the
 # `lineinfile` module won't work; use the `command` module with `ed`
 # to get around this
@@ -71,7 +76,7 @@
           | ed /etc/hosts || true"
   become: true
   delegate_to: localhost
-  when: do_create.changed
+  when: do_create.changed or check_ip.stdout == 'no'
 
 ##############################################
 # Create and attach block storage
@@ -111,3 +116,4 @@
   wait_for:
     host: "{{hostname}}"
     port: 22
+  when: do_create.changed
