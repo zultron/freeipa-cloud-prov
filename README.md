@@ -22,7 +22,7 @@
 			-e ansible_ssh_user=core
 
         # List all variables for a host
-        ansible h01 -m debug -a "var=hostvars.host1"
+        ansible host1 -m debug -a "var=hostvars[inventory_hostname]"
         # Also vars, environment, group_names, groups
 
 - Depends on `defunctzombie.coreos-bootstrap`, installed in Docker
