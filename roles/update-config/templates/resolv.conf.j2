@@ -1,8 +1,8 @@
 {% if bootstrapping -%}
 nameserver 8.8.8.8
 nameserver 8.8.4.4
-{%- else %}
+{% else %}
 nameserver {{ipa_ip|default('')}}
-{%- endif %}
+{% endif %}
 search {{domain_name}}
 
