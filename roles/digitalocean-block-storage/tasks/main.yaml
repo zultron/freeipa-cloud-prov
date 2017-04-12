@@ -1,0 +1,43 @@
+---
+##############################################
+# Create and attach DigitalOcean block storage
+#
+# Config vars:
+# - volume_name
+# - volume_size
+
+- name: Get droplet ID
+  do_droplet_id:
+    name: "{{fqdn}}"
+  register: do_droplet
+
+- name: Ensure block storage volume {{hostname}}-{{volume_name}} exists
+  digital_ocean_block_storage:
+    volume_name: "{{hostname}}-{{volume_name}}"
+    description: "{{volume_name}} volume for {{hostname}}"
+    state: present
+    command: create
+    api_token:  "{{ do_token }}"
+    region: "{{ region_id }}"
+    block_size: "{{ volume_size }}"
+  register: block_storage_volume
+
+# - name: debug block storage volume creation
+#   debug:
+#     var: block_storage_volume
+#     verbosity: 3
+
+- name: Attach block storage volume {{hostname}}-{{volume_name}} to droplet
+  digital_ocean_block_storage:
+    volume_name: "{{hostname}}-{{volume_name}}"
+    state: present
+    command: attach
+    droplet_id: "{{ do_droplet.id }}"
+    region: "{{ region_id }}"
+    api_token:  "{{ do_token }}"
+  register: block_storage_attach
+
+# - name: debug block storage volume attach
+#   debug:
+#     var: block_storage_attach
+#     verbosity: 3

@@ -1,11 +1,11 @@
 ---
-# Set up ext4 fs on partition
+# Make ext4 fs on partition and create+start systemd mount unit
 
 # Example playbook entry
 #
 # - role: mkfs-ext4
 #   device:  /dev/disk/by-id/myvol
-#   mount_path: /media/myvol (optional)
+#   mount_path: /media/myvol
 
 - name:  Create ext4 fs
   filesystem:
@@ -13,8 +13,31 @@
     fstype: ext4
   become: true
   register: mkfs_ext4
-  notify: Mount filesystem
 
-- name:  Debug create ext4 fs
-  debug:
-    var: mkfs_ext4
+# - name:  Debug create ext4 fs
+#   debug:
+#     var: mkfs_ext4
+
+- name:  Add systemd mount unit
+  template:
+    src: fs.mount.j2
+    dest: "/etc/systemd/system/{{ mount_path|systemd_escape }}.mount"
+  become: true
+  register: systemd_mount_unit
+
+# - name:  Debug systemd mount unit
+#   debug:
+#     var: systemd_mount_unit
+
+- name: Check mount status
+  shell: "grep -q ' {{mount_path|quote}} ' /proc/mounts && echo yes || echo no"
+  changed_when: false
+  register: mount_check
+
+- name: Mount filesystem
+  systemd:
+    name: "{{ mount_path|systemd_escape }}.mount"
+    daemon_reload: yes
+    state: restarted
+  become: true
+  when: mount_check.stdout == 'no'

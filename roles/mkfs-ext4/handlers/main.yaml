@@ -1,9 +1,0 @@
----
-# Handle ext4 fs
-
-- name: Mount filesystem
-  service:
-    name:  "{{ mount_path | systemd_escape }}"
-    state: started
-  # command:  "mount {{device}} {{mount_path}}"
-  # become: true

@@ -1,0 +1,13 @@
+---
+# Vars for FreeIPA
+
+# Docker images
+freeipa_docker_image: "adelton/freeipa-server:centos-7"
+freeipa_docker_client_image: "zultron/freeipa-cloud-prov:ipaclient"
+
+# FreeIPA data volume
+freeipa_volume_path:  "/media/freeipa"
+freeipa_volume_block_device:  "{{ block_device_path_pat %
+                                   ( '%s-freeipa' % hostname ) }}"
+freeipa_volume_device:  "{{freeipa_volume_block_device}}-part1"
+freeipa_volume_size: 1

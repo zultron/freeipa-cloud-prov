@@ -1,0 +1,32 @@
+---
+# Provision FreeIPA in Docker
+
+############################################
+- name: Provision FreeIPA in Docker
+  hosts: freeipa
+
+  vars:
+    ansible_python_interpreter: /home/core/bin/python
+
+  environment:
+    # Path for python
+    PATH: "/usr/sbin:/usr/bin:/home/core/bin"
+
+  roles:
+    # Create and attach block storage
+    - role: digitalocean-block-storage
+      volume_name: freeipa
+      volume_size: "{{freeipa_volume_size}}"
+
+    # Label and partition block device
+    - role: disk-label
+      volume_name: freeipa
+      device: "{{freeipa_volume_block_device}}"
+      partitions:
+        - number: 1
+
+    # Make ext4 fs on data partition and install+start systemd mount
+    # service
+    - role: mkfs-ext4
+      device: "{{freeipa_volume_device}}"
+      mount_path: "{{freeipa_volume_path}}"
