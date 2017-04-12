@@ -1,0 +1,20 @@
+---
+- name: Initialize ansible
+  hosts: localhost
+  connection: local
+  # Don't run setup on localhost
+  gather_facts: False
+
+  vars_prompt:
+  - name: freeipa_admin_password
+    prompt: Please enter the FreeIPA admin password
+    private: yes
+
+  - name: freeipa_ds_password
+    prompt: Please enter the FreeIPA ds password
+    private: yes
+
+  roles:
+    # Create encrypted FreeIPA password vault
+    - role: vault
+      vault_path: group_vars/freeipa/vault.yaml

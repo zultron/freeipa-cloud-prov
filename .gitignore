@@ -3,7 +3,8 @@
 *.pyc
 # User's config files
 /hosts.yaml
-/vault_password_file
+/.vault_pass
+/group_vars/freeipa/vault.yaml
 # Ansible-generated files
 /cache/
 *.retry

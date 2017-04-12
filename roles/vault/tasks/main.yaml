@@ -1,0 +1,30 @@
+---
+# Create Ansible vault file
+
+- name: Check if Ansible vault file exists
+  stat:
+    path: group_vars/freeipa/vault.yaml
+  register: vault_path_stat
+
+# - debug:
+#     var: vault_path_stat
+
+- block:
+
+  - debug:
+      var: freeipa_admin_password
+
+  - debug:
+      var: freeipa_ds_password
+
+  - name:  Template group_vars/freeipa/vault.yaml
+    template:
+      src: vault.yaml.j2
+      dest: /tmp/vault.yaml
+    register: vault_template
+
+  - name: Create Ansible vault file
+    command: "env EDITOR=bin/editor.sh
+                  ansible-vault create group_vars/freeipa/vault.yaml"
+
+  when: not vault_path_stat.stat.exists

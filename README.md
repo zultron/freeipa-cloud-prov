@@ -9,6 +9,10 @@
         # Docker container
         ansible-galaxy install -p ./roles -r misc/requirements.yaml
 
+        # Set up password vault once
+        echo "mySecretVaultPass" > .vault_pass
+        ansible-playbook init.yaml # Set up FreeIPA passwords
+
         # Provision host1
         ansible-playbook provision.yaml -l host1
         # Destroy host1
