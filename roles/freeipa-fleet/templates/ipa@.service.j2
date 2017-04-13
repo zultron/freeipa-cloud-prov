@@ -35,6 +35,7 @@ ExecStart=/usr/bin/docker run --rm \
         --volume /sys/fs/cgroup:/sys/fs/cgroup:ro \
         --net cnet --ip ${IPA_IP} \
         -e IPA_SERVER_IP=${COREOS_PUBLIC_IPV4} \
+	{{freeipa_ports|docker_port_args}} \
         ${DEBUGOPTS} \
         {{freeipa_docker_image}}
 # Wait for DNS to come online; this takes a minute normally, or about

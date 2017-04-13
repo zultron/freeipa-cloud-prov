@@ -32,4 +32,4 @@
       mount_path: "{{freeipa_volume_path}}"
 
     # Install FreeIPA
-    - role: freeipa
+    - role: freeipa-install

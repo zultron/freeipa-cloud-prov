@@ -1,0 +1,105 @@
+---
+# Provision FreeIPA Docker container
+
+#################################
+# Set up Docker
+- name: Install docker-py
+  pip:
+    name: docker-py
+
+- name: Pull FreeIPA docker image
+  docker_image:
+    name: "{{freeipa_docker_image}}"
+  register: freeipa_docker_image_pull
+
+# - name: Debug FreeIPA docker image pull
+#   debug:
+#     var: freeipa_docker_image_pull
+
+- name: Create FreeIPA container network
+  docker_network:
+    name: ipa
+    driver_options:
+      com.docker.network.bridge.name: freeipa
+    ipam_options:
+      subnet: "{{freeipa_network_cidr}}"
+      gateway: "{{freeipa_network_gateway}}"
+
+#################################
+# Set up IPA server configuration
+- name: Install FreeIPA server config
+  template:
+    src: ipa-server-install-options.j2
+    dest: "{{freeipa_volume_path}}/ipa-server-install-options"
+  register: ipa_install_options
+  become: true
+  when: hostname == master_host
+
+#################################
+# Set up IPA replica configuration
+- name: Install FreeIPA replica config
+  template:
+    src: ipa-replica-install-options.j2
+    dest: "{{freeipa_volume_path}}/ipa-replica-install-options"
+  register: ipa_install_options
+  become: true
+  when: hostname != master_host
+
+- name: Create FreeIPA replica info file on master
+  command: "docker exec -i ipa ipa-replica-prepare {{fqdn}}
+                 --ip-address {{ip_addr}} --no-reverse"
+  delegate_to: "{{master_host}}"
+  when: hostname != master_host
+
+- name: Fetch FreeIPA replica info from master
+  fetch:
+    src: "{{freeipa_volume_path}}/var/lib/ipa/replica-info-{{fqdn}}.gpg"
+    dest: "cache/replica-info-{{fqdn}}.gpg"
+  become: true
+  delegate_to: "{{master_host}}"
+  when: hostname != master_host
+
+- name: Copy FreeIPA replica info to replica
+  fetch:
+    src: "cache/replica-info-{{fqdn}}.gpg"
+    dest: "{{freeipa_volume_path}}/var/lib/ipa/replica-info-{{fqdn}}.gpg"
+  become: true
+  when: hostname != master_host
+
+#################################
+# Install IPA server/replica
+- name: Run FreeIPA install in Docker container
+  # FIXME This always restarts the container
+  docker_container:
+    name: ipa
+    hostname: "{{fqdn}}"
+    image: "{{freeipa_docker_image}}"
+    volumes:
+      - "{{freeipa_volume_path}}:/data"
+      - "/sys/fs/cgroup:/sys/fs/cgroup:ro"
+    env:
+      IPA_SERVER_IP: "{{ip_addr}}"
+    detach: yes
+    cleanup: yes
+    interactive: yes
+    tty: yes
+    security_opts:
+      - seccomp:unconfined
+    state: started
+    recreate: no
+    restart: no
+    restart_policy: on-failure
+    networks:
+      - name: ipa
+        ipv4_address: "{{freeipa_network_addr}}"
+    purge_networks: yes
+    published_ports: "{{freeipa_ports|docker_port_list}}"
+  register: docker_run
+
+- name: Debug Docker container
+  debug:
+    var: docker_run
+
+- name: Wait for FreeIPA install to complete
+  command: "docker exec ipa systemctl start ipa.service"
+  changed_when: False

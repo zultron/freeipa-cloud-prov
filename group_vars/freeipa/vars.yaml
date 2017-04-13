@@ -18,3 +18,23 @@ freeipa_network_cidr: "{{freeipa_network_prefix}}.0/24"
 freeipa_network_gateway: "{{freeipa_network_prefix}}.1"
 freeipa_network_addr: "{{freeipa_network_prefix}}.2"
 freeipa_hostname: "ipa{{host_id}}.{{domain_name}}"
+
+# FreeIPA published ports
+freeipa_ports:
+  # HTTP/HTTPS
+  - "80"
+  - "443"
+  # DNS
+  - "53"
+  - "53/udp"
+  # LDAP/LDAPS
+  - "389"
+  - "636"
+  # Kerberos
+  - "88"
+  - "88/udp"
+  - "464"
+  - "464/udp"
+  # Dogtag
+  - "8080"
+  # - "7839"
