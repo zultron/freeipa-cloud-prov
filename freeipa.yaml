@@ -30,3 +30,6 @@
     - role: mkfs-ext4
       device: "{{freeipa_volume_device}}"
       mount_path: "{{freeipa_volume_path}}"
+
+    # Install FreeIPA
+    - role: freeipa

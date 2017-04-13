@@ -153,25 +153,29 @@ coreos:
     - name: ntpd.service
       enable: true
       command: start
+    #
     # - name: ntpdate.service
     #   enable: true
     #   command: start
-    - name: docker.service
-      drop-ins:
-        - name: no-ip-masq.conf
-          content: |
-            [Service]
-            Environment="DOCKER_OPT_IPMASQ=--ip-masq=false --iptables=false --userland-proxy=false"
-    # Load IPSec kernel module
-    # https://coreos.com/os/docs/latest/other-settings.html#via-cloud-init
-    # Also see below /etc/modules-load.d/af_key.conf
-    - name: systemd-modules-load.service
-      command: restart
+    #
+    # # Disable IP masquerading in Docker
+    # - name: docker.service
+    #   drop-ins:
+    #     - name: no-ip-masq.conf
+    #       content: |
+    #         [Service]
+    #         Environment="DOCKER_OPT_IPMASQ=--ip-masq=false --iptables=false --userland-proxy=false"
+    #
+    # # Load IPSec kernel module
+    # # https://coreos.com/os/docs/latest/other-settings.html#via-cloud-init
+    # # Also see below /etc/modules-load.d/af_key.conf
+    # - name: systemd-modules-load.service
+    #   command: restart
 
 write_files:
-  # Load IPSec kernel module
-  - path: /etc/modules-load.d/af_key.conf
-    content: "af_key"
+  # # Load IPSec kernel module
+  # - path: /etc/modules-load.d/af_key.conf
+  #   content: "af_key"
 
   - path: /home/core/.toolboxrc
     # https://coreos.com/os/docs/latest/install-debugging-tools.html

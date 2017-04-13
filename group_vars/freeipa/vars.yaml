@@ -11,3 +11,10 @@ freeipa_volume_block_device:  "{{ block_device_path_pat %
                                    ( '%s-freeipa' % hostname ) }}"
 freeipa_volume_device:  "{{freeipa_volume_block_device}}-part1"
 freeipa_volume_size: 1
+
+# FreeIPA container network
+freeipa_network_prefix: "{{network_prefix}}.128"
+freeipa_network_cidr: "{{freeipa_network_prefix}}.0/24"
+freeipa_network_gateway: "{{freeipa_network_prefix}}.1"
+freeipa_network_addr: "{{freeipa_network_prefix}}.2"
+freeipa_hostname: "ipa{{host_id}}.{{domain_name}}"
