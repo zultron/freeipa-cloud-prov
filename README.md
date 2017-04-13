@@ -15,15 +15,16 @@
 
         # Provision host1
         ansible-playbook provision.yaml -l host1
-        # Destroy host1
-        ansible-playbook destroy.yaml -l host1 -e confirm=true
-		# CoreOS on host1
-        ansible-playbook coreos.yaml -l host1
+		# FreeIPA on host1
+        ansible-playbook freeipa.yaml -l host1
 
 		# Re-collect facts about host
 		ansible h01 -m setup \
 			-e ansible_python_interpreter=/home/core/bin/python \
 			-e ansible_ssh_user=core
+
+        # Destroy host1
+        ansible-playbook destroy.yaml -l host1 -e confirm=true
 
         # List all variables for a host
         ansible host1 -m debug -a "var=hostvars[inventory_hostname]"
