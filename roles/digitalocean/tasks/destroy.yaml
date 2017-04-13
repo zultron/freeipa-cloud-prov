@@ -6,7 +6,7 @@
   fail: msg="Please set '-e confirm=1' to destroy droplet"
   when: not confirm|default(False)
 
-- name:  destroy droplet
+- name:  Destroy droplet
   digital_ocean:
     state: absent
     command: droplet
@@ -14,10 +14,16 @@
     unique_name: yes
     api_token:  "{{ do_token }}"
 
-- name:  destroy block storage
+- name:  Destroy block storage
   digital_ocean_block_storage:
     state: absent
     command: create
     volume_name: "{{ data_volume_name }}"
     region: "{{ region_id }}"
     api_token:  "{{ do_token }}"
+
+- name:  Destroy ansible cached data
+  file:
+    path: "cache/{{hostname}}"
+    state: absent
+  delegate_to: localhost
