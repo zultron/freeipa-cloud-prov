@@ -6,15 +6,21 @@
 - name: Install docker-py
   pip:
     name: docker-py
+  tags:
+    - setup
 
 - name: Pull FreeIPA docker image
   docker_image:
     name: "{{freeipa_docker_image}}"
   register: freeipa_docker_image_pull
+  tags:
+    - setup
 
 # - name: Debug FreeIPA docker image pull
 #   debug:
 #     var: freeipa_docker_image_pull
+#   tags:
+#     - setup
 
 - name: Create FreeIPA container network
   docker_network:
@@ -24,6 +30,8 @@
     ipam_options:
       subnet: "{{freeipa_network_cidr}}"
       gateway: "{{freeipa_network_gateway}}"
+  tags:
+    - setup
 
 #################################
 # Set up IPA server configuration
@@ -34,6 +42,8 @@
   register: ipa_install_options
   become: true
   when: hostname == master_host
+  tags:
+    - configure
 
 #################################
 # Set up IPA replica configuration
@@ -44,12 +54,16 @@
   register: ipa_install_options
   become: true
   when: hostname != master_host
+  tags:
+    - configure
 
 - name: Create FreeIPA replica info file on master
   command: "docker exec -i ipa ipa-replica-prepare {{fqdn}}
                  --ip-address {{ip_addr}} --no-reverse"
   delegate_to: "{{master_host}}"
   when: hostname != master_host
+  tags:
+    - configure
 
 - name: Fetch FreeIPA replica info from master
   fetch:
@@ -58,6 +72,8 @@
   become: true
   delegate_to: "{{master_host}}"
   when: hostname != master_host
+  tags:
+    - configure
 
 - name: Copy FreeIPA replica info to replica
   fetch:
@@ -65,6 +81,8 @@
     dest: "{{freeipa_volume_path}}/var/lib/ipa/replica-info-{{fqdn}}.gpg"
   become: true
   when: hostname != master_host
+  tags:
+    - configure
 
 #################################
 # Install IPA server/replica
@@ -95,11 +113,17 @@
     purge_networks: yes
     published_ports: "{{freeipa_ports|docker_port_list}}"
   register: docker_run
+  tags:
+    - install
 
 - name: Debug Docker container
   debug:
     var: docker_run
+  tags:
+    - install
 
 - name: Wait for FreeIPA install to complete
   command: "docker exec ipa systemctl start ipa.service"
   changed_when: False
+  tags:
+    - install

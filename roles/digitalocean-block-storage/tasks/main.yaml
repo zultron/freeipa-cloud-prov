@@ -10,6 +10,8 @@
   do_droplet_id:
     name: "{{fqdn}}"
   register: do_droplet
+  tags:
+    - setup
 
 - name: Ensure block storage volume {{hostname}}-{{volume_name}} exists
   digital_ocean_block_storage:
@@ -21,11 +23,15 @@
     region: "{{ region_id }}"
     block_size: "{{ volume_size }}"
   register: block_storage_volume
+  tags:
+    - setup
 
 # - name: debug block storage volume creation
 #   debug:
 #     var: block_storage_volume
 #     verbosity: 3
+#   tags:
+#     - setup
 
 - name: Attach block storage volume {{hostname}}-{{volume_name}} to droplet
   digital_ocean_block_storage:
@@ -36,8 +42,12 @@
     region: "{{ region_id }}"
     api_token:  "{{ do_token }}"
   register: block_storage_attach
+  tags:
+    - setup
 
 # - name: debug block storage volume attach
 #   debug:
 #     var: block_storage_attach
 #     verbosity: 3
+#   tags:
+#     - setup

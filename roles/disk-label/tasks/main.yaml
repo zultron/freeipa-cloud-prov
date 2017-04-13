@@ -28,10 +28,14 @@
     unit: GiB
   become: true
   register: parted_info
+  tags:
+    - setup
 
 # - name: debug volume info
 #   debug:
 #     var: parted_info
+#   tags:
+#     - setup
 
 - name: Create volume label
   parted:
@@ -42,10 +46,14 @@
   become: true
   register: parted_label
   when: parted_info.disk.table == 'unknown'
+  tags:
+    - setup
 
 # - name: debug data volume label
 #   debug:
 #     var: parted_label
+#   tags:
+#     - setup
 
 
 ##############################
@@ -54,10 +62,16 @@
 - name: Init partition_map facts
   set_fact:
     partition_map: {}
+  tags:
+    - setup
 
 - include: partition.yaml partition="{{item}}"
   with_items:  "{{ partitions }}"
+  tags:
+    - setup
 
 # - name: debug partition map
 #   debug:
 #     var: partition_map
+#   tags:
+#     - setup

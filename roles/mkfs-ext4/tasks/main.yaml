@@ -13,10 +13,14 @@
     fstype: ext4
   become: true
   register: mkfs_ext4
+  tags:
+    - setup
 
 # - name:  Debug create ext4 fs
 #   debug:
 #     var: mkfs_ext4
+#   tags:
+#     - setup
 
 - name:  Add systemd mount unit
   template:
@@ -24,15 +28,21 @@
     dest: "/etc/systemd/system/{{ mount_path|systemd_escape }}.mount"
   become: true
   register: systemd_mount_unit
+  tags:
+    - setup
 
 # - name:  Debug systemd mount unit
 #   debug:
 #     var: systemd_mount_unit
+#   tags:
+#     - setup
 
 - name: Check mount status
   shell: "grep -q ' {{mount_path|quote}} ' /proc/mounts && echo yes || echo no"
   changed_when: false
   register: mount_check
+  tags:
+    - setup
 
 - name: Mount filesystem
   systemd:
@@ -41,3 +51,5 @@
     state: restarted
   become: true
   when: mount_check.stdout == 'no'
+  tags:
+    - setup

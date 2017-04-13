@@ -3,7 +3,7 @@
 
 - Password file in `password`
 
-- Commands:
+- Setup commands:
 
         # Install required roles from Ansible Galaxy, if not running
         # Docker container
@@ -13,10 +13,16 @@
         echo "mySecretVaultPass" > .vault_pass
         ansible-playbook init.yaml # Set up FreeIPA passwords
 
+- Install commands:
+
         # Provision host1
         ansible-playbook provision.yaml -l host1
-		# FreeIPA on host1
-        ansible-playbook freeipa.yaml -l host1
+
+		# Install FreeIPA on host1
+		# - tags:  setup,configure,install
+        ansible-playbook freeipa-install.yaml -l host1
+
+- Misc commands:
 
 		# Re-collect facts about host
 		ansible h01 -m setup \
