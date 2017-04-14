@@ -27,6 +27,7 @@
 
   roles:
     - defunctzombie.coreos-bootstrap
+    - coreos-ansible
 
 ############################################
 - name: Configure CoreOS block storage

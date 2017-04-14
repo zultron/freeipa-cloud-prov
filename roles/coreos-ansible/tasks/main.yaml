@@ -1,0 +1,8 @@
+---
+# Install and configure Docker dependencies
+
+- name: Install docker-py
+  pip:
+    name: docker-py
+  tags:
+    - setup
