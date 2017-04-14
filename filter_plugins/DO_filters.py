@@ -3,9 +3,13 @@ __metaclass__ = type
 class FilterModule(object):
     ''' Query filter '''
 
-    def mapformat(self, data, fmt, sep=''):
+    def formatmapstr(self, data, fmt, sep=''):
         items = [fmt.format(d) for d in data]
         return sep.join(items)
+
+    def formatmaplist(self, data, fmt):
+        items = [fmt.format(d) for d in data]
+        return items
 
     def systemd_escape(self, data):
         """Convert a path into a string suitable for a systemd unit name,
@@ -33,8 +37,22 @@ class FilterModule(object):
                 res += '\\' + hex(ord(c))[1:]
         return res
 
+    def shortname(self, data):
+        """Given a fqdn, return the host name portion without the domain name
+        """
+        return data.split('.')[0]
+
+    def domain_to_dn(self, data):
+        """Given a domain name, return the ldap DN,
+        e.g. example.com|domain_to_dn returns dc=example,dc=com
+        """
+        return ','.join(map('dc={}'.format, data.split('.')))
+
     def filters(self):
         return {
-            'mapformat': self.mapformat,
+            'formatmapstr': self.formatmapstr,
+            'formatmaplist': self.formatmaplist,
             'systemd_escape': self.systemd_escape,
+            'shortname': self.shortname,
+            'domain_to_dn': self.domain_to_dn,
         }

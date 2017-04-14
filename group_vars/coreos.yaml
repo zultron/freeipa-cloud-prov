@@ -51,7 +51,7 @@ ca_cert_file_path: "{{ etcd2_config_path }}/ca.pem"
 
 # Cluster configuration
 initial_cluster:
-  "{{[groups.coreos_master[0],hostname]|mapformat(
+  "{{[groups.coreos_master[0],hostname]|formatmapstr(
   '{0}=https://{0}.%s:2380' % domain_name,',')}}"
 initial_cluster_state:
   "{{ (hostname==groups.coreos_master[0])|ternary('new','existing') }}"
