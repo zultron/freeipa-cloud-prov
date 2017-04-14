@@ -25,7 +25,15 @@
   vars:
      ansible_python_interpreter: /home/core/bin/python
 
+  environment:
+    # Path for python
+    PATH: "/usr/sbin:/usr/bin:/home/core/bin"
+
   roles:
+    # Update /etc/hosts with new droplets
+    - local-etc-hosts
+
+    # Install python and modules needed by Ansible
     - defunctzombie.coreos-bootstrap
     - coreos-ansible
 
@@ -52,7 +60,6 @@
           part_end:  "{{ swap_size }}GiB"
         - number: 2
           part_start:  "{{ swap_size }}GiB"
-      # when:
 
     # Set up swap on `swap_device`
     - swap

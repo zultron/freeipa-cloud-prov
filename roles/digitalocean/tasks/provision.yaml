@@ -60,25 +60,6 @@
     msg: "{{hostname}} IP={{droplet_ip}}; ID={{droplet_id}}"
 
 ##############################################
-# Update /etc/hosts in Docker container
-
-- name: "Check host IP in /etc/hosts"
-  shell: "grep -q '{{fqdn}}.*{{droplet_ip}}' /etc/hosts && echo yes || echo no"
-  changed_when: false
-  register: check_ip
-
-# In Docker, /etc/hosts may be edited but not replaced, so the
-# `lineinfile` module won't work; use the `command` module with `ed`
-# to get around this
-
-- name: "Add/update host IP in /etc/hosts"
-  shell: "echo '/ {{fqdn}}/d\n$a\n{{droplet_ip}} {{hostname}} {{fqdn}}\n.\nw\nq'
-          | ed /etc/hosts || true"
-  become: true
-  delegate_to: localhost
-  when: do_create.changed or check_ip.stdout == 'no'
-
-##############################################
 # Create and attach block storage
 
 - name: ensure block storage volume <host>_data exists
