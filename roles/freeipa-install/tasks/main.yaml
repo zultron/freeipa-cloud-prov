@@ -3,12 +3,6 @@
 
 #################################
 # Set up Docker
-- name: Install docker-py
-  pip:
-    name: docker-py
-  tags:
-    - setup
-
 - name: Pull FreeIPA docker image
   docker_image:
     name: "{{freeipa_docker_image}}"
@@ -76,7 +70,7 @@
     - configure
 
 - name: Copy FreeIPA replica info to replica
-  fetch:
+  copy:
     src: "cache/replica-info-{{fqdn}}.gpg"
     dest: "{{freeipa_volume_path}}/var/lib/ipa/replica-info-{{fqdn}}.gpg"
   become: true
