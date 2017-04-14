@@ -37,12 +37,23 @@ RUN echo "ALL	ALL=(ALL:ALL) NOPASSWD: ALL" >> /etc/sudoers
 
 RUN apt-get -y install ed
 
+RUN apt-get -y install libldap2-dev libsasl2-dev
+RUN pip install python-ldap
+
+RUN apt-get -y install dnsutils
+
+# For manual IPA ds query
+RUN apt-get -y install ldap-utils
+
 RUN useradd -s /bin/bash user
 
-COPY requirements.yaml /tmp
+COPY misc/requirements.yaml /tmp
 RUN ansible-galaxy install -r /tmp/requirements.yaml
 
 ENV PYTHONPATH=/data/python
+
+# Work around annoying python location on CoreOS
+RUN mkdir -p /home/core/bin && ln -s /usr/bin/python /home/core/bin/python
 
 VOLUME /data
 WORKDIR /data
