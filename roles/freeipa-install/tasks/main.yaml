@@ -80,8 +80,15 @@
 
 #################################
 # Install IPA server/replica
+- name:  Check if install is already complete
+  stat:
+    path: "{{freeipa_volume_path}}/etc/systemd/system/{{ ''
+             }}container-ipa.target.wants/ipa-server-upgrade.service"
+  register: install_path_stat
+  tags:
+    - install
+
 - name: Run FreeIPA install in Docker container
-  # FIXME This always restarts the container
   docker_container:
     name: ipa
     hostname: "{{fqdn}}"
@@ -107,17 +114,35 @@
     purge_networks: yes
     published_ports: "{{freeipa_ports|docker_port_list}}"
   register: docker_run
+  # In Ansible 2.2.2.0 (at least), this docker container always gets
+  # restarted, despite `recreate` and `restart` params turned off; use
+  # other criteria for when this task is run
+  when: not install_path_stat.stat.exists
   tags:
     - install
 
-- name: Debug Docker container
-  debug:
-    var: docker_run
-  tags:
-    - install
+# - name: Debug Docker container
+#   debug:
+#     var: docker_run
+#   when: not install_path_stat.stat.exists
+#   tags:
+#     - install
 
 - name: Wait for FreeIPA install to complete
+  wait_for:
+    # This file is updated at the end of the install
+    path: "/media/freeipa/etc/openldap/ldap.conf"
+    state: present
+    search_regex: "^TLS_CACERT /etc/ipa/ca.crt"
+    # Install can take almost minutes to install on a 1GB droplet
+    timeout: 900
+  when: not install_path_stat.stat.exists
+  tags:
+    - install
+
+- name: Wait for FreeIPA service to start
   command: "docker exec ipa systemctl start ipa.service"
   changed_when: False
+  when: not install_path_stat.stat.exists
   tags:
     - install
