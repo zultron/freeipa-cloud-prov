@@ -7,7 +7,7 @@
 # - volume_size
 
 - name: Get droplet ID
-  do_droplet_id:
+  do_droplet_info:
     name: "{{fqdn}}"
   register: do_droplet
   tags:
