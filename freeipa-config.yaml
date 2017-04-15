@@ -1,0 +1,23 @@
+---
+# Provision FreeIPA in Docker
+
+############################################
+- name: Configure FreeIPA
+  hosts: freeipa
+
+  vars:
+    ansible_python_interpreter: /home/core/bin/python
+
+  environment:
+    # Path for python
+    PATH: "/usr/sbin:/usr/bin:/home/core/bin"
+
+  roles:
+    # Be sure /etc/hosts is up to date
+    - role: local-etc-hosts
+
+    # Be sure SSL certs are up to date
+    - role: local-ca-certs
+
+    # Configure FreeIPA
+    - role: freeipa-configure
