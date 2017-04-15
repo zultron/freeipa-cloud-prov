@@ -169,24 +169,99 @@
     - configure
 
 #################################
-# Fix up DNS zones
-
+# Fix up ipa-ca DNS record
+# 
 # ipa-server-install erroneously puts container IP into A record
-- name: IPA check if ipa-ca.{{domain_name}} points to container IP
-  shell: "{{ipa_exec}} ipa dnsrecord-show --raw {{domain_name}} ipa-ca
-          | awk -v res=ok '
-              /arecord:/ { if ($2 ~ \"{{freeipa_network_prefix}}\") res=$2; }
-              END { print res; }'"
-  register: ipa_ca_addr
-  changed_when: ipa_ca_addr.stdout != 'ok'
 
-- name: IPA delete ipa-ca.{{domain_name}} A record pointing to container IP
-  command: "{{ipa_exec}} ipa dnsrecord-del {{domain_name}} ipa-ca
-                  --a-rec={{ipa_ca_addr.stdout}}"
-  when: ipa_ca_addr.changed
+- name: "Prepare to del host IP {{ip_addr}} from {{domain_name}} zone
+            ipa-ca entry"
+  set_fact:
+    zone: "{{domain_name}}"
+    record: "ipa-ca"
+    arecord: "{{freeipa_network_addr}}"
+  tags:
+    - configure
+    - dns
 
-- name: IPA add ipa-ca.{{domain_name}} A record pointing to host IP
-  command: "{{ipa_exec}} ipa dnsrecord-add {{domain_name}} ipa-ca
-                  --a-rec={{ip_addr}}"
-  when: ipa_ca_addr.changed
+- include: del-a-record.yaml
 
+- name: "Prepare to add host IP {{ip_addr}} to {{fqdn}} zone ipa-ca entry"
+  set_fact:
+    zone: "{{domain_name}}"
+    record: "ipa-ca"
+    arecord: "{{ip_addr}}"
+  tags:
+    - configure
+    - dns
+
+- include: add-a-record.yaml
+
+#################################
+# Add host DNS zone and transfer A record
+
+- name: "Prepare to add {{fqdn}} zone"
+  set_fact:
+    zone: "{{fqdn}}"
+  tags:
+    - configure
+    - dns
+
+- include: add-zone.yaml
+
+- name: "Prepare to del host IP {{ip_addr}} from {{domain_name}} zone
+            {{hostname}} entry"
+  set_fact:
+    zone: "{{domain_name}}"
+    record: "{{hostname}}"
+    arecord: "{{ip_addr}}"
+  tags:
+    - configure
+    - dns
+
+- include: del-a-record.yaml
+
+- name: "Prepare to add host IP {{ip_addr}} to {{fqdn}} zone @ entry"
+  set_fact:
+    zone: "{{fqdn}}"
+    record: "@"
+    arecord: "{{ip_addr}}"
+  tags:
+    - configure
+    - dns
+
+- include: add-a-record.yaml
+
+- name: "Prepare to add IPA container IP {{freeipa_network_addr}}
+             to {{fqdn}} zone ipa entry"
+  set_fact:
+    zone: "{{fqdn}}"
+    record: "ipa"
+    arecord: "{{freeipa_network_addr}}"
+  tags:
+    - configure
+    - dns
+
+- include: add-a-record.yaml
+
+#################################
+# Add host DNS freeipa network reverse zone
+
+- name: "Prepare to add {{freeipa_network_prefix|reverse_zone}} zone"
+  set_fact:
+    zone: "{{freeipa_network_prefix|reverse_zone}}"
+  tags:
+    - configure
+    - dns
+
+- include: add-zone.yaml
+
+- name: "Prepare to add IPA container PTR record to {{fqdn}} zone"
+  set_fact:
+    zone: "{{freeipa_network_prefix|reverse_zone}}"
+    record: "{{freeipa_network_addr|last_octet}}"
+    ptrrecord: "ipa.{{fqdn}}"
+  tags:
+    - configure
+    - dns
+
+- include: add-ptr-record.yaml
