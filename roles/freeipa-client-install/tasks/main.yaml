@@ -1,0 +1,61 @@
+---
+# Provision FreeIPA client Docker container
+
+#################################
+# Set up Docker
+- name: Pull FreeIPA client docker image
+  docker_image:
+    name: "{{freeipa_docker_client_image}}"
+  register: freeipa_client_docker_image_pull
+  tags:
+    - setup
+
+# - name: Debug FreeIPA client docker image pull
+#   debug:
+#     var: freeipa_client_docker_image_pull
+#   tags:
+#     - setup
+
+#################################
+# Install IPA client container
+
+- name: Run FreeIPA client install in Docker container
+  docker_container:
+    name: ipaclient
+    hostname: "ipaclient.{{region_id}}.{{domain_name}}"
+    image: "{{freeipa_docker_client_image}}"
+    volumes:
+      - "{{data_volume_path}}:{{data_volume_path}}"
+      - "{{freeipa_volume_path}}:{{freeipa_volume_path}}"
+      - "/sys/fs/cgroup:/sys/fs/cgroup:ro"
+    env:
+      IPA_SERVER_IP: "{{ip_addr}}"
+      IPA_PORT_53_UDP_ADDR: "{{ip_addr}}"
+      PASSWORD: "{{freeipa_admin_password}}"
+      IPA_PORT_80_TCP_ADDR: "{{ip_addr}}"
+      IPA_CLIENT_INSTALL_OPTS: "-N --force-join --force --server={{fqdn}}
+                                 --fixed-primary --domain={{domain_name}}"
+    privileged: yes
+    detach: yes
+    cleanup: yes
+    interactive: yes
+    tty: yes
+    state: started
+    recreate: no
+    restart: no
+    command: "-s"
+    etc_hosts: "{
+      '{{fqdn}}': '{{ip_addr}}',
+    }"
+  register: docker_run
+  # when: not install_path_stat.stat.exists
+  tags:
+    - install
+
+
+- name: Wait for FreeIPA client install to complete
+  shell: "while ! docker logs ipaclient |
+              grep -q FreeIPA-enrolled; do sleep 1; done"
+  when: docker_run.changed
+  tags:
+    - install
