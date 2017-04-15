@@ -3,7 +3,10 @@
 
 - Password file in `password`
 
-- Setup commands:
+- Setup commands (only run once):
+
+        # Start container
+        ./container shell
 
         # Install required roles from Ansible Galaxy, if not running
         # Docker container
@@ -15,6 +18,9 @@
 
 - Install commands:
 
+        # Start container
+        ./container shell
+
         # Provision host1
         ansible-playbook provision.yaml -l host1
 
@@ -23,6 +29,9 @@
         ansible-playbook playbooks/freeipa-install.yaml -l host1
 
 - Misc commands:
+
+        # Start container
+        ./container shell
 
         # Re-collect facts about host
         ansible h01 -m setup \
