@@ -33,3 +33,6 @@
 
     # Install FreeIPA
     - role: freeipa-install
+
+    # Install SSL certs locally
+    - role: local-ca-certs

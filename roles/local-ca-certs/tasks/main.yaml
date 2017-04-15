@@ -1,0 +1,50 @@
+---
+#################################
+# Install CA cert in local container
+
+- name: Fetch CA cert
+  fetch:
+    src: "{{freeipa_volume_path}}/root/cacert.p12"
+    dest: "cache/cacert.p12"
+    flat: yes
+  when: hostname == master_host
+  register: fetch_ca_cert
+  tags:
+    - install
+
+- name: Convert CA cert to pem format
+  command: "openssl pkcs12 -in cache/cacert.p12 -clcerts -nokeys
+            -passin pass:{{freeipa_ds_password}} -passout pass:
+            -out cache/cacert.pem"
+  delegate_to: localhost
+  when: fetch_ca_cert.changed
+
+- name: Convert CA cert to pem format
+  command: "openssl pkcs12 -in cache/cacert.p12 -clcerts -nokeys
+            -passin pass:{{freeipa_ds_password}} -passout pass:
+            -out cache/cacert.pem"
+  delegate_to: localhost
+  when: fetch_ca_cert.changed
+
+- name: Local create directory /usr/local/share/ca-certificates/{{domain_name}}
+  file:
+    path: /usr/local/share/ca-certificates/{{domain_name}}
+    state: directory
+    mode: 0755
+  become: true
+  delegate_to: localhost
+  register: mkdir_ca_certs
+
+- name: Local Install CA cert {{mkdir_ca_certs.path}}/{{domain_name}}_CA.crt
+  copy:
+    src: cache/cacert.pem
+    dest: "{{mkdir_ca_certs.path}}/{{domain_name}}_CA.crt"
+  become: true
+  register: usr_local_share_ca_certificates
+  delegate_to: localhost
+
+- name: Update 
+  command: update-ca-certificates
+  become: true
+  delegate_to: localhost
+  when: usr_local_share_ca_certificates.changed
