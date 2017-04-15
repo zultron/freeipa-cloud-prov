@@ -10,7 +10,7 @@
 
   environment:
     # Path for python
-    PATH: "/usr/sbin:/usr/bin:/home/core/bin"
+    PATH: "/usr/sbin:/usr/bin:/home/core/bin:/bin:/sbin"
 
   roles:
     # Be sure /etc/hosts is up to date
