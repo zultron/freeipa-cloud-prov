@@ -37,11 +37,6 @@ class FilterModule(object):
                 res += '\\' + hex(ord(c))[1:]
         return res
 
-    def shortname(self, data):
-        """Given a fqdn, return the host name portion without the domain name
-        """
-        return data.split('.')[0]
-
     def domain_to_dn(self, data):
         """Given a domain name, return the ldap DN,
         e.g. example.com|domain_to_dn returns dc=example,dc=com
@@ -53,6 +48,5 @@ class FilterModule(object):
             'formatmapstr': self.formatmapstr,
             'formatmaplist': self.formatmaplist,
             'systemd_escape': self.systemd_escape,
-            'shortname': self.shortname,
             'domain_to_dn': self.domain_to_dn,
         }
