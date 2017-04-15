@@ -50,7 +50,7 @@ RUN useradd -s /bin/bash user
 COPY lib/requirements.yaml /tmp
 RUN ansible-galaxy install -r /tmp/requirements.yaml
 
-ENV PYTHONPATH=/data/python
+ENV PYTHONPATH=/data/lib/python
 
 # Work around annoying python location on CoreOS
 RUN mkdir -p /home/core/bin && ln -s /usr/bin/python /home/core/bin/python
