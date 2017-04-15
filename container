@@ -2,7 +2,7 @@
 
 DIR="$(readlink -f $(dirname $0))"
 UID_GID=`id -u`:`id -g`
-DOCKER_IMG="zultron/freeipa-cloud-prov:master"
+DOCKER_IMG="zultron/freeipa-cloud-prov:latest"
 DO_API_KEY=$(awk '/^token:/ {print $2}' config.yaml)
 
 
