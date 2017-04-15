@@ -4,8 +4,8 @@
 # User's config files
 /hosts.yaml
 /.vault_pass
-/group_vars/freeipa/vault.yaml
+/lib/inventory/group_vars/freeipa/vault.yaml
 # Ansible-generated files
-/cache/
+/var/*
+!/var/.exists
 *.retry
-/ansible.log

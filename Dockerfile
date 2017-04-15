@@ -47,7 +47,7 @@ RUN apt-get -y install ldap-utils
 
 RUN useradd -s /bin/bash user
 
-COPY misc/requirements.yaml /tmp
+COPY lib/requirements.yaml /tmp
 RUN ansible-galaxy install -r /tmp/requirements.yaml
 
 ENV PYTHONPATH=/data/python

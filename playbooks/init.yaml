@@ -7,14 +7,13 @@
 
   vars_prompt:
   - name: freeipa_admin_password
-    prompt: Please enter the FreeIPA admin password
+    prompt: Please enter the FreeIPA admin pass
     private: yes
 
   - name: freeipa_ds_password
-    prompt: Please enter the FreeIPA ds password
+    prompt: Please enter the FreeIPA ds pass
     private: yes
 
   roles:
     # Create encrypted FreeIPA password vault
     - role: vault
-      vault_path: group_vars/freeipa/vault.yaml

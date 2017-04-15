@@ -7,30 +7,30 @@
 
         # Install required roles from Ansible Galaxy, if not running
         # Docker container
-        ansible-galaxy install -p ./roles -r misc/requirements.yaml
+        ansible-galaxy install -p ./roles -r lib/requirements.yaml
 
         # Set up password vault once
         echo "mySecretVaultPass" > .vault_pass
-        ansible-playbook init.yaml # Set up FreeIPA passwords
+        ansible-playbook playbooks/init.yaml
 
 - Install commands:
 
         # Provision host1
         ansible-playbook provision.yaml -l host1
 
-		# Install FreeIPA on host1
-		# - tags:  setup,configure,install
-        ansible-playbook freeipa-install.yaml -l host1
+        # Install FreeIPA on host1
+        # - tags:  setup,configure,install
+        ansible-playbook playbooks/freeipa-install.yaml -l host1
 
 - Misc commands:
 
-		# Re-collect facts about host
-		ansible h01 -m setup \
-			-e ansible_python_interpreter=/home/core/bin/python \
-			-e ansible_ssh_user=core
+        # Re-collect facts about host
+        ansible h01 -m setup \
+            -e ansible_python_interpreter=/home/core/bin/python \
+            -e ansible_ssh_user=core
 
         # Destroy host1
-        ansible-playbook destroy.yaml -l host1 -e confirm=true
+        ansible-playbook playbooks/destroy.yaml -l host1 -e confirm=true
 
         # List all variables for a host
         ansible host1 -m debug -a "var=hostvars[inventory_hostname]"
