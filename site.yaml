@@ -6,7 +6,7 @@
 - include: provision.yaml
 
 # Install FreeIPA in Docker container
-- include: freeipa.yaml
+- include: freeipa-install.yaml
 
 # Configure FreeIPA
 - include: freeipa-config.yaml
