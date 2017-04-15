@@ -7,11 +7,12 @@ MAINTAINER John Morris <john@zultron.com>
 RUN apt-get update
 RUN apt-get install -y \
         python-yaml \
-	python-pip \
-	python-dev \
+        libyaml-dev \
+        python-pip \
+        python-dev \
         libffi-dev \
-	libssl-dev \
-	build-essential \
+        libssl-dev \
+        build-essential \
         python-setuptools \
         python-pkg-resources
 RUN pip install python-digitalocean
