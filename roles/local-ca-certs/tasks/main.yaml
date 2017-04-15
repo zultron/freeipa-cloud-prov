@@ -10,7 +10,7 @@
   when: hostname == master_host
   register: fetch_ca_cert
   tags:
-    - install
+    - local-setup
 
 - name: Convert CA cert to pem format
   command: "openssl pkcs12 -in cache/cacert.p12 -clcerts -nokeys
@@ -18,6 +18,8 @@
             -out cache/cacert.pem"
   delegate_to: localhost
   when: fetch_ca_cert.changed
+  tags:
+    - local-setup
 
 - name: Convert CA cert to pem format
   command: "openssl pkcs12 -in cache/cacert.p12 -clcerts -nokeys
@@ -25,6 +27,8 @@
             -out cache/cacert.pem"
   delegate_to: localhost
   when: fetch_ca_cert.changed
+  tags:
+    - local-setup
 
 - name: Local create directory /usr/local/share/ca-certificates/{{domain_name}}
   file:
@@ -34,6 +38,8 @@
   become: true
   delegate_to: localhost
   register: mkdir_ca_certs
+  tags:
+    - local-setup
 
 - name: Local Install CA cert {{mkdir_ca_certs.path}}/{{domain_name}}_CA.crt
   copy:
@@ -42,9 +48,13 @@
   become: true
   register: usr_local_share_ca_certificates
   delegate_to: localhost
+  tags:
+    - local-setup
 
-- name: Update 
+- name: Local update CA certs
   command: update-ca-certificates
   become: true
   delegate_to: localhost
   when: usr_local_share_ca_certificates.changed
+  tags:
+    - local-setup

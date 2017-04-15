@@ -8,11 +8,15 @@
               && echo 'yes' || echo 'no'"
   changed_when: False
   register: kerb_creds
+  tags:
+    - setup
 
 - name: Obtain kerberos credentials
   shell: "echo {{freeipa_admin_password}} |
               docker exec -i ipaclient kinit admin"
   when: kerb_creds.stdout == 'no'
+  tags:
+    - setup
 
 #################################
 # Harden DNS
@@ -24,6 +28,8 @@
     line: "        allow-recursion { 127.0.0.1; 10.0.0.0/8; };"
   become: true
   register:  dns_recursion
+  tags:
+    - configure
 
 - name: Restrict DNS zone transfers
   lineinfile:
@@ -34,10 +40,14 @@
     line: "        allow-transfer { none; };"
   become: true
   register:  dns_transfers
+  tags:
+    - configure
 
 - name: Restart named
   command: "{{ipa_exec}} systemctl restart named-pkcs11.service"
   when: dns_recursion.changed or dns_transfers.changed
+  tags:
+    - configure
 
 - name: Check DNS zone transfers in IPA
   shell:  "{{ipa_exec}} ipa dnszone-show {{domain_name}}
@@ -45,12 +55,16 @@
   register: ipa_dns_transfers
   changed_when: ipa_dns_transfers.stdout == 'fix'
   when:  hostname == master_host
+  tags:
+    - configure
 
 - name: Disable DNS zone transfers in IPA
   command: "{{ipa_exec}} ipa dnszone-mod {{domain_name}} --allow-transfer='none;'"
   when: ipa_dns_transfers.changed
           and (dns_recursion.changed or dns_transfers.changed)
           and hostname == master_host
+  tags:
+    - configure
 
 #################################
 # Harden LDAP
@@ -65,6 +79,8 @@
     state: exact
     values: rootdse
   delegate_to: localhost
+  tags:
+    - configure
 
 #################################
 # Configure httpd
@@ -87,6 +103,8 @@
     backrefs: yes
   become: true
   register:  ipa_redirect_1
+  tags:
+    - configure
 
 - name: Disable IPA web UI redirect to https 2
   lineinfile:
@@ -97,6 +115,8 @@
     backrefs: yes
   become: true
   register:  ipa_redirect_2
+  tags:
+    - configure
 
 - name: Disable IPA web UI redirect to https 3
   lineinfile:
@@ -107,6 +127,8 @@
     backrefs: yes
   become: true
   register:  ipa_redirect_3
+  tags:
+    - configure
 
 - name: Disable IPA web UI redirect to https 4
   lineinfile:
@@ -117,6 +139,8 @@
     backrefs: yes
   become: true
   register:  ipa_redirect_4
+  tags:
+    - configure
 
 - name: Restart httpd
   command: "{{ipa_exec}} systemctl restart httpd.service"
@@ -124,6 +148,8 @@
      or ipa_redirect_2.changed
      or ipa_redirect_3.changed
      or ipa_redirect_4.changed
+  tags:
+    - configure
 
 #################################
 # Misc
@@ -139,6 +165,8 @@
     state: exact
   delegate_to: localhost
   when:  hostname == master_host
+  tags:
+    - configure
 
 #################################
 # Fix up DNS zones

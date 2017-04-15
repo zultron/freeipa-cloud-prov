@@ -6,6 +6,8 @@
   do_droplet_info:
     names: "{{ groups.digitalocean|formatmaplist('{}.%s' % domain_name)}}"
   register: droplet_info
+  tags:
+    - local-setup
 
 - name: "Add/update host IP in /etc/hosts"
   lineinfile:
@@ -17,4 +19,6 @@
   become: true
   delegate_to: localhost
   with_items: "{{droplet_info.d}}"
+  tags:
+    - local-setup
 
