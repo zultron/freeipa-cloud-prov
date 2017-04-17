@@ -5,44 +5,41 @@
 
 - Setup commands (only run once):
 
-        # Start container
-        ./container shell
+        # Optionally build container if not pulling from docker hub
+		./container -b
 
         # Install required roles from Ansible Galaxy, if not running
         # Docker container
-        ansible-galaxy install -p ./roles -r lib/requirements.yaml
+        ./container ansible-galaxy install -p ./roles -r lib/requirements.yaml
 
         # Set up password vault once
         echo "mySecretVaultPass" > .vault_pass
-        ansible-playbook playbooks/init.yaml
+        ./container ansible-playbook playbooks/init.yaml
 
 - Install commands:
 
-        # Start container
-        ./container shell
-
         # Provision host1
-        ansible-playbook provision.yaml -l host1
+        ./container ansible-playbook provision.yaml -l host1
 
         # Install FreeIPA on host1
         # - tags:  setup,configure,install
-        ansible-playbook playbooks/freeipa-install.yaml -l host1
+        ./container ansible-playbook playbooks/freeipa-install.yaml -l host1
 
 - Misc commands:
 
-        # Start container
-        ./container shell
+        # Interactive shell in container
+        ./container
 
         # Re-collect facts about host
-        ansible h01 -m setup \
+        ./container ansible h01 -m setup \
             -e ansible_python_interpreter=/home/core/bin/python \
             -e ansible_ssh_user=core
 
         # Destroy host1
-        ansible-playbook playbooks/destroy.yaml -l host1 -e confirm=true
+        ./container ansible-playbook playbooks/destroy.yaml -l host1 -e confirm=true
 
         # List all variables for a host
-        ansible host1 -m debug -a "var=hostvars[inventory_hostname]"
+        ./container ansible host1 -m debug -a "var=hostvars[inventory_hostname]"
         # Also vars, environment, group_names, groups
 
 - Depends on `defunctzombie.coreos-bootstrap`, installed in Docker

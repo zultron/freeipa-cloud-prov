@@ -12,29 +12,26 @@ if tty >/dev/null; then
     DOCKER_TTY_ARGS="-t"
 fi
 
-if test "$1" = "build"; then
+if test "$1" = "-b"; then
     set -x
     exec docker build -t ${DOCKER_IMG} .
 
-elif test "$1" = "shell"; then
+elif test "${1:0:1}" = "-"; then
+    {
+	echo "Usage:"
+	echo "    $0 -b              # build container"
+	echo "    $0 COMMAND ARG ... # run command with args in container"
+    } >&2
+    exit 1
+
+else
     shift
     set -x
     exec docker run --rm -i ${DOCKER_TTY_ARGS} \
 	-v $HOME:/home/user \
 	-v $PWD:/data \
 	-u $UID_GID \
-	--network=cnet \
 	--entrypoint /bin/bash \
-	-e DO_API_KEY=${DO_API_KEY} \
-	${DOCKER_IMG} "$@"
-
-else
-    set -x
-    exec docker run --rm -i ${DOCKER_TTY_ARGS} \
-	-v $HOME:/home/user \
-	-v $PWD:/data \
-	-u $UID_GID \
-	--network=cnet \
 	-e DO_API_KEY=${DO_API_KEY} \
 	${DOCKER_IMG} "$@"
 fi

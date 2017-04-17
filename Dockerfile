@@ -60,5 +60,3 @@ VOLUME /data
 WORKDIR /data
 
 USER user
-
-ENTRYPOINT ["./provision-helper.py"]
