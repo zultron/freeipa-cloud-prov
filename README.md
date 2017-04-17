@@ -47,6 +47,37 @@
 - Interesting ansible examples incl. etcd2, docker in kubernetes
   - https://github.com/kubernetes/contrib/tree/master/ansible/roles
 
+- Docker connection plugin docs (st. similar merged into Ansible)
+  - https://github.com/lorin/ansible-docker-connection
+
+- Kubernetes is replacing fleet; examples w/CoreOS
+  - https://github.com/thesamet/ansible-kubernetes-coreos
+	- w/blog articles
+  - https://github.com/sebiwi/kubernetes-coreos
+  - https://github.com/deimosfr/ansible-coreos-kubernetes
+	- for "production usage"
+  - CoreOS docs:  Kubernetes
+	- https://coreos.com/kubernetes/docs/latest/
+  - Kubernetes docs:  CoreOS
+	- https://kubernetes.io/docs/getting-started-guides/coreos/
+  - Article calls for creating certs with IP addr altname attributes
+	- How to do with FreeIPA?
+	  - FreeIPA won't issue IP SANs
+		- https://www.redhat.com/archives/freeipa-users/2016-October/msg00053.html
+	  - Emailed kubernetes-users list
+		- https://groups.google.com/forum/#!topic/kubernetes-users/azpLUFHu_2I
+	- https://github.com/kubernetes/kubernetes/issues/22063
+	  - Is this about using fqdns for ent-points?
+  - cloud-config `fleet` and `etcd2` sections will disappear
+	- https://groups.google.com/forum/#!topic/coreos-user/Lfd1tmkwmRg
+  - Kubernetes module in Ansible
+	- http://docs.ansible.com/ansible/kubernetes_module.html
+
+- etcd3 will replace etcd2
+  - Recommendation to run etcd3 in a container
+	- https://groups.google.com/forum/#!topic/coreos-user/Lfd1tmkwmRg
+
+
 # FreeIPA in Docker on CoreOS on DigitalOcean
 
 FreeIPA integrates LDAP, Kerberos, DNS and SSL CA services and exposes
