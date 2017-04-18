@@ -173,28 +173,34 @@
 # 
 # ipa-server-install erroneously puts container IP into A record
 
-- name: "Prepare to del host IP {{ip_addr}} from {{domain_name}} zone
+- name: "Remove container IP {{freeipa_network_addr}} from {{domain_name}} zone
             ipa-ca entry"
-  set_fact:
+  ipa_dnsrecord:
+    name: ipa-ca
     zone: "{{domain_name}}"
-    record: "ipa-ca"
     arecord: "{{freeipa_network_addr}}"
+    state: absent
+    ipa_host: "{{fqdn}}"
+    ipa_user: "{{ipa_user}}"
+    ipa_pass: "{{freeipa_admin_password}}"
+  delegate_to: localhost
   tags:
     - configure
     - dns
 
-- include: del-a-record.yaml
-
-- name: "Prepare to add host IP {{ip_addr}} to {{fqdn}} zone ipa-ca entry"
-  set_fact:
+- name: "Add host IP {{ip_addr}} to {{domain_name}} zone ipa-ca entry"
+  ipa_dnsrecord:
+    name: ipa-ca
     zone: "{{domain_name}}"
-    record: "ipa-ca"
     arecord: "{{ip_addr}}"
+    state: present
+    ipa_host: "{{fqdn}}"
+    ipa_user: "{{ipa_user}}"
+    ipa_pass: "{{freeipa_admin_password}}"
+  delegate_to: localhost
   tags:
     - configure
     - dns
-
-- include: add-a-record.yaml
 
 #################################
 # Add host DNS zone and transfer A record
@@ -205,44 +211,56 @@
     state: present
     ipa_host: "{{fqdn}}"
     ipa_user: "{{ipa_user}}"
-    ipa_pass: "{{freeipa_admin_user}}"
-  register: create_fqdn_dnszone
+    ipa_pass: "{{freeipa_admin_password}}"
   delegate_to: localhost
+  register: create_fqdn_dnszone
+  tags:
+    - configure
+    - dns
 
-- name: "Prepare to del host IP {{ip_addr}} from {{domain_name}} zone
+- name: "Remove host IP {{ip_addr}} from {{domain_name}} zone
             {{hostname}} entry"
-  set_fact:
+  ipa_dnsrecord:
+    name: "{{hostname}}"
     zone: "{{domain_name}}"
-    record: "{{hostname}}"
     arecord: "{{ip_addr}}"
+    state: absent
+    ipa_host: "{{fqdn}}"
+    ipa_user: "{{ipa_user}}"
+    ipa_pass: "{{freeipa_admin_password}}"
+  delegate_to: localhost
   tags:
     - configure
     - dns
 
-- include: del-a-record.yaml
-
-- name: "Prepare to add host IP {{ip_addr}} to {{fqdn}} zone @ entry"
-  set_fact:
+- name: "Add host IP {{ip_addr}} to {{fqdn}} zone @ entry"
+  ipa_dnsrecord:
+    name: "@"
     zone: "{{fqdn}}"
-    record: "@"
     arecord: "{{ip_addr}}"
+    state: present
+    ipa_host: "{{fqdn}}"
+    ipa_user: "{{ipa_user}}"
+    ipa_pass: "{{freeipa_admin_password}}"
+  delegate_to: localhost
   tags:
     - configure
     - dns
 
-- include: add-a-record.yaml
-
-- name: "Prepare to add IPA container IP {{freeipa_network_addr}}
-             to {{fqdn}} zone ipa entry"
-  set_fact:
+- name: "Add IPA container IP {{freeipa_network_addr}}
+            to {{fqdn}} zone ipa entry"
+  ipa_dnsrecord:
+    name: ipa
     zone: "{{fqdn}}"
-    record: "ipa"
     arecord: "{{freeipa_network_addr}}"
+    state: present
+    ipa_host: "{{fqdn}}"
+    ipa_user: "{{ipa_user}}"
+    ipa_pass: "{{freeipa_admin_password}}"
+  delegate_to: localhost
   tags:
     - configure
     - dns
-
-- include: add-a-record.yaml
 
 #################################
 # Add host DNS freeipa network reverse zone
@@ -253,17 +271,20 @@
     state: present
     ipa_host: "{{fqdn}}"
     ipa_user: "{{ipa_user}}"
-    ipa_pass: "{{freeipa_admin_user}}"
+    ipa_pass: "{{freeipa_admin_password}}"
   register: create_rev_dnszone
   delegate_to: localhost
 
-- name: "Prepare to add IPA container PTR record to {{fqdn}} zone"
-  set_fact:
+- name: "Add IPA container PTR to {{fqdn}} zone"
+  ipa_dnsrecord:
+    name: "{{freeipa_network_addr|last_octet}}"
     zone: "{{freeipa_network_prefix|reverse_zone}}"
-    record: "{{freeipa_network_addr|last_octet}}"
     ptrrecord: "ipa.{{fqdn}}"
+    state: present
+    ipa_host: "{{fqdn}}"
+    ipa_user: "{{ipa_user}}"
+    ipa_pass: "{{freeipa_admin_password}}"
+  delegate_to: localhost
   tags:
     - configure
     - dns
-
-- include: add-ptr-record.yaml

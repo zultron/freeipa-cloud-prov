@@ -1,0 +1,12 @@
+---
+############################################
+- name: Gather node information for container
+  hosts: digitalocean
+  gather_facts: no
+
+  roles:
+    # Be sure /etc/hosts is up to date
+    - role: local-etc-hosts
+
+    # Be sure SSL certs are up to date
+    - role: local-ca-certs
