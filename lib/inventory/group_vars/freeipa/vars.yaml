@@ -39,9 +39,14 @@ freeipa_ports:
   - "8080"
   # - "7839"
 
+# FreeIPA credentials
+ipa_user: admin
+# freeipa_admin_password: (in vault.yaml)
+
 # Shortcut commands
 ipa_exec: "docker exec -i ipa"
 
 # LDAP values
 bind_dn: "cn=Directory Manager"
 domain_dn: "{{ domain_name | domain_to_dn }}"
+# freeipa_ds_password: (in vault.yaml)

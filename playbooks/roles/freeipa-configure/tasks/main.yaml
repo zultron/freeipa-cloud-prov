@@ -199,14 +199,15 @@
 #################################
 # Add host DNS zone and transfer A record
 
-- name: "Prepare to add {{fqdn}} zone"
-  set_fact:
-    zone: "{{fqdn}}"
-  tags:
-    - configure
-    - dns
-
-- include: add-zone.yaml
+- name: "Add {{fqdn}} zone"
+  ipa_dnszone:
+    idnsname: "{{fqdn}}"
+    state: present
+    ipa_host: "{{fqdn}}"
+    ipa_user: "{{ipa_user}}"
+    ipa_pass: "{{freeipa_admin_user}}"
+  register: create_fqdn_dnszone
+  delegate_to: localhost
 
 - name: "Prepare to del host IP {{ip_addr}} from {{domain_name}} zone
             {{hostname}} entry"
@@ -246,14 +247,15 @@
 #################################
 # Add host DNS freeipa network reverse zone
 
-- name: "Prepare to add {{freeipa_network_prefix|reverse_zone}} zone"
-  set_fact:
-    zone: "{{freeipa_network_prefix|reverse_zone}}"
-  tags:
-    - configure
-    - dns
-
-- include: add-zone.yaml
+- name: "Add {{freeipa_network_prefix|reverse_zone}} zone"
+  ipa_dnszone:
+    idnsname: "{{freeipa_network_prefix|reverse_zone}}"
+    state: present
+    ipa_host: "{{fqdn}}"
+    ipa_user: "{{ipa_user}}"
+    ipa_pass: "{{freeipa_admin_user}}"
+  register: create_rev_dnszone
+  delegate_to: localhost
 
 - name: "Prepare to add IPA container PTR record to {{fqdn}} zone"
   set_fact:
