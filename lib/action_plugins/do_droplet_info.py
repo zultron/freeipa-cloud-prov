@@ -51,10 +51,10 @@ class ActionModule(ActionBase):
 
         result = super(ActionModule, self).run(tmp, task_vars)
 
-        args = result['invocation']['module_args']
+        args = self._task.args
 
         # Get DO API token and manager object
-        api_token = self._task.args.get(
+        api_token = args.get(
             'api_token', os.environ.get('DO_API_KEY', None))
         if api_token is None:
             return dict(failed=True,
