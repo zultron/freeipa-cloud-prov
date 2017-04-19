@@ -16,6 +16,11 @@ dropin_dir_pat: "/etc/systemd/system/%s.service.d"
 # Swap partition size, GiB
 swap_size:  2
 
+# Container network
+container_network_prefix: "{{network_prefix}}.32"
+container_network_cidr: "{{container_network_prefix}}.0/24"
+container_network_gateway: "{{container_network_prefix}}.1"
+freeipa_client_network_addr: "{{container_network_prefix}}.2"
 
 ##################################
 # Data volume
