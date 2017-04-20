@@ -4,7 +4,8 @@ DIR="$(readlink -f $(dirname $0))"
 UID_GID=`id -u`:`id -g`
 DOCKER_IMG="zultron/freeipa-cloud-prov:latest"
 DO_API_KEY=$(awk '/^token:/ {print $2}' config.yaml)
-
+CONTAINER_NAME=freeipa-cloud-prov
+EXISTING_CONTAINER=$(docker ps -aq --filter=name=$CONTAINER_NAME)
 
 cd "$DIR"
 
@@ -24,12 +25,16 @@ elif test "${1:0:1}" = "-"; then
     } >&2
     exit 1
 
+elif test -n "$EXISTING_CONTAINER"; then
+    set -x
+    exec docker start -ai $EXISTING_CONTAINER
 else
     shift
     DOCKER_EXTRA_ARGS="$(
         test ! -f .docker-extra-args || cat .docker-extra-args)"
     set -x
     exec docker run -i ${DOCKER_TTY_ARGS} \
+	--name freeipa-cloud-prov \
 	-v $HOME:/home/user \
 	-v $PWD:/data \
 	-u $UID_GID \
