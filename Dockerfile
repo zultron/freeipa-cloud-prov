@@ -50,9 +50,6 @@ RUN useradd -s /bin/bash user
 
 RUN apt-get -y install git
 
-# Install author's fave editor
-RUN apt-get -y install emacs-common
-
 RUN ansible-galaxy install defunctzombie.coreos-bootstrap
 
 ENV PYTHONPATH=/data/lib/python
