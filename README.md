@@ -18,12 +18,16 @@
 
 - Install commands:
 
-        # Provision host1
+        # Provision host1 droplet on DigitalOcean and configure storage
         ./container ansible-playbook provision.yaml -l host1
 
-        # Install FreeIPA on host1
+        # Install FreeIPA server and client containers on host1
         # - tags:  setup,configure,install
         ./container ansible-playbook playbooks/freeipa-install.yaml -l host1
+
+        # Configure FreeIPA server on host1
+        # - tags:  setup,configure,install
+        ./container ansible-playbook playbooks/freeipa-config.yaml -l host1
 
 - Misc commands:
 
@@ -49,6 +53,14 @@
 
 - Docker connection plugin docs (st. similar merged into Ansible)
   - https://github.com/lorin/ansible-docker-connection
+  - Make conns with TLS
+    - http://stackoverflow.com/questions/32878795/run-command-inside-of-docker-container-using-ansible
+    - http://docs.ansible.com/ansible/intro_inventory.html#non-ssh-connection-types
+
+- Local actions, incl. nice syntax
+  - http://stackoverflow.com/questions/18900236/run-command-on-the-ansible-host
+- Glossary of Play, Role, Block, Task directives
+  - https://docs.ansible.com/ansible/playbooks_keywords.html
 
 - Kubernetes is replacing fleet; examples w/CoreOS
   - https://github.com/thesamet/ansible-kubernetes-coreos
