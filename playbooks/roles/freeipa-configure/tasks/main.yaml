@@ -19,7 +19,7 @@
 
 #################################
 # Harden DNS
-- name: Restrict DNS recursion
+- name: Restrict DNS recursion in named.conf
   lineinfile:
     dest: "/media/freeipa/etc/named.conf"
     regexp: "allow-recursion"
@@ -30,7 +30,7 @@
   tags:
     - configure
 
-- name: Restrict DNS zone transfers
+- name: Restrict DNS zone transfers globally in named.conf
   lineinfile:
     dest: "/media/freeipa/etc/named.conf"
     regexp: "allow-transfer"
@@ -48,22 +48,19 @@
   tags:
     - configure
 
-- name: Check DNS zone transfers in IPA
-  shell:  "{{ipa_exec}} ipa dnszone-show {{domain_name}}
-               | grep -q 'Allow transfer. none' && echo 'ok' || echo 'fix'"
-  register: ipa_dns_transfers
-  changed_when: ipa_dns_transfers.stdout == 'fix'
-  when:  hostname == master_host
+- name: "Restrict DNS zone transfers for {{domain_name}} in IPA"
+  ipa_dnszone:
+    idnsname: "{{domain_name}}"
+    state: present
+    idnsallowtransfer: "none;"
+    ipa_host: "{{fqdn}}"
+    ipa_user: "{{ipa_user}}"
+    ipa_pass: "{{freeipa_admin_password}}"
+  delegate_to: localhost
+  register: create_fqdn_dnszone
   tags:
     - configure
-
-- name: Disable DNS zone transfers in IPA
-  command: "{{ipa_exec}} ipa dnszone-mod {{domain_name}} --allow-transfer='none;'"
-  when: ipa_dns_transfers.changed
-          and (dns_recursion.changed or dns_transfers.changed)
-          and hostname == master_host
-  tags:
-    - configure
+    - dns
 
 #################################
 # Harden LDAP
