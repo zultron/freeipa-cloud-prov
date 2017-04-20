@@ -53,9 +53,7 @@ RUN apt-get -y install git
 # Install author's fave editor
 RUN apt-get -y install emacs-common
 
-
-COPY lib/requirements.yaml /tmp
-RUN ansible-galaxy install -r /tmp/requirements.yaml
+RUN ansible-galaxy install defunctzombie.coreos-bootstrap
 
 ENV PYTHONPATH=/data/lib/python
 
