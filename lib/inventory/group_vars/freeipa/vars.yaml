@@ -5,6 +5,12 @@
 freeipa_docker_image: "adelton/freeipa-server:centos-7"
 freeipa_docker_client_image: "zultron/freeipa-cloud-prov:ipaclient"
 
+# FreeIPA container network
+freeipa_network_prefix: "{{network_prefix}}.128"
+freeipa_network_cidr: "{{freeipa_network_prefix}}.0/24"
+freeipa_network_gateway: "{{freeipa_network_prefix}}.1"
+freeipa_network_addr: "{{freeipa_network_prefix}}.2"
+
 # FreeIPA data volume
 freeipa_volume_path:  "/media/freeipa"
 freeipa_volume_block_device:  "{{ block_device_path_pat %
@@ -12,12 +18,21 @@ freeipa_volume_block_device:  "{{ block_device_path_pat %
 freeipa_volume_device:  "{{freeipa_volume_block_device}}-part1"
 freeipa_volume_size: 1
 
-# FreeIPA container network
-freeipa_network_prefix: "{{network_prefix}}.128"
-freeipa_network_cidr: "{{freeipa_network_prefix}}.0/24"
-freeipa_network_gateway: "{{freeipa_network_prefix}}.1"
-freeipa_network_addr: "{{freeipa_network_prefix}}.2"
-freeipa_hostname: "ipa{{host_id}}.{{domain_name}}"
+# FreeIPA server/replica container
+freeipa_hostname: "ipa"
+freeipa_container_name: "{{freeipa_client_hostname}}.{{hostname}}"
+freeipa_dns_zone: "{{fqdn}}"
+freeipa_fqdn: "{{freeipa_hostname}}.{{freeipa_dns_zone}}"
+
+# FreeIPA client container
+# - Short hostname
+freeipa_client_hostname: "ipaclient"
+# - Ansible hostname, Docker container name
+freeipa_client_container_name: "{{freeipa_client_hostname}}.{{hostname}}"
+# - DNS zone
+freeipa_client_dns_zone: "{{fqdn}}"
+# - Container fqdn
+freeipa_client_fqdn: "{{freeipa_client_hostname}}.{{freeipa_client_dns_zone}}"
 
 # FreeIPA published ports
 freeipa_ports:
@@ -40,11 +55,13 @@ freeipa_ports:
   # - "7839"
 
 # FreeIPA credentials
+ipa_host: "{{fqdn}}"
 ipa_user: admin
 # freeipa_admin_password: (in vault.yaml)
 
 # Shortcut commands
 ipa_exec: "docker exec -i ipa"
+ipaclient_exec: "docker exec -i ipaclient"
 
 # LDAP values
 bind_dn: "cn=Directory Manager"
