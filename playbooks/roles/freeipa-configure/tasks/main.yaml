@@ -4,17 +4,16 @@
 #################################
 # Init Kerberos credentials
 - name: Check for kerberos credentials
-  shell: "docker exec -i ipaclient klist |& grep -q krbtgt
-              && echo 'yes' || echo 'no'"
-  changed_when: False
+  shell: "{{ipa_exec}} klist -s && echo 'yes' || echo 'no'"
   register: kerb_creds
+  changed_when: kerb_creds.stdout == 'no'
   tags:
     - setup
 
 - name: Obtain kerberos credentials
   shell: "echo {{freeipa_admin_password}} |
-              docker exec -i ipaclient kinit admin"
-  when: kerb_creds.stdout == 'no'
+              {{ipa_exec}} kinit admin"
+  when: kerb_creds.changed
   tags:
     - setup
 
@@ -274,6 +273,9 @@
     ipa_pass: "{{freeipa_admin_password}}"
   register: create_rev_dnszone
   delegate_to: localhost
+  tags:
+    - configure
+    - dns
 
 - name: "Add IPA container PTR to {{fqdn}} zone"
   ipa_dnsrecord:
@@ -288,3 +290,4 @@
   tags:
     - configure
     - dns
+
