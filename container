@@ -26,11 +26,14 @@ elif test "${1:0:1}" = "-"; then
 
 else
     shift
+    DOCKER_EXTRA_ARGS="$(
+        test ! -f .docker-extra-args || cat .docker-extra-args)"
     set -x
-    exec docker run --rm -i ${DOCKER_TTY_ARGS} \
+    exec docker run -i ${DOCKER_TTY_ARGS} \
 	-v $HOME:/home/user \
 	-v $PWD:/data \
 	-u $UID_GID \
+	$DOCKER_EXTRA_ARGS \
 	--entrypoint /bin/bash \
 	-e DO_API_KEY=${DO_API_KEY} \
 	${DOCKER_IMG} "$@"

@@ -5,6 +5,7 @@
 /hosts.yaml
 /.vault_pass
 /lib/inventory/group_vars/freeipa/vault.yaml
+/.docker-extra-args
 # Ansible-generated files
 /var/*
 !/var/.exists

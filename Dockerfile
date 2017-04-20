@@ -48,6 +48,12 @@ RUN apt-get -y install ldap-utils
 
 RUN useradd -s /bin/bash user
 
+RUN apt-get -y install git
+
+# Install author's fave editor
+RUN apt-get -y install emacs-common
+
+
 COPY lib/requirements.yaml /tmp
 RUN ansible-galaxy install -r /tmp/requirements.yaml
 
