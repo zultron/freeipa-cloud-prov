@@ -1,0 +1,17 @@
+---
+############################################
+- name: Configure Docker service TLS access
+  # This has to happen after FreeIPA server and client are installed
+  # and running
+
+  hosts: coreos
+
+  vars:
+    ansible_python_interpreter: /home/core/bin/python
+
+  environment:
+    # Path for python
+    PATH: "/usr/sbin:/usr/bin:/home/core/bin:/bin:/sbin"
+
+  roles:
+    - role: docker-tls

@@ -1,0 +1,149 @@
+---
+#################################
+# Configure Docker server TLS
+#
+# Enable TLS service on port 2375; afterwards, run docker remotely like this
+#
+# docker --tlsverify \
+#     -H tcp://host1.example.com:2375 \
+#     --tlscacert ~/.docker/ca.pem
+#     --tlscert ~/.docker/cert.pem
+#     --tlskey ~/.docker/key.pem
+#
+# or
+# export DOCKER_HOST=tcp://server.example.com:2376 DOCKER_TLS_VERIFY=1
+#
+# Instructions for enabling TLS with auth
+# https://coreos.com/os/docs/latest/customizing-docker.html#enable-the-remote-api-with-tls-authentication
+
+#
+# Docker service certs
+#
+# Configure service in FreeIPA and use certmonger to generate certs
+#
+- name:  "Create {{docker_service_principal}} service principal and
+              add managed by {{freeipa_client_fqdn}} host"
+  ipa_service:
+    name: "{{docker_service_principal}}"
+    host:
+      - "{{freeipa_client_fqdn}}"
+    state: present
+    ipa_host: "{{fqdn}}"
+    ipa_user: "{{ipa_user}}"
+    ipa_pass: "{{freeipa_admin_password}}"
+  delegate_to: localhost
+  tags:
+    - cert
+
+- name: "Check if cert exists in {{docker_ssl_cert}}"
+  stat:
+    path: "{{docker_ssl_cert}}"
+  register: docker_ssl_cert_stat
+  tags:
+    - cert
+
+- name: "Create cert directory {{docker_ssl_dir}}"
+  file:
+    path: "{{docker_ssl_dir}}"
+    state: directory
+    mode: 0700
+  become: true
+  when: not docker_ssl_cert_stat.stat.exists
+  tags:
+    - cert
+
+- name:  "Create pem cert for {{docker_service_principal}}"
+  # The cert is actually created and maintained by certmonger running
+  # in ipaclient.  The {{docker_ssl_dir}} has been bind-mounted in the
+  # container for this purpose.
+  shell: "{{ipaclient_exec}} ipa-getcert request -w
+              -f '{{docker_ssl_cert}}' -k '{{docker_ssl_key}}'
+              -F '{{docker_ssl_cacert}}'
+              -K {{docker_service_principal}} -N '{{fqdn}}' -g 2048"
+  when: not docker_ssl_cert_stat.stat.exists
+  register: docker_ssl_cert_create
+  tags:
+    - cert
+
+
+#
+# Configure docker TCP socket
+#
+# Instructions require separate `docker-tls-tcp.socket` unit.  Doing
+# it this way requires the docker service to be stopped, the docker
+# socket restarted, and the docker service started again, or the
+# socket will fail with the following error:
+#
+#     docker-tls-tcp.socket: Socket service docker.service already active, refusing.
+#     Failed to listen on Docker Secured Socket for the API.
+#
+# Interleaved service stopping/starting is complicated in Ansible.
+# Instead, just run both the TCP and local socket from the same
+# service.  See https://github.com/coreos/bugs/issues/1362
+#
+# systemd socket unit docs
+# https://www.freedesktop.org/software/systemd/man/systemd.socket.html
+
+- name: "Install docker.socket systemd dropin directory"
+  file:
+    path: "/etc/systemd/system/docker.socket.d"
+    state: directory
+    mode: 0755
+  become: true
+  tags:
+    - docker-tls
+
+- name: "Install docker.socket dropin file to add TCP port 2375"
+  template:
+    src: 10-docker-tcp-socket.conf.j2
+    dest: "/etc/systemd/system/docker.socket.d/10-docker-tcp-socket.conf"
+  become: true
+  register: systemd_docker_socket
+  tags:
+    - docker-tls
+
+- name: "Restart docker.socket systemd unit"
+  systemd:
+    name: docker.socket
+    daemon_reload: yes
+    enabled: true
+    state: restarted
+  become: true
+  when: systemd_docker_socket.changed
+  tags:
+    - docker-tls
+
+#
+# Configure dockerd TLS command line args
+#
+# Docker daemon command line docs
+# https://docs.docker.com/engine/reference/commandline/dockerd/
+#
+
+- name: "Install docker.service systemd dropin directory"
+  file:
+    path: "/etc/systemd/system/docker.service.d"
+    state: directory
+    mode: 0755
+  become: true
+  tags:
+    - docker-tls
+
+- name: "Install docker.service systemd dropin to add dockerd TLS options"
+  template:
+    src: 10-dockerd-tls.conf.j2
+    dest: "/etc/systemd/system/docker.service.d/10-dockerd-tls.conf"
+  become: true
+  register: systemd_docker_dropin
+  tags:
+    - docker-tls
+
+- name: "Restart docker service"
+  systemd:
+    name: docker.service
+    daemon_reload: yes
+    state: restarted
+  become: true
+  when: systemd_docker_socket.changed or systemd_docker_dropin.changed
+  tags:
+    - docker-tls

@@ -194,3 +194,8 @@ write_files:
   #     export ETCDCTL_CERT_FILE={{clnt_cert_file_path}}
   #     export ETCDCTL_KEY_FILE={{clnt_key_file_path}}
   #     export ETCDCTL_CA_FILE={{ca_cert_file_path}}
+
+docker:
+  flags:
+    # Keep containers alive during restart
+    - --live-restore
