@@ -184,6 +184,14 @@ write_files:
       TOOLBOX_DOCKER_TAG=ipaclient
       TOOLBOX_USER=root
 
+  - path: /home/core/.docker/config.json
+    # Allow default detachKeys to be overridden
+    content: |
+      {
+        "detachKeys": "{{docker_detach_keys|default('ctrl-p,ctrl-q')"
+      }
+
+
   # This seems to break provisioning
   # - path: /usr/share/skel/.bashrc
   #   permissions: 0644

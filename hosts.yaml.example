@@ -10,6 +10,8 @@ all:
     etcd2_cluster_token: c1
     # Name of master host
     master_host: host1
+    # Docker detach keys:  uncomment to redefine
+    #docker_detach_keys: "ctrl-^"
 
 # Define CoreOS cluster hosts
 coreos_master:
