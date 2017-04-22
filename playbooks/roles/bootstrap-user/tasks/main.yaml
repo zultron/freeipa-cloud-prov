@@ -1,0 +1,131 @@
+---
+###########################
+# Create bootstrap user with client cert
+#
+# During bootstrap, we need a user with a client cert, but admin user
+# can't have client cert
+
+#
+# Create bootstrap user
+#
+- block:
+
+    - name: "Create bootstrap user"
+      ipa_user:
+        name: bootstrap
+        state: present
+        givenname: Bootstrap
+        sn: Bootstrap
+        password: "{{freeipa_admin_password}}"
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+
+    - name: "Check if bootstrap user is in CA ACL {{user_cert_acl}}"
+      shell: "{{ipaclient_exec}} ipa caacl-show --all --raw {{user_cert_acl}}
+                      | grep -q 'memberuser. uid=bootstrap,'
+                      && echo 'yes' || echo 'no'"
+      register: check_user_in_acl
+      changed_when: check_user_in_acl.stdout == 'no'
+
+    - name: "Add bootstrap user to CA ACL {{user_cert_acl}}"
+      command: "{{ipaclient_exec}} ipa caacl-add-user {{user_cert_acl}}
+                     --users bootstrap"
+      when: check_user_in_acl.changed
+      delegate_to: "{{hostname}}"
+
+  delegate_to: localhost
+  tags:
+    - bootstrap-user
+
+#
+# Generate client cert
+#
+- name: "Check if cert already exists locally in {{local_docker_client_dir}}"
+  stat:
+    path: "{{local_docker_client_cert}}"
+  register: local_docker_client_cert_stat
+  tags:
+    - bootstrap-client-cert
+
+- block:
+
+    - name: "Create remote bootstrap client cert directory
+             {{bootstrap_client_cert_dir}}"
+      file:
+        path: "{{bootstrap_client_cert_dir}}"
+        state: directory
+        mode: 0700
+      become: true
+
+    - name: "Create openssl.conf for bootstrap client cert"
+      template:
+        src: openssl-bootstrap-client.conf.j2
+        dest: "{{bootstrap_client_openssl_conf}}"
+      become: true
+
+    - name: "Generate bootstrap client cert key in {{bootstrap_client_key}}"
+      command: "openssl genrsa -out {{bootstrap_client_key}} 2048"
+      args:
+        creates: "{{bootstrap_client_key}}"
+      become: true
+
+    - name: "Generate bootstrap client certificate request in {{bootstrap_client_req}}"
+      command: "openssl req -new
+                  -key {{bootstrap_client_key}}
+                  -out {{bootstrap_client_req}}
+                  -config {{bootstrap_client_openssl_conf}}"
+      args:
+        creates: "{{bootstrap_client_req}}"
+      become: true
+
+    - name: "Generate bootstrap client certificate in IPA"
+      shell: "{{ipaclient_exec}} ipa cert-request {{bootstrap_client_req}}
+                     --principal bootstrap@{{kerberos_realm}}
+                     --profile-id IECUserRoles --raw
+                     | awk '/serial_number. / { print $2 }'"
+      register: client_cert_req
+
+    - name: "Dump bootstrap client certificate into {{bootstrap_client_cert}}"
+      command: "{{ipaclient_exec}} ipa cert-show {{client_cert_req.stdout}}
+                     --out {{bootstrap_client_cert}}"
+      become: true
+
+    - name: "Create local docker directory {{local_docker_client_dir}}"
+      file:
+        path: "{{local_docker_client_dir}}"
+        state: directory
+      delegate_to: localhost
+
+    - name: "Fetch bootstrap docker client cert to
+                 {{local_docker_client_cert}}"
+      fetch:
+        src: "{{bootstrap_client_cert}}"
+        dest: "{{local_docker_client_cert}}"
+        flat: yes
+      become: true
+
+    - name: "Fetch bootstrap docker client SSL key to
+                 {{local_docker_client_key}}"
+      fetch:
+        src: "{{bootstrap_client_key}}"
+        dest: "{{local_docker_client_key}}"
+        flat: yes
+      become: true
+
+    - name: "Fetch docker CA cert to
+                 {{local_docker_client_cacert}}"
+      fetch:
+        src: "{{bootstrap_client_cacert}}"
+        dest: "{{local_docker_client_cacert}}"
+        flat: yes
+      become: true
+
+    - name: "Restrict read permission on {{local_docker_client_key}}"
+    - file:
+        path: "{{local_docker_client_key}}"
+        mode: 0600
+
+  when: not local_docker_client_cert_stat.stat.exists
+  tags:
+    - bootstrap-client-cert

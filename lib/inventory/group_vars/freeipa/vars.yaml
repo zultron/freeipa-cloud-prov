@@ -67,3 +67,7 @@ ipaclient_exec: "docker exec -i ipaclient"
 bind_dn: "cn=Directory Manager"
 domain_dn: "{{ domain_name | domain_to_dn }}"
 # freeipa_ds_password: (in vault.yaml)
+
+# CA ACL
+user_cert_acl: user_cert_acl
+user_cert_profile: IECUserRoles

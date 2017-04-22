@@ -50,6 +50,22 @@ RUN useradd -s /bin/bash user
 
 RUN apt-get -y install git
 
+# Install docker
+# https://docs.docker.com/engine/installation/linux/debian/
+RUN apt-get install -y \
+	apt-transport-https \
+	ca-certificates \
+	curl \
+	gnupg2 \
+	software-properties-common
+RUN curl -fsSL https://download.docker.com/linux/debian/gpg | \
+        apt-key add -
+RUN add-apt-repository \
+	"deb https://download.docker.com/linux/debian jessie stable"
+RUN apt-get update
+RUN apt-get install -y \
+        docker-ce
+
 RUN ansible-galaxy install defunctzombie.coreos-bootstrap
 
 ENV PYTHONPATH=/data/lib/python
