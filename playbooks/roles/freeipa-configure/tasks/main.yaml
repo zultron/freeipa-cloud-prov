@@ -272,3 +272,35 @@
     - configure
     - dns
 
+#################################
+# Set up CA ACL for IECUserRoles cert profile
+
+- block:
+    - name: "Check if CA ACL {{user_cert_acl}} exists"
+      shell: "{{ipaclient_exec}} ipa caacl-find
+                    --name {{user_cert_acl|quote}} >/dev/null
+                    && echo 'yes' || echo 'no'"
+      register: check_user_cert_acl
+      changed_when: check_user_cert_acl.stdout == 'no'
+
+    - name: "Add CA ACL {{user_cert_acl}}"
+      command: "{{ipaclient_exec}} ipa caacl-add {{user_cert_acl}}"
+      when: check_user_cert_acl.changed
+
+    - name: "Check if cert profile {{user_cert_profile}}
+                  is in CA ACL {{user_cert_acl}}"
+      shell: "{{ipaclient_exec}} ipa caacl-show --all --raw {{user_cert_acl}}
+                  | grep -q 'ipamembercertprofile. cn={{user_cert_profile}},'
+                  && echo 'yes' || echo 'no'"
+      register: check_profile_in_acl
+      changed_when: check_profile_in_acl.stdout == 'no'
+
+    - name: "Add cert profile {{user_cert_profile}} to CA ACL {{user_cert_acl}}"
+      command: "{{ipaclient_exec}} ipa caacl-add-profile {{user_cert_acl}}
+                    --certprofile {{user_cert_profile}}"
+      when: check_profile_in_acl.changed
+
+  tags:
+    - configure
+    - ca-acl
+
