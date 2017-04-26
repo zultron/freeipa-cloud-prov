@@ -13,9 +13,14 @@
     operation: provision
 
   roles:
-    - base
-    - coreos-cloud-config
-    - digitalocean
+    - role: ssh-key
+      tags: ssh-key
+
+    - role: coreos-cloud-config
+      tags: coreos-cloud-config
+
+    - role: digitalocean
+      tags: digitalocean
 
 ############################################
 - name: Bootstrap ansible on CoreOS
@@ -31,11 +36,15 @@
 
   roles:
     # Update /etc/hosts with new droplets
-    - local-etc-hosts
+    - role: local-etc-hosts
+      tags: local-etc-hosts
 
     # Install python and modules needed by Ansible
-    - defunctzombie.coreos-bootstrap
-    - coreos-ansible
+    - role: defunctzombie.coreos-bootstrap
+      tags: coreos-bootstrap-python
+
+    - role: coreos-ansible
+      tags: coreos-ansible
 
 ############################################
 - name: Configure CoreOS block storage
@@ -60,11 +69,14 @@
           part_end:  "{{ swap_size }}GiB"
         - number: 2
           part_start:  "{{ swap_size }}GiB"
+      tags: disk-label
 
     # Set up swap on `swap_device`
-    - swap
+    - role: swap
+      tags: swap
 
     # Set up ext4 fs on data partition
     - role: mkfs-ext4
       device: "{{data_volume_device}}"
       mount_path: "{{data_volume_path}}"
+      tags: data-volume
