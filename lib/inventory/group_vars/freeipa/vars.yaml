@@ -13,10 +13,10 @@ freeipa_network_addr: "{{freeipa_network_prefix}}.2"
 
 # FreeIPA data volume
 freeipa_volume_path:  "/media/freeipa"
-freeipa_volume_block_device:  "{{ block_device_path_pat %
-                                   ( '%s-freeipa' % hostname ) }}"
+freeipa_volume_block_device:  "{{ block_device_path_pat % 'freeipa' }}"
 freeipa_volume_device:  "{{freeipa_volume_block_device}}-part1"
 freeipa_volume_size: 1
+freeipa_block_storage_name: "{{ block_storage_name_pat % freeipa }}"
 
 # FreeIPA server/replica container
 freeipa_hostname: "ipa"

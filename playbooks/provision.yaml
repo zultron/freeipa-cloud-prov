@@ -12,11 +12,21 @@
   roles:
     # Generate cloud-config for next step
     - role: coreos-cloud-config
-      tags: coreos-cloud-config
+      tags: create-droplet
 
-    # Create DigitalOcean droplets
+    # Create DigitalOcean droplet
     - role: digitalocean-droplet-create
-      tags: digitalocean
+      tags: create-droplet
+
+    # Update /etc/hosts with new droplet
+    - role: local-etc-hosts
+      tags: create-droplet
+
+    # Create data volume
+    - role: digitalocean-block-storage
+      volume_name: "{{data_volume_name}}"
+      volume_size: "{{data_volume_size}}"
+      tags: create-droplet
 
 ############################################
 - name: Bootstrap ansible on CoreOS
@@ -31,16 +41,12 @@
     PATH: "/usr/sbin:/usr/bin:/home/core/bin"
 
   roles:
-    # Update /etc/hosts with new droplets
-    - role: local-etc-hosts
-      tags: local-etc-hosts
-
     # Install python and modules needed by Ansible
     - role: defunctzombie.coreos-bootstrap
       tags: coreos-bootstrap-python
 
     - role: coreos-ansible
-      tags: coreos-ansible
+      tags: coreos-bootstrap-python
 
 ############################################
 - name: Configure CoreOS block storage
@@ -64,11 +70,11 @@
           part_end:  "{{ swap_size }}GiB"
         - number: 2
           part_start:  "{{ swap_size }}GiB"
-      tags: disk-label
+      tags: data-volume
 
     # Set up swap on `swap_device`
     - role: swap
-      tags: swap
+      tags: data-volume
 
     # Set up ext4 fs on data partition
     - role: mkfs-ext4

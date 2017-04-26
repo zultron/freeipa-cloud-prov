@@ -59,42 +59,8 @@
   debug:
     msg: "{{hostname}} IP={{droplet_ip}}; ID={{droplet_id}}"
 
-##############################################
-# Create and attach block storage
-
-- name: ensure block storage volume <host>_data exists
-  digital_ocean_block_storage:
-    volume_name: "{{ data_volume_name }}"
-    description: "data volume for {{ hostname }}"
-    state: present
-    command: create
-    api_token:  "{{ do_token }}"
-    region: "{{ region_id }}"
-    block_size: "{{ volume_size }}"
-  register: block_storage_volumes
-
-# - name: debug block storage volume creation
-#   debug:
-#     var: block_storage_volumes
-#     verbosity: 3
-
-- name: attach block storage volume <host>_data to droplet
-  digital_ocean_block_storage:
-    volume_name: "{{ data_volume_name }}"
-    state: present
-    command: attach
-    droplet_id: "{{ droplet_id }}"
-    region: "{{ region_id }}"
-    api_token:  "{{ do_token }}"
-  register: block_storage_attach
-
-# - name: debug block storage volume attach
-#   debug:
-#     var: block_storage_attach
-#     verbosity: 3
-
 - name: Wait for host to come up
   wait_for:
-    host: "{{hostname}}"
+    host: "{{droplet_ip}}"
     port: 22
-  when: do_create.changed
+  # when: do_create.changed

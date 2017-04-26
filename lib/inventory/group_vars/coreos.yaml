@@ -5,7 +5,6 @@
 size_id: 1gb
 image_id: coreos-stable
 region_id: nyc1
-volume_size: 10
 
 # CoreOS login ID
 ansible_ssh_user: core
@@ -44,7 +43,8 @@ docker_tcp_port: "tcp://{{ip_addr}}:2375"
 # Used for swap and etcd2 state
 
 # Data volume block device
-data_volume_block_device:  "{{ block_device_path_pat % data_volume_name }}"
+data_volume_block_device:  "{{ block_device_path_pat % 'data' }}"
+data_volume_size: 4
 
 # Data volume partition
 data_volume_device: "{{ data_volume_block_device }}-part2"

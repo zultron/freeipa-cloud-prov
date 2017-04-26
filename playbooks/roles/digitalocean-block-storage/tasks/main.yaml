@@ -13,9 +13,9 @@
   tags:
     - setup
 
-- name: Ensure block storage volume {{hostname}}-{{volume_name}} exists
+- name: "Ensure block storage volume {{volume_name}} exists"
   digital_ocean_block_storage:
-    volume_name: "{{hostname}}-{{volume_name}}"
+    volume_name: "{{volume_name}}"
     description: "{{volume_name}} volume for {{hostname}}"
     state: present
     command: create
@@ -33,9 +33,9 @@
 #   tags:
 #     - setup
 
-- name: Attach block storage volume {{hostname}}-{{volume_name}} to droplet
+- name: "Attach block storage volume {{volume_name}} to droplet"
   digital_ocean_block_storage:
-    volume_name: "{{hostname}}-{{volume_name}}"
+    volume_name: "{{volume_name}}"
     state: present
     command: attach
     droplet_id: "{{ do_droplet.id }}"
