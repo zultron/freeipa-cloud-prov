@@ -7,7 +7,7 @@
 #   device:  /dev/disk/by-id/myvol
 #   mount_path: /media/myvol
 
-- name:  Create ext4 fs
+- name:  "Create ext4 fs on {{device}}"
   filesystem:
     dev: "{{ device }}"
     fstype: ext4
@@ -22,7 +22,8 @@
 #   tags:
 #     - setup
 
-- name:  Add systemd mount unit
+- name:  "Add systemd mount unit to
+            /etc/systemd/system/{{ mount_path|systemd_escape }}.mount"
   template:
     src: fs.mount.j2
     dest: "/etc/systemd/system/{{ mount_path|systemd_escape }}.mount"
@@ -37,14 +38,14 @@
 #   tags:
 #     - setup
 
-- name: Check mount status
+- name: "Check {{mount_path}} mount status"
   shell: "grep -q ' {{mount_path|quote}} ' /proc/mounts && echo yes || echo no"
   changed_when: false
   register: mount_check
   tags:
     - setup
 
-- name: Mount filesystem
+- name: " Start {{ mount_path|systemd_escape }}.mount service"
   systemd:
     name: "{{ mount_path|systemd_escape }}.mount"
     daemon_reload: yes
