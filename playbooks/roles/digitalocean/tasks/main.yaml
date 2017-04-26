@@ -1,5 +1,0 @@
----
-# DigitalOcean tasks
-
-# Include appropriate tasks
-- include: "{{operation}}.yaml"

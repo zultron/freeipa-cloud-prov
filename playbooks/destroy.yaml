@@ -8,9 +8,5 @@
   gather_facts: False
   connection: local
 
-  vars:
-    operation: destroy
-
   roles:
-    - base
-    - digitalocean
+    - digitalocean-destroy

@@ -1,0 +1,4 @@
+---
+dependencies:
+  - role: ssh-key
+    tags: deps

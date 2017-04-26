@@ -9,17 +9,13 @@
   gather_facts: False
   connection: local
 
-  vars:
-    operation: provision
-
   roles:
-    - role: ssh-key
-      tags: ssh-key
-
+    # Generate cloud-config for next step
     - role: coreos-cloud-config
       tags: coreos-cloud-config
 
-    - role: digitalocean
+    # Create DigitalOcean droplets
+    - role: digitalocean-droplet-create
       tags: digitalocean
 
 ############################################
@@ -51,7 +47,6 @@
   hosts: coreos
 
   vars:
-    operation: configure
     ansible_python_interpreter: /home/core/bin/python
 
   environment:
