@@ -47,9 +47,10 @@ class IPAObjectDiff(object):
     """Compute ansible present, exact, absent state changes for items that
     are dicts of lists
     """
-    def __init__(self, curr, change, method_map, method_trans):
+    def __init__(self, curr, change, method_map, method_trans, action_type):
         self.method_map = method_map
         self.method_trans = method_trans
+        self.action_type = action_type
 
         # Clean up current and change object params
         self.curr = self.clean(curr, translate=True)
@@ -62,9 +63,14 @@ class IPAObjectDiff(object):
                 key = self.method_trans.get(key, None)
             if key not in self.method_map:
                 continue # common arg
+            if self.action_type in self.method_map[key]['when_name']:
+                continue # used as `name` attr; don't compare
             if translate:
                 if self.method_map[key]['value_filter'] is not None:
                     val = self.method_map[key]['value_filter'](val)
+            if self.method_map[key]['type'] == 'str' and isinstance(val, list):
+                # In some find results, string values are still in lists
+                val = val[0] if val else None
             if val is None:
                 continue
             elif self.method_map[key]['type'] == 'list':
@@ -74,25 +80,7 @@ class IPAObjectDiff(object):
                 c[key] = val
         return c
 
-    def op(self, a, b, op, action_type):
-        keys = set(self.method_map.keys())
-        res = {}
-        for key in set(a) | set(b):
-            if key not in keys: continue
-            if self.method_map[key]['type'] != 'list': continue
-            if action_type not in self.method_map[key]['when']: continue
-            # => res_val = a[key] <op> b[key]
-            res_val = list(getattr(set(a.get(key, [])), op)(b.get(key, [])))
-            if res_val: res[key] = res_val
-        return res
-
-    def difference(self, a, b, action_type):
-        return self.op(a, b, 'difference', action_type)
-
-    def intersection(self, a, b, action_type):
-        return self.op(a, b, 'intersection', action_type)
-
-    def mods(self, action_type):
+    def mods(self):
         keys = set(self.method_map.keys())
         res = {}
         for key in self.change:
@@ -101,45 +89,53 @@ class IPAObjectDiff(object):
             # List attributes are handled in exact/present/absent methods
             if self.method_map[key]['type'] == 'list': continue
             # Observe attribute restrictions for add/mod/rem action types
-            if action_type not in self.method_map[key]['when']: continue
+            if self.action_type not in self.method_map[key]['when']: continue
             # Only add keys that don't match requested state
-            if self.change[key] != self.curr.get(key, None): # FIXME are these ever lists?
+            if self.change[key] != self.curr.get(key, None):
                 res[key] = self.change[key]
         return res
 
-    def exact(self, action_type):
+    def op(self, a, b, op):
+        keys = set(self.method_map.keys())
+        res = {}
+        for key in set(a) | set(b):
+            if key not in keys: continue
+            if self.method_map[key]['type'] != 'list': continue
+            if self.action_type not in self.method_map[key]['when']: continue
+            # => res_val = a[key] <op> b[key]
+            res_val = list(getattr(set(a.get(key, [])), op)(b.get(key, [])))
+            if res_val: res[key] = res_val
+        return res
+
+    def exact(self):
         return (
-            self.mods(action_type),                 # scalar params
-            self.difference(self.change, self.curr,
-                            action_type),           # records to add
-            self.difference(self.curr, self.change,
-                            action_type),           # records to del
+            self.mods(),                                     # scalar params
+            self.op(self.change, self.curr, 'difference'),   # records to add
+            self.op(self.curr, self.change, 'difference'),   # records to del
         )
 
-    def present(self, action_type):
+    def present(self):
         return (
-            self.mods(action_type),                 # scalar params
-            self.difference(self.change, self.curr,
-                            action_type),           # records to add
-            {},                                     # records to del
+            self.mods(),                                     # scalar params
+            self.op(self.change, self.curr, 'difference'),   # records to add
+            {},                                              # records to del
         )
 
-    def absent(self, action_type):
+    def absent(self):
         return (
-            {},                                     # scalar params
-            {},                                     # records to add
-            self.intersection(self.change, self.curr,
-                              action_type),         # records to del
+            {},                                              # scalar params
+            {},                                              # records to add
+            self.op(self.change, self.curr, 'intersection'), # records to del
         )
 
-    def enabled(self, action_type):
-        return self.present(action_type)
+    def enabled(self):
+        return self.present()
 
-    def disabled(self, action_type):
-        return self.present(action_type)
+    def disabled(self):
+        return self.present()
 
-    def state(self, state, action_type):
-        return getattr(self, state)(action_type)
+    def state(self, state):
+        return getattr(self, state)()
 
     def list_keys(self):
         return [ k for k in self.change.keys()
@@ -159,14 +155,15 @@ class IPAObjectDiff(object):
         return len(self.scalar_keys() > 0)
 
 class IPAClient(object):
+
+    # Object name: must be overridden
+    name = 'unnamed'
+
     # Diff class:  may be overridden
     diff_class = IPAObjectDiff
 
     # Parameters for finding existing objects:  must be overridden
     #
-    # - search keys for existing objects
-    # find_keys = ['subject', 'cacn']
-    find_keys = []
     # - additional args to add to search
     # extra_find_args = dict(exactly=True)
     extra_find_args = dict()
@@ -177,24 +174,23 @@ class IPAClient(object):
     # Parameters for adding and modifying objects:  must be overridden
     # 
     # - name param (positional) for add/mod operations
-    add_or_mod_key = None
+    add_or_mod_name = None
 
     # Parameters for removing objects:  must be overridden
     # 
     # - name param (positional) for rem operations
     rem_name = None
-    # - other keyword params for rem operations
-    rem_keys = []
 
     # Map method names in base object:  may be overridden
+    # - Pattern will be filled with class `name` attribute
     methods = dict(
-        add = None,
-        rem = None,
-        mod = None,
-        find = None,
-        show = None,
-        enable = None,
-        disable = None,
+        add = '%s_add',
+        rem = '%s_del',
+        mod = '%s_mod',
+        find = '%s_find',
+        show = '%s_show',
+        enable = '%s_enable',
+        disable = '%s_disable',
         )
 
     # Keyword args:  must be overridden
@@ -206,12 +202,20 @@ class IPAClient(object):
 
 
     def __init__(self):
+        self.debug = {}
+
         # Process module parameters
+        self.init_methods()
         self.init_standard_params()
         self.init_kw_args()
 
         # Init module object
         self.init_module()
+
+    def init_methods(self):
+        self.methods = dict(map(
+            lambda x: (x[0],x[1]%self.name),
+            self.__class__.methods.items()))
 
     def init_standard_params(self):
         self.argument_spec = dict(
@@ -240,18 +244,31 @@ class IPAClient(object):
     def init_kw_args(self):
         self.method_map = {}
         self.method_trans = {}
+        self.name_map = {}
+        self.enablekey = None
+        # self.debug['kw_args'] = self.kw_args.copy()
         for name, spec in self.kw_args.items():
+            if isinstance(spec, basestring):  continue
             self.method_map[name] = dict(
+                type = spec['type'],
+                when = (spec.pop('when', ['add', 'mod', 'find']) \
+                        if 'add' not in spec else []),
+                when_name = spec.pop('when_name', []),
+                value_filter = spec.pop('value_filter', None),
+                # For list args
                 add = spec.pop('add', self.methods['add']),
                 rem = spec.pop('rem', self.methods['rem']),
                 mod = spec.pop('mod', self.methods.get('mod',None)),
-                type = spec['type'],
-                when = spec.pop('when', ['add', 'rem', 'mod']),
-                value_filter = spec.pop('value_filter', None),
             )
+            for k in self.method_map[name]['when_name']:
+                self.name_map[k] = name
+            if spec.pop('enablekey',False):
+                self.enablekey = name
             self.argument_spec[name] = spec
             self.method_trans[spec.pop('from_result_attr', name)] = name
                 
+            self.debug['enablekey'] = self.enablekey
+
 
     def param(self, name, default=None):
         return self.module.params.get(name, default)
@@ -262,12 +279,18 @@ class IPAClient(object):
             res[p] = self.param(p)
         return res
 
-    def param_slice(self, action_type, skip_name):
+    def param_slice(self):
         res = {}
+        name = None
         for key, val in self.method_map.items():
-            if key != skip_name and action_type in val['when']:
-                res[key] = self.param(key)
-        return res
+            if key == self.name_map.get(self.action_type, None):
+                name = self.param(key)
+                continue
+            if hasattr(self, 'action_type') \
+               and self.action_type not in val['when']: continue
+            if self.param(key) is None: continue
+            res[key] = self.param(key)
+        return res, name
 
     def init_module(self):
         self.module = AnsibleModule(
@@ -329,7 +352,8 @@ class IPAClient(object):
             item = {}
         url = '%s/session/json' % self.get_base_url()
         data = {'method': method, 'params': [[name], item]}
-        self.debug['data_%s' % method] = data
+        self.debug['data_%s' % method] = data.copy()
+        self.debug['data_%s' % method]['action_type'] = self.action_type
         try:
             resp, info = fetch_url(
                 module=self.module, url=url,
@@ -368,50 +392,69 @@ class IPAClient(object):
             return result
         return None
 
+    def name_attr(self):
+        return ([ k for k,v in self.kw_args.items() \
+                  if self.action_type in v.get('when_name',[])] + [None])[0]
+
+    def name_value(self):
+        return self.param(self.name_attr())
+
     def find(self):
+        self.action_type = 'find'
         item = dict(all=True)
         item.update(self.extra_find_args)
-        for k in self.find_keys:
-            if self.param(k) is not None:
-                item[k] = self.param(k)
+        params, name = self.param_slice()
+        item.update(params)
         self.current_obj = self._post_json(
-            method=self.methods['find'], name=None, item=item,
+            method=self.methods['find'], name=name,
+            item=item,
             item_filter=self.find_filter)
         if self.current_obj:
             self.new_obj = self.current_obj
 
-    def add_or_mod(self, action_type, actions):
-        if action_type not in self.methods:
-            self._fail('Cannot modify existing object')
+    def add_or_mod(self, actions):
+        if self.action_type not in self.methods:
+            self._fail('Cannot %s object' % self.action_type)
 
         self.changed = True
         if self.module.check_mode: return
         
+        params, name = self.param_slice()
+
         self.new_obj = self._post_json(
-            method=self.methods[action_type],
-            name=(actions.pop(self.add_or_mod_key)
-                  if self.add_or_mod_key else None),
+            method=self.methods[self.action_type],
+            name=name,
+            # FIXME this should be params?
             item=actions)
         
+    @property
+    def is_enabled(self):
+        enabled = self.current_obj[self.enablekey]
+        if isinstance(enabled, list):
+            enabled = enabled[0] if enabled else False
+        if isinstance(enabled, basestring):
+            enabled = (enabled.lower() == 'true')
+        return enabled
+
     def enable(self):
-        if self.current_obj['ipaenabledflag']: return
+        if self.is_enabled: return
 
         self.changed = True
         if self.module.check_mode: return
 
         self.new_obj = self._post_json(
             method=self.methods['enable'],
-            name=self.param(self.add_or_mod_key))
+            name=self.param(self.name_map['add']))
 
     def disable(self):
-        if not self.current_obj['ipaenabledflag']: return
+        if not self.is_enabled: return
 
         self.changed = True
         if self.module.check_mode: return
 
         self.new_obj = self._post_json(
             method=self.methods['disable'],
-            name=self.param(self.add_or_mod_key))
+            name=self.param(self.name_map['add']))
 
     def rem(self):
         self.changed = True
@@ -423,11 +466,12 @@ class IPAClient(object):
             name=self.param(self.rem_name) or self.current_obj[self.rem_name]
         else:
             name=None
+        params, name = self.param_slice()
         self.new_obj = self._post_json(
             method=self.methods['rem'],
             name=name,
             # item=self.param_slice(self.rem_keys))
-            item=self.param_slice('rem', self.rem_name))
+            item=params)
 
     def list_mod(self, name, method, action):
         self.changed = True
@@ -438,34 +482,34 @@ class IPAClient(object):
 
 
     def ensure(self):
-        self.debug = dict(
+        self.debug.update(dict(
             argument_spec = self.argument_spec,
             module_params = self.module.params,
             # method_map = self.method_map,
-        )
+        ))
 
         # Find any existing objects
         self.find()
 
-        # Create difference object
-        self.diff = self.diff_class(
-            self.current_obj, self.module.params, self.method_map,
-            self.method_trans,
-        )
-        self.debug['diff_curr'] = self.diff.curr
-        self.debug['diff_change'] = self.diff.change
-
         # Figure out which of add/mod/rem
         if self.state in ('present', 'exact', 'enabled', 'disabled'):
             # Adding items to new object or existing object?
-            action_type_scalar = 'mod' if self.current_obj else 'add'
+            self.action_type = 'mod' if self.current_obj else 'add'
+            self.diff = self.diff_class(
+                self.current_obj, self.module.params, self.method_map,
+                self.method_trans, self.action_type,
+            )
+            self.debug['action_type'] = 'mod' if self.current_obj else 'add'
 
         else: # state == 'absent'
             if self.current_obj:
-                if self.diff.has_list_keys():
-                    # Existing object and absent list keys requested
-                    action_type_scalar = 'mod'
-                else:
+                # Existing object
+                self.action_type = 'rem'
+                self.diff = self.diff_class(
+                    self.current_obj, self.module.params, self.method_map,
+                    self.method_trans, self.action_type,
+                )
+                if not self.diff.has_list_keys():
                     # Existing object and no absent list key
                     # requested: remove whole object
                     self.rem()
@@ -476,26 +520,23 @@ class IPAClient(object):
 
         # Compute list of items to modify/add/delete
         actions_scalar, actions_add, actions_rem = self.diff.state(
-            self.state, action_type_scalar)
+            self.state)
 
+        self.debug['diff_curr'] = self.diff.curr
+        self.debug['diff_change'] = self.diff.change
         self.debug['actions_scalar'] = actions_scalar
         self.debug['actions_add'] = actions_add
         self.debug['actions_rem'] = actions_rem
-        self.debug['action_type_scalar'] = action_type_scalar
 
-        # Compile list of changes; each change is a tuple:
-        # (method_name,
-        #  { attr1 : [ val1, val2 ],
-        #    attr2 : [ val3 ],
-        #  })
-        changes = []
+        # Effect changes
+        # - All but 'rem' changes effected here
 
         # Scalars first; they may bring base object into existence
         if actions_scalar:
-            self.add_or_mod(
-                action_type_scalar, actions_scalar)
+            self.debug['actions_scalar_add_or_mod'] = actions_scalar.copy()
+            self.add_or_mod(actions_scalar)
 
-        # Enabled/disabled
+        # Enable/disable
         if self.state == 'enabled':
             self.enable()
         if self.state == 'disabled':
@@ -512,7 +553,7 @@ class IPAClient(object):
                     self.method_map[key][method_type], {})[key] = val
             for method, action in action_map.items():
                 self.list_mod(
-                    name=self.param(self.add_or_mod_key),
+                    name=self.param(self.add_or_mod_name),
                     method=method, action=action)
 
         return self.changed, self.new_obj
