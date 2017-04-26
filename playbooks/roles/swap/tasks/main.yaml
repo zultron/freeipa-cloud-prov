@@ -6,7 +6,7 @@
 ##############################
 # Check swap status
 
-- name:  Get canonical device path
+- name:  "Get canonical device path of {{swap_device}}"
   shell: "readlink -f {{ swap_device|quote }}"
   register: swap_device_canon_cmd
   # Never report "changed"
@@ -16,11 +16,11 @@
 #   debug:
 #     var: swap_device_canon_cmd
 
-- name:  Set swap_device_canon fact
+- name:  "Set swap_device_canon fact to {{ swap_device_canon_cmd.stdout }}"
   set_fact:
     swap_device_canon:  "{{ swap_device_canon_cmd.stdout }}"
 
-- name:  Check if already swapping to device
+- name:  "Check if already swapping to device {{swap_device_canon}}"
   shell:  "swapon -s | grep -q '{{ swap_device_canon|quote }}'
             && echo 'swapping' || echo 'not swapping'"
   register:  swap_status_cmd
@@ -30,18 +30,18 @@
 #   debug:
 #     var: swap_status_cmd
 
-- name:  Set is_swapping fact
+- name:  "Set is_swapping fact to {{ swap_status_cmd.stdout == 'swapping' }}"
   set_fact:
     is_swapping:  "{{ swap_status_cmd.stdout == 'swapping' }}"
 
-- name: Debug swap facts
-  debug:
-    msg: "Swap device = {{swap_device_canon}}; is_swapping = {{is_swapping}}"
+# - name: Debug swap facts
+#   debug:
+#     msg: "Swap device = {{swap_device_canon}}; is_swapping = {{is_swapping}}"
 
 - block:
     # Stuff to do if the swap device isn't swapping
 
-    - name:  Format swap partition
+    - name:  "Format swap partition {{ swap_device_canon }}"
       command: "mkswap {{ swap_device_canon }}"
       become: true
       register:  mkswap_cmd
@@ -50,7 +50,7 @@
     #   debug:
     #     var:  mkswap_cmd
 
-    - name:  Swap on swap partition
+    - name:  "Swap on swap partition {{ swap_device_canon }}"
       command:  "swapon {{ swap_device_canon }}"
       become: true
       register:  swapon_cmd
@@ -59,7 +59,7 @@
     #   debug:
     #     var:  swapon_cmd
 
-    - name:  Verify swapon status
+    - name:  "Verify swapon status of device {{ swap_device_canon }}"
       shell:  "swapon -s | grep -q '{{ swap_device_canon|quote }}'
                 && echo 'swapping' || echo 'not swapping'"
       register:  verify_swap_status_cmd
