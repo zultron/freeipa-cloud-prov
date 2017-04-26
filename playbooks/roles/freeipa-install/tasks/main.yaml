@@ -20,7 +20,7 @@
   docker_network:
     name: ipa
     driver_options:
-      com.docker.network.bridge.name: freeipa
+      com.docker.network.bridge.name: ipa
     ipam_options:
       subnet: "{{freeipa_network_cidr}}"
       gateway: "{{freeipa_network_gateway}}"
