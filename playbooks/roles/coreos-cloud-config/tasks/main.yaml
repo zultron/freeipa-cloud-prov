@@ -5,8 +5,10 @@
 - name: generate cloud-config
   set_fact:
     user_data: "{{ lookup('template', 'cloud-config.yaml.j2') }}"
+  tags: cloud-config
 
-# - name: debug cloud-config
-#   debug:
-#     var: user_data
-#     verbosity: 2
+- name: debug cloud-config
+  debug:
+    var: user_data
+    verbosity: 1
+  tags: debug-cloud-config

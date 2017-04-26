@@ -38,6 +38,15 @@
 #   tags:
 #     - setup
 
+- name: "Install {{ mount_path|systemd_escape }}.mount service"
+  systemd:
+    name: "{{ mount_path|systemd_escape }}.mount"
+    daemon_reload: yes
+    enabled: yes
+  become: true
+  tags:
+    - setup
+
 - name: "Check {{mount_path}} mount status"
   shell: "grep -q ' {{mount_path|quote}} ' /proc/mounts && echo yes || echo no"
   changed_when: false
@@ -45,10 +54,9 @@
   tags:
     - setup
 
-- name: " Start {{ mount_path|systemd_escape }}.mount service"
+- name: "Start {{ mount_path|systemd_escape }}.mount service"
   systemd:
     name: "{{ mount_path|systemd_escape }}.mount"
-    daemon_reload: yes
     state: restarted
   become: true
   when: mount_check.stdout == 'no'

@@ -15,8 +15,9 @@
   roles:
     # Create and attach block storage
     - role: digitalocean-block-storage
-      volume_name: freeipa
+      volume_name: "{{freeipa_block_storage_name}}"
       volume_size: "{{freeipa_volume_size}}"
+      tags: freeipa-volume
 
     # Label and partition block device
     - role: disk-label
@@ -24,18 +25,23 @@
       device: "{{freeipa_volume_block_device}}"
       partitions:
         - number: 1
+      tags: freeipa-volume
 
     # Make ext4 fs on data partition and install+start systemd mount
     # service
     - role: mkfs-ext4
       device: "{{freeipa_volume_device}}"
       mount_path: "{{freeipa_volume_path}}"
+      tags: freeipa-volume
 
     # Install FreeIPA
     - role: freeipa-install
+      tags: freeipa-install
 
     # Install SSL certs locally
     - role: local-ca-certs
+      tags: freeipa-install
 
     # Install FreeIPA client
     - role: freeipa-client-install
+      tags: freeipa-install
