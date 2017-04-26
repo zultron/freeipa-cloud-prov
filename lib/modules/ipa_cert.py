@@ -33,7 +33,7 @@ options:
   serial_number:
     description: Cert serial number; used for C(state=absent) to revoke a cert
   revocation_reason:
-    description: Reason for revoking cert
+    description: Reason for revoking cert (See legend with C(ipa help cert))
     required: false
     default: 0
     choices: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
@@ -105,15 +105,17 @@ from ipa import IPAClient, IPAObjectDiff
 
 import re
 
-class CertDiff(IPAObjectDiff):
-    def enabled(self, action_type):
-        if action_type == 'mod':
-            # Existing certs are immutable
-            return [{}, {}, {}]
-        return super(CertDiff, self).enabled(action_type)
-
 class CertClient(IPAClient):
-    diff_class = CertDiff
+
+    # Searching for existing objects
+    find_keys = ['subject', 'cacn']
+    extra_find_args = dict(exactly=True)
+    find_filter = lambda self,x: (x['status'] == 'VALID')
+    # Parameters for adding and modifying objects
+    add_or_mod_key = 'req'
+    # Parameters for removing objects
+    rem_name = 'serial_number'
+    rem_keys = ['cacn','revocation_reason']
 
     methods = dict(
         add = 'cert_request',
@@ -121,64 +123,29 @@ class CertClient(IPAClient):
         find = 'cert_find',
         show = 'cert_show',
     )
-    pos_args = [
-        dict(name = 'serial_number', # cert-revoke
-             spec = dict(type='str', required=False, aliases=['name'],
-                         when=['rem'])),
-        # serial_number?
-        dict(name = 'req', # cert-request
-             spec = dict(type='str', required=False, aliases=['name'],
-                         when=['add'])),
-    ]
-    find_keys = ['subject', 'cacn']
-    extra_find_args = dict(exactly=True)
-    find_filter = lambda self,x: (x['status'] == 'VALID')
-    rem_key = 'serial_number'
-    add_or_mod_key = 'req'
 
+    # 'subject' param goes in as 'host1' but comes out 'CN=host1,O=EXAMPLE.COM'
     dn_to_cn_re = re.compile(r'CN=([^,]*),')
     def dn_to_cn(x):
         m = CertClient.dn_to_cn_re.match(x)
         return m.group(1) if m else None
 
     kw_args = dict(
-        # Subject is required for searching
-        subject = dict(
-            type='str', required=True, when=[], filt=dn_to_cn),
-        # "request" and "revoke" params
+        # common params
+        principal = dict(
+            type='str', required=True, when=['add'],
+            value_filter=dn_to_cn, from_result_attr='subject'),
         cacn = dict(
             type='str', default='ipa'),
         # "request" params
-        principal = dict(
+        req = dict(
             type='str', required=False, when=['add']),
         # "revoke" params
         revocation_reason = dict(
-            type='int', required=False, choices=range(11), when=['rem']),
+            type='int', required=False, when=['rem'], choices=range(11)),
+        serial_number = dict(
+            type='str', required=False, when=['rem']),
     )
-
-    def add_or_mod(self, action_type, actions):
-        item = dict( principal=self.param('subject') )
-        if self.param('cacn') is not None:
-            item['cacn'] = self.param('cacn')
-        return self._post_json(
-            method="cert_request",
-            name=self.param('req'),
-            item=item,
-        )
-
-    def rem(self):
-        item = dict(
-            revocation_reason = self.param('revocation_reason', '0'),
-        )
-        if self.param('cacn') is not None:
-            item['cacn'] = self.param('cacn')
-        rem_data = dict(
-            method="cert_revoke",
-            name=self.param('serial_number') or self.ipa_obj['serial_number'],
-            item=item,
-        )
-        self.debug['rem_data'] = rem_data
-        return self._post_json(**rem_data)
 
 def main():
     client = CertClient()
@@ -188,8 +155,8 @@ def main():
     client.module.exit_json(changed=changed, cert=cert, debug=client.debug)
     # try:
     #     client.login()
-    #     changed, ca = client.ensure()
-    #     client.module.exit_json(changed=changed, ca=ca)
+    #     changed, cert = client.ensure()
+    #     client.module.exit_json(changed=changed, cert=cert)
     # except Exception:
     #     e = get_exception()
     #     client.module.fail_json(msg=str(e), debug=client.debug)

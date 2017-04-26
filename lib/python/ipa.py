@@ -47,10 +47,9 @@ class IPAObjectDiff(object):
     """Compute ansible present, exact, absent state changes for items that
     are dicts of lists
     """
-    def __init__(self, curr, change, method_map, method_trans, method_filt):
+    def __init__(self, curr, change, method_map, method_trans):
         self.method_map = method_map
         self.method_trans = method_trans
-        self.method_filt = method_filt
 
         # Clean up current and change object params
         self.curr = self.clean(curr, translate=True)
@@ -61,11 +60,13 @@ class IPAObjectDiff(object):
         for key, val in dirty.items():
             if translate:
                 key = self.method_trans.get(key, None)
-                val = self.method_filt.get(key, lambda x: x)(val)
+            if key not in self.method_map:
+                continue # common arg
+            if translate:
+                if self.method_map[key]['value_filter'] is not None:
+                    val = self.method_map[key]['value_filter'](val)
             if val is None:
                 continue
-            elif key not in self.method_map:
-                continue # common arg
             elif self.method_map[key]['type'] == 'list':
                 # Allow single list args to be provided as strings
                 c[key] = [val,] if isinstance(val, basestring) else val
@@ -158,10 +159,34 @@ class IPAObjectDiff(object):
         return len(self.scalar_keys() > 0)
 
 class IPAClient(object):
-    # Allow diff class to be overridden
+    # Diff class:  may be overridden
     diff_class = IPAObjectDiff
 
-    # Override:  Map method names in base object
+    # Parameters for finding existing objects:  must be overridden
+    #
+    # - search keys for existing objects
+    # find_keys = ['subject', 'cacn']
+    find_keys = []
+    # - additional args to add to search
+    # extra_find_args = dict(exactly=True)
+    extra_find_args = dict()
+    # - for list results, a function to select relevant results
+    # find_filter = lambda x: [...]
+    find_filter = None
+
+    # Parameters for adding and modifying objects:  must be overridden
+    # 
+    # - name param (positional) for add/mod operations
+    add_or_mod_key = None
+
+    # Parameters for removing objects:  must be overridden
+    # 
+    # - name param (positional) for rem operations
+    rem_name = None
+    # - other keyword params for rem operations
+    rem_keys = []
+
+    # Map method names in base object:  may be overridden
     methods = dict(
         add = None,
         rem = None,
@@ -172,25 +197,17 @@ class IPAClient(object):
         disable = None,
         )
 
-    # Override:  Positional args
-    pos_args = [
-        dict(name = 'arg1',
-             spec = dict(type='str', required=True, aliases=['name'])),
-    ]
-    
-    # Override: Keyword args
-    kw_args = dict(
-        description = dict(
-            type='str', required=False),
-    )
+    # Keyword args:  must be overridden
+    # kw_args = dict(
+    #     description = dict(
+    #         type='str', required=False),
+    # )
+    kw_args = dict()
 
-    extra_find_args = dict()
-    find_filter = None
 
     def __init__(self):
         # Process module parameters
         self.init_standard_params()
-        self.init_pos_args()
         self.init_kw_args()
 
         # Init module object
@@ -198,51 +215,59 @@ class IPAClient(object):
 
     def init_standard_params(self):
         self.argument_spec = dict(
-            state=dict(type='str', required=False, default='present',
-                       choices=['present', 'absent', 'exact'] +
-                       (['enabled', 'disabled'] if 'enable' in self.methods
-                        else [])),
-            ipa_prot=dict(type='str', required=False, default='https',
-                          choices=['http', 'https']),
-            ipa_host=dict(type='str', required=False,
-                          default='ipa.example.com'),
-            ipa_port=dict(type='int', required=False, default=443),
-            ipa_user=dict(type='str', required=False, default='admin'),
-            ipa_pass=dict(type='str', required=True, no_log=True),
-            validate_certs=dict(type='bool', required=False, default=True),
+            state=dict(
+                type='str', required=False, default='present',
+                choices=(['present', 'absent']
+                         + (['exact'] if 'mod' in self.methods else [])
+                         + (['enabled', 'disabled'] if 'enable' in self.methods
+                            else []))),
+            ipa_prot=dict(
+                type='str', required=False, default='https',
+                choices=['http', 'https']),
+            ipa_host=dict(
+                type='str', required=False,
+                default='ipa.example.com'),
+            ipa_port=dict(
+                type='int', required=False, default=443),
+            ipa_user=dict(
+                type='str', required=False, default='admin'),
+            ipa_pass=dict(
+                type='str', required=True, no_log=True),
+            validate_certs=dict(
+                type='bool', required=False, default=True),
         )
-
-    def init_pos_args(self):
-        self.scalar_method_map = {}
-        for a in self.pos_args:
-            name = a['name']
-            self.argument_spec[name] = a['spec']
-            self.scalar_method_map[name] = dict(
-                add = self.methods['add'],
-                rem = self.methods['rem'],
-                mod = self.methods.get('mod',None),
-                when = a.pop('when', ['add', 'rem', 'mod']),
-            )
 
     def init_kw_args(self):
         self.method_map = {}
         self.method_trans = {}
-        self.method_filt = {}
         for name, spec in self.kw_args.items():
-            self.argument_spec[name] = spec
             self.method_map[name] = dict(
                 add = spec.pop('add', self.methods['add']),
                 rem = spec.pop('rem', self.methods['rem']),
                 mod = spec.pop('mod', self.methods.get('mod',None)),
                 type = spec['type'],
                 when = spec.pop('when', ['add', 'rem', 'mod']),
+                value_filter = spec.pop('value_filter', None),
             )
-            self.method_trans[spec.pop('ipa_name', name)] = name
-            self.method_filt[name] = spec.pop('filt', lambda x: x)
+            self.argument_spec[name] = spec
+            self.method_trans[spec.pop('from_result_attr', name)] = name
                 
 
     def param(self, name, default=None):
         return self.module.params.get(name, default)
+
+    def param_slice_old(self, params):
+        res = {}
+        for p in params:
+            res[p] = self.param(p)
+        return res
+
+    def param_slice(self, action_type, skip_name):
+        res = {}
+        for key, val in self.method_map.items():
+            if key != skip_name and action_type in val['when']:
+                res[key] = self.param(key)
+        return res
 
     def init_module(self):
         self.module = AnsibleModule(
@@ -257,6 +282,8 @@ class IPAClient(object):
         self.password = self.param('ipa_pass')
         self.headers = None
         self.state = self.param('state')
+        self.changed = False
+        self.new_obj = {}
 
     def get_base_url(self):
         return '%s://%s/ipa' % (self.protocol, self.host)
@@ -302,7 +329,7 @@ class IPAClient(object):
             item = {}
         url = '%s/session/json' % self.get_base_url()
         data = {'method': method, 'params': [[name], item]}
-        self.debug['data'] = data
+        self.debug['data_%s' % method] = data
         try:
             resp, info = fetch_url(
                 module=self.module, url=url,
@@ -332,13 +359,12 @@ class IPAClient(object):
             result = resp.get('result')
             if 'result' in result:
                 result = result.get('result')
-                if isinstance(result, list) and item_filter is not None:
-                    result = [ i for i in result if item_filter(i) ]
                 if isinstance(result, list):
-                    if len(result) > 0:
-                        return result[0]
-                    else:
-                        return {}
+                    if item_filter is not None:
+                        result = [ i for i in result if item_filter(i) ]
+                    self.debug['result_%s' % method] = result
+                    return (result[-1] if len(result) > 0 else {})
+            self.debug['result_%s' % method] = result
             return result
         return None
 
@@ -348,68 +374,108 @@ class IPAClient(object):
         for k in self.find_keys:
             if self.param(k) is not None:
                 item[k] = self.param(k)
-        self.debug['find_data'] = dict(
-            method=self.methods['find'], name=None, item=item)
-        return self._post_json(
+        self.current_obj = self._post_json(
             method=self.methods['find'], name=None, item=item,
             item_filter=self.find_filter)
+        if self.current_obj:
+            self.new_obj = self.current_obj
 
     def add_or_mod(self, action_type, actions):
-        return self._post_json(
+        if action_type not in self.methods:
+            self._fail('Cannot modify existing object')
+
+        self.changed = True
+        if self.module.check_mode: return
+        
+        self.new_obj = self._post_json(
             method=self.methods[action_type],
-            name=self.param(self.add_or_mod_key),
+            name=(actions.pop(self.add_or_mod_key)
+                  if self.add_or_mod_key else None),
             item=actions)
         
+    def enable(self):
+        if self.current_obj['ipaenabledflag']: return
+
+        self.changed = True
+        if self.module.check_mode: return
+
+        self.new_obj = self._post_json(
+            method=self.methods['enable'],
+            name=self.param(self.add_or_mod_key))
+
+    def disable(self):
+        if not self.current_obj['ipaenabledflag']: return
+
+        self.changed = True
+        if self.module.check_mode: return
+
+        self.new_obj = self._post_json(
+            method=self.methods['disable'],
+            name=self.param(self.add_or_mod_key))
+
     def rem(self):
-        return self._post_json(
-            method=self.methods['rem'], name=self.param(self.rem_key))
+        self.changed = True
+        if self.module.check_mode: return
+
+        if self.rem_name is not None:
+            # When removing, sometimes the object key is only in the
+            # find() results
+            name=self.param(self.rem_name) or self.current_obj[self.rem_name]
+        else:
+            name=None
+        self.new_obj = self._post_json(
+            method=self.methods['rem'],
+            name=name,
+            # item=self.param_slice(self.rem_keys))
+            item=self.param_slice('rem', self.rem_name))
+
+    def list_mod(self, name, method, action):
+        self.changed = True
+        if self.module.check_mode: return
+
+        self.new_obj = self._post_json(
+            method=method, name=name, item=action)
 
 
     def ensure(self):
         self.debug = dict(
             argument_spec = self.argument_spec,
             module_params = self.module.params,
-            method_map = self.method_map,
+            # method_map = self.method_map,
         )
 
-        self.ipa_obj = self.find()
-        self.debug['ipa_obj'] = self.ipa_obj
+        # Find any existing objects
+        self.find()
 
-        d = self.diff_class(
-            self.ipa_obj, self.module.params, self.method_map,
-            self.method_trans, self.method_filt,
+        # Create difference object
+        self.diff = self.diff_class(
+            self.current_obj, self.module.params, self.method_map,
+            self.method_trans,
         )
-        self.debug['diff_curr'] = d.curr
-        self.debug['diff_change'] = d.change
+        self.debug['diff_curr'] = self.diff.curr
+        self.debug['diff_change'] = self.diff.change
 
-        action_enable = False
-        action_disable = False
-
-        # Compute changes
+        # Figure out which of add/mod/rem
         if self.state in ('present', 'exact', 'enabled', 'disabled'):
-
             # Adding items to new object or existing object?
-            action_type_scalar = 'mod' if self.ipa_obj else 'add'
+            action_type_scalar = 'mod' if self.current_obj else 'add'
 
         else: # state == 'absent'
-            if self.ipa_obj:
-                if not d.has_list_keys():
-                    # No list items supplied
-                    if not self.module.check_mode:
-                        # Remove existing object
-                        return True, self.rem()
-                    else:
-                        # Or do nothing in check mode
-                        return True, self.ipa_obj
-                else:
-                    # Existing object
+            if self.current_obj:
+                if self.diff.has_list_keys():
+                    # Existing object and absent list keys requested
                     action_type_scalar = 'mod'
+                else:
+                    # Existing object and no absent list key
+                    # requested: remove whole object
+                    self.rem()
+                    return self.changed, self.new_obj
             else:
-                # Do nothing with non-existent object
-                return False, self.ipa_obj
+                # Object is already absent; do nothing
+                return self.changed, self.new_obj
 
         # Compute list of items to modify/add/delete
-        actions_scalar, actions_add, actions_rem = d.state(
+        actions_scalar, actions_add, actions_rem = self.diff.state(
             self.state, action_type_scalar)
 
         self.debug['actions_scalar'] = actions_scalar
@@ -423,30 +489,21 @@ class IPAClient(object):
         #    attr2 : [ val3 ],
         #  })
         changes = []
-        changed = False
 
         # Scalars first; they may bring base object into existence
         if actions_scalar:
-            changed = True
-            if not self.module.check_mode:
-                self.ipa_obj = self.add_or_mod(
-                    action_type_scalar, actions_scalar)
-                self.debug['add_or_mod'] = self.ipa_obj
+            self.add_or_mod(
+                action_type_scalar, actions_scalar)
 
         # Enabled/disabled
-        if self.state == 'enabled' and not self.ipa_obj['ipaenabledflag']:
-            self.ipa_obj = changes.append(dict(
-                method=self.methods['enable'],
-                name=self.param(self.add_or_mod_key)))
-            self.debug['enabled'] = self.ipa_obj
-        if self.state == 'disabled' and self.ipa_obj['ipaenabledflag']:
-            self.ipa_obj = changes.append(dict(
-                method=self.methods['disable'],
-                name=self.param(self.add_or_mod_key)))
-            self.debug['enabled'] = self.ipa_obj
+        if self.state == 'enabled':
+            self.enable()
+        if self.state == 'disabled':
+            self.disable()
 
-        # Add list add/remove actions grouped by method; additions come
-        # first, since removals may inadvertently delete object
+        # List parameter add/remove actions grouped by method;
+        # additions come first, since removals may inadvertently
+        # delete object
         for method_type, actions in (('add', actions_add),
                                      ('rem', actions_rem)):
             action_map = {}
@@ -454,20 +511,9 @@ class IPAClient(object):
                 action_map.setdefault(
                     self.method_map[key][method_type], {})[key] = val
             for method, action in action_map.items():
-                changes.append(dict(
-                    method=method,
+                self.list_mod(
                     name=self.param(self.add_or_mod_key),
-                    item=action))
+                    method=method, action=action)
 
-        self.debug['changes'] = changes
-
-        # Effect changes
-        res = {}
-        if not self.module.check_mode:
-            for c in changes:
-                self.ipa_obj = self._post_json(**c)
-                res[c['method']] = self.ipa_obj
-        changed |= (len(changes) > 0) and (not self.module.check_mode)
-
-        return changed, res[-1] if res else None
+        return self.changed, self.new_obj
 
