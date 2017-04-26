@@ -1,5 +1,5 @@
 ---
-# basic provisioning tasks
+# SSH key
 
 - name: ensure SSH key exists at ~/.ssh/id_rsa
   user:
