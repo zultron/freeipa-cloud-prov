@@ -8,5 +8,10 @@
   gather_facts: False
   connection: local
 
+  vars_prompt:
+  - name: confirm
+    prompt: "Really destroy droplet(s)? Enter `yes` to confirm"
+
   roles:
-    - digitalocean-destroy
+    - role: digitalocean-droplet-destroy
+      when: confirm == 'yes'

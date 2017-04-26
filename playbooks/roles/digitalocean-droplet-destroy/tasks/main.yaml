@@ -2,9 +2,9 @@
 # DigitalOcean:  droplet destruction tasks
 
 
-- name: Refuse to destroy droplet if 'confirm' is not set
-  fail: msg="Please set '-e confirm=1' to destroy droplet"
-  when: not confirm|default(False)
+- name: "Refuse to destroy droplet if 'confirm' is not set to 'yes'"
+  fail: msg="Please set '-e confirm=yes' to destroy droplet"
+  when: confirm|default('no') != 'yes'
 
 - name:  Destroy droplet
   digital_ocean:
@@ -14,8 +14,8 @@
     unique_name: yes
     api_token:  "{{ do_token }}"
 
-- name:  Destroy ansible cached data
+- name:  "Destroy ansible cached data in var/cache/{{hostname}}"
   file:
-    path: "cache/{{hostname}}"
+    path: "../var/cache/{{hostname}}"
     state: absent
   delegate_to: localhost
