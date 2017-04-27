@@ -93,8 +93,8 @@ EXAMPLES = '''
 '''
 
 RETURN = '''
-ca:
-  description: ca as returned by IPA API
+cert:
+  description: cert as returned by IPA API
   returned: always
   type: dict
 '''
@@ -107,15 +107,16 @@ import re
 
 class CertClient(IPAClient):
 
+    # Object name
+    name = 'cert'
+
     # Searching for existing objects
-    find_keys = ['subject', 'cacn']
     extra_find_args = dict(exactly=True)
     find_filter = lambda self,x: (x['status'] == 'VALID')
     # Parameters for adding and modifying objects
-    add_or_mod_key = 'req'
+    add_or_mod_name = 'req'
     # Parameters for removing objects
     rem_name = 'serial_number'
-    rem_keys = ['cacn','revocation_reason']
 
     methods = dict(
         add = 'cert_request',
@@ -133,7 +134,7 @@ class CertClient(IPAClient):
     kw_args = dict(
         # common params
         principal = dict(
-            type='str', required=True, when=['add'],
+            type='str', required=True, when=['add', 'find'],
             value_filter=dn_to_cn, from_result_attr='subject'),
         cacn = dict(
             type='str', default='ipa'),
@@ -151,12 +152,22 @@ def main():
     client = CertClient()
 
     client.login()
-    changed, cert = client.ensure()
-    client.module.exit_json(changed=changed, cert=cert, debug=client.debug)
+    changed, obj = client.ensure()
+    result = {
+        'changed': changed,
+        client.name: obj,
+        'debug': client.debug,
+    }
+    client.module.exit_json(**result)
     # try:
     #     client.login()
-    #     changed, cert = client.ensure()
-    #     client.module.exit_json(changed=changed, cert=cert)
+    #     changed, obj = client.ensure()
+    #     result = {
+    #         'changed': changed,
+    #         client.name: obj,
+    #         'debug': client.debug,
+    #     }
+    #     client.module.exit_json(**result)
     # except Exception:
     #     e = get_exception()
     #     client.module.fail_json(msg=str(e), debug=client.debug)
