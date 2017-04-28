@@ -128,7 +128,7 @@ dnszone:
 '''
 
 from ansible.module_utils.pycompat24 import get_exception
-from ipa import IPAClient
+from ansible.module_utils.ipa import IPAClient
 
 
 class DNSZoneIPAClient(IPAClient):
