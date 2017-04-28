@@ -128,7 +128,7 @@ dnszone:
 '''
 
 from ansible.module_utils.pycompat24 import get_exception
-from ansible.module_utils.ipa import IPAClient
+from ipa import IPAClient
 
 
 class DNSZoneIPAClient(IPAClient):
@@ -138,7 +138,8 @@ class DNSZoneIPAClient(IPAClient):
         # common params
         idnsname = dict(
             type='str', required=True,
-            aliases=['name'], when_name=['add', 'mod','rem'], when=['find']),
+            aliases=['name'], when=['find'],
+            when_name=['add','mod','rem','enabled','disabled']),
         idnssoarname = dict(
             type='str', required=False),
         idnssoamname = dict(
