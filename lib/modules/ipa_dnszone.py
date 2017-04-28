@@ -127,17 +127,14 @@ dnszone:
   type: dict
 '''
 
-from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.pycompat24 import get_exception
-# from ansible.module_utils.ipa import IPAClient
-from ipa import IPAClient, IPAObjectDiff
+from ipa import IPAClient
 
 
 class DNSZoneIPAClient(IPAClient):
     name = 'dnszone'
 
     kw_args = dict(
-        # common params
         idnsname = dict(
             type='str', required=True,
             aliases=['name'], when_name=['add','mod','rem'], when=['find']),
@@ -176,29 +173,7 @@ class DNSZoneIPAClient(IPAClient):
 
 
 def main():
-    client = DNSZoneIPAClient()
-
-    # client.login()
-    # changed, obj = client.ensure()
-    # result = {
-    #     'changed': changed,
-    #     client.name: obj,
-    #     'debug': client.debug,
-    # }
-    # client.module.exit_json(**result)
-    try:
-        client.login()
-        changed, obj = client.ensure()
-        result = {
-            'changed': changed,
-            client.name: obj,
-            'debug': client.debug,
-        }
-        client.module.exit_json(**result)
-    except Exception:
-        e = get_exception()
-        client.module.fail_json(msg=str(e), debug=client.debug)
-
+    DNSZoneIPAClient().main()
 
 if __name__ == '__main__':
     main()
