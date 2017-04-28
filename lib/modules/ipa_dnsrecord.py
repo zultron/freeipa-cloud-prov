@@ -112,10 +112,18 @@ from ipa import IPAClient
 class DNSRecordIPAClient(IPAClient):
     name = 'dnsrecord'
 
+    methods = dict(
+        add = '%s_add',
+        rem = '%s_del',
+        mod = '%s_mod',
+        find = '%s_find',
+        show = '%s_show',
+        )
+
     kw_args = dict(
         zone=dict(
             type='str', required=True, aliases=['name'],
-            when_name=['add','mod','rem','find']),
+            when_name=['add', 'mod','rem','find']),
         idnsname = dict(
             type='str', required=True, when=['find'], req_key='__dns_name__',
             when_name=['add','mod','rem'],),

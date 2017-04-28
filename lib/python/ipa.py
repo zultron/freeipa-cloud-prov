@@ -43,124 +43,10 @@ from ansible.module_utils.urls import fetch_url
 from ansible.module_utils.basic import AnsibleModule
 
 
-class IPAObjectDiff(object):
-    """Compute ansible present, exact, absent state changes for items that
-    are dicts of lists
-    """
-    def __init__(self, curr, change, method_map, method_trans, action_type):
-        self.method_map = method_map
-        self.method_trans = method_trans
-        self.action_type = action_type
-
-        # Clean up current and change object params
-        self.curr = self.clean(curr, translate=True)
-        self.change = self.clean(change)
-
-    def clean(self, dirty, translate=False):
-        c = {}
-        for key, val in dirty.items():
-            if translate:
-                key = self.method_trans.get(key, None)
-            if key not in self.method_map:
-                continue # common arg
-            if self.action_type in self.method_map[key]['when_name']:
-                continue # used as `name` attr; don't compare
-            if translate:
-                if self.method_map[key]['value_filter'] is not None:
-                    val = self.method_map[key]['value_filter'](val)
-            if self.method_map[key]['type'] != 'list' and isinstance(val, list):
-                # In some find results, string values are still in lists
-                val = val[0] if val else None
-            if val is None:
-                continue
-            elif self.method_map[key]['type'] == 'list':
-                # Allow single list args to be provided as strings
-                c[key] = [val,] if isinstance(val, basestring) else val
-            else:
-                c[key] = val
-        return c
-
-    def mods(self):
-        keys = set(self.method_map.keys())
-        res = {}
-        for key in self.change:
-            # Ignore junk keys
-            if key not in keys:  continue
-            # List attributes are handled in exact/present/absent methods
-            if self.method_map[key]['type'] == 'list': continue
-            # Observe attribute restrictions for add/mod/rem action types
-            if self.action_type not in self.method_map[key]['when']: continue
-            # Only add keys that don't match requested state
-            if self.change[key] != self.curr.get(key, None):
-                res[key] = self.change[key]
-        return res
-
-    def op(self, a, b, op):
-        keys = set(self.method_map.keys())
-        res = {}
-        for key in set(a) | set(b):
-            if key not in keys: continue
-            if self.method_map[key]['type'] != 'list': continue
-            if self.action_type not in self.method_map[key]['when']: continue
-            # => res_val = a[key] <op> b[key]
-            res_val = list(getattr(set(a.get(key, [])), op)(b.get(key, [])))
-            if res_val: res[key] = res_val
-        return res
-
-    def exact(self):
-        return (
-            self.mods(),                                     # scalar params
-            self.op(self.change, self.curr, 'difference'),   # records to add
-            self.op(self.curr, self.change, 'difference'),   # records to del
-        )
-
-    def present(self):
-        return (
-            self.mods(),                                     # scalar params
-            self.op(self.change, self.curr, 'difference'),   # records to add
-            {},                                              # records to del
-        )
-
-    def absent(self):
-        return (
-            {},                                              # scalar params
-            {},                                              # records to add
-            self.op(self.change, self.curr, 'intersection'), # records to del
-        )
-
-    def enabled(self):
-        return self.present()
-
-    def disabled(self):
-        return self.present()
-
-    def state(self, state):
-        return getattr(self, state)()
-
-    def list_keys(self):
-        return [ k for k in self.change.keys()
-                 if self.method_map[k]['type'] == 'list'
-                 and self.change[k] is not None ]
-
-    def has_list_keys(self):
-        # Presence of lists in change set affects processing
-        return len(self.list_keys()) > 0
-
-    def scalar_keys(self):
-        return [ k for k in self.change.keys()
-                 if self.method_map[k]['type'] != 'list' ]
-
-    def has_scalar_keys(self):
-        # Presence of scalars in change set affects processing
-        return len(self.scalar_keys() > 0)
-
 class IPAClient(object):
 
     # Object name: must be overridden
     name = 'unnamed'
-
-    # Diff class:  may be overridden
-    diff_class = IPAObjectDiff
 
     # Parameters for finding existing objects:  must be overridden
     #
@@ -232,54 +118,30 @@ class IPAClient(object):
     def init_kw_args(self):
         self.method_map = {}
         self.method_trans = {}
-        self.name_map = {}
+        self._name_map = {}
         self.enablekey = None
-        for name, spec in self.kw_args.items():
-            spec = spec.copy()
-            # if isinstance(spec, basestring):  continue
+        for name, spec_orig in self.kw_args.items():
+            spec = spec_orig.copy()
             self.method_map[name] = dict(
                 type = spec['type'],
-                when = (spec.pop('when', ['add', 'mod']) \
-                        if 'add' not in spec else []),
+                when = spec.pop('when', ['add','mod']),
                 when_name = spec.pop('when_name', []),
+                req_key = spec.pop('req_key', None),
                 value_filter = spec.pop('value_filter', None),
-                # For list args
-                add = spec.pop('add', self._methods['add']),
-                rem = spec.pop('rem', self._methods['rem']),
-                mod = spec.pop('mod', self._methods.get('mod',None)),
             )
-            for k in self.method_map[name]['when_name']:
-                self.name_map[k] = name
+            for k in spec_orig.get('when_name',[]):
+                name_map = self._name_map.setdefault(k,[None,{}])
+                if 'req_key' in spec_orig:
+                    name_map[1][name] = spec_orig['req_key']
+                else:
+                    name_map[0] = name
             if spec.pop('enablekey',False):
                 self.enablekey = name
             self.argument_spec[name] = spec
             self.method_trans[spec.pop('from_result_attr', name)] = name
                 
-
     def param(self, name, default=None):
         return self.module.params.get(name, default)
-
-    def param_slice_old(self, params):
-        res = {}
-        for p in params:
-            res[p] = self.param(p)
-        return res
-
-    def param_slice(self):
-        res = {}
-        name = None
-        for key, val in self.method_map.items():
-            # Special handling for request 'name' positional parameter
-            if key == self.name_map.get(self.action_type, None):
-                name = self.param(key)
-                continue
-            # Skip keys not applicable to current action type
-            if self.action_type not in val['when']:  continue
-            # Skip keys with no values
-            if self.param(key) is None:  continue
-            # Add key:val to slice
-            res[key] = self.param(key)
-        return res, name
 
     def init_module(self):
         self.module = AnsibleModule(
@@ -296,6 +158,7 @@ class IPAClient(object):
         self.state = self.param('state')
         self.changed = False
         self.new_obj = {}
+
 
     def get_base_url(self):
         return '%s://%s/ipa' % (self.protocol, self.host)
@@ -334,10 +197,9 @@ class IPAClient(object):
         self.module.fail_json(msg='%s: %s' % (msg, err_string))
 
     def _post_json(self, method, name, item=None, item_filter=None):
-        if item is None:
-            item = {}
+        self.debug=dict(method=method,name=name,item=item)  # FIXME
         url = '%s/session/json' % self.get_base_url()
-        data = {'method': method, 'params': [[name], item]}
+        data = {'method': method, 'params': [name, item]}
         try:
             resp, info = fetch_url(
                 module=self.module, url=url,
@@ -374,181 +236,182 @@ class IPAClient(object):
             return result
         return None
 
-    def name_attr(self):
-        return ([ k for k,v in self.kw_args.items() \
-                  if self.action_type in v.get('when_name',[])] + [None])[0]
+    def name_map(self, action, i):
+        return self._name_map.get(action, [None,{}])[i]
 
-    def name_value(self):
-        return self.param(self.name_attr())
+    def clean(self, dirty, action='add', curr=False):
+        item = {}
+        name = [None, {}]
+        for key, val in dirty.items():
+            if not curr:
+                # Special handling for request 'name' args
+                if key == self.name_map(action,0): # Positional arg
+                    name[0] = val
+                    continue
+                if key in self.name_map(action,1): # Keyword arg
+                    name[1][self.name_map(action,1)[key]] = val
+                    continue
+            # Translate attr keys from current to change object
+            if curr:  key = self.method_trans.get(key, None)
+            # Ignore params not central to object definition ('dn', 'ipa_host')
+            if key not in self.method_map:  continue
+            # Ignore params irrelevant to this action
+            if action not in self.method_map[key]['when']:  continue
+            # Ignore enable flag attr
+            if key == self.enablekey:  continue
+            # All attributes in lists in find results, even scalars
+            if action != 'find' and not isinstance(val, list):  val = [val]
+            # Munge current attr values into change-compatible values
+            if curr and self.method_map[key]['value_filter'] is not None:
+                val = map(self.method_map[key]['value_filter'], val)
+            # Ignore empty values
+            if val[0] is None:  continue
+            if self.method_map[key]['req_key'] is not None:
+                # Add key:{__req_key__:val} to item
+                item[key] = { self.method_map[key]['req_key']:val }
+            else:
+                # Add key:val to item
+                item[key] = val
+        # Most API requests don't need kw args
+        if not name[1]: name.pop(1)
+        return dict(
+            item=item,
+            name=name,
+            method=self._methods[action],
+            item_filter = self.find_filter if action=='find' else None,
+        )
 
     def find(self):
-        assert self.action_type == 'find'
-        item = dict(all=True)
-        params, name = self.param_slice()
-        item.update(params)
-        item.update(self.extra_find_args)
-        self.current_obj = self._post_json(
-            method=self._methods['find'], name=name,
-            item=item,
-            item_filter=self.find_filter)
-        if self.current_obj:
-            self.new_obj = self.current_obj
+        request = self.clean(self.module.params, 'find')
+        request['item'].update(dict(all=True))
+        request['item'].update(self.extra_find_args)
+        self.current_obj = self._post_json(**request)
 
-    def add_or_mod(self, actions):
-        assert self.action_type in ('add', 'mod')
-        if self.action_type not in self._methods:
-            self._fail('Cannot %s object' % self.action_type)
+    def op(self, a, b, op):
+        keys = set(self.method_map.keys())
+        res = {}
+        for key in set(a) | set(b):
+            # if key not in self.method_map: continue
+            # FIXME can we treat scalars this way?
+            # if self.method_map[key]['type'] != 'list': continue
+            # FIXME
+            # if 'add' not in self.method_map[key]['when']: continue
+            # => res_val = a[key] <op> b[key]
+            res_val = list(getattr(set(a.get(key, [])), op)(b.get(key, [])))
+            if res_val: res.setdefault(key,[]).extend(res_val)
+        return res
 
-        self.changed = True
-        if self.module.check_mode: return
-        
-        params, name = self.param_slice()
+    def compute_changes(self):
+        request = self.clean(self.module.params,
+                             action = 'mod' if self.current_obj else 'add')
+        change_params = request['item']
+        current = self.clean(self.current_obj, curr=True,
+                             action = 'mod' if self.current_obj else 'add')
+        curr_params = current['item']
 
-        self.new_obj = self._post_json(
-            method=self._methods[self.action_type],
-            name=name,
-            # FIXME this should be params?
-            item=actions)
-        
-    @property
-    def is_enabled(self):
-        enabled = self.current_obj[self.enablekey]
-        if isinstance(enabled, list):
-            enabled = enabled[0] if enabled else False
-        if isinstance(enabled, basestring):
-            enabled = (enabled.lower() == 'true')
-        return enabled
-
-    @property
-    def request_name_value(self):
-        return self.param(self.name_map[self.action_type])
-
-    def enable(self):
-        if self.is_enabled: return
-
-        self.changed = True
-        if self.module.check_mode: return
-
-        self.new_obj = self._post_json(
-            method=self._methods['enable'],
-            name=self.request_name_value)
-
-    def disable(self):
-        if not self.is_enabled: return
-
-        self.changed = True
-        if self.module.check_mode: return
-
-        self.new_obj = self._post_json(
-            method=self._methods['disable'],
-            name=self.request_name_value)
-
-    @property
-    def action_type(self):
-        if not hasattr(self, 'current_obj'):
-            # Haven't searched yet
-            return 'find'
-
+        changes = {'addattr':{}, 'delattr':{}, 'setattr':{}}
+        if self.state in ('exact', 'present', 'enabled', 'disabled'):
+            changes['addattr'].update(
+                self.op(change_params, curr_params, 'difference'))
+        if self.state == 'exact':
+            changes['delattr'].update(
+                self.op(curr_params, change_params, 'difference'))
         if self.state == 'absent':
-            # Remove either list values or the whole object
-            return 'rem'
+            changes['delattr'].update(
+                self.op(change_params, curr_params, 'intersection'))
+        if self.state == 'enabled' and \
+           not self.current_obj.get(self.enablekey,[False])[0]:
+            changes['addattr'][self.enablekey] = ['TRUE']
+        if self.state == 'disabled' and \
+           self.current_obj.get(self.enablekey,[True])[0]:
+            changes['addattr'][self.enablekey] = ['FALSE']
 
-        # In 'present', 'exact', 'disable', 'enable' states...
-        if self.current_obj:
-            # ...modify existing object...
-            return 'mod'
-        else:
-            # ...or add absent object
-            return 'add'
+        for key in changes['addattr'].keys():
+            # Find only non-list keys
+            if self.method_map[key]['type'] == 'list':  continue
+            # Sanity check:  exactly one entry in add list
+            if len(changes['addattr'][key]) != 1:
+                self._fail(key, 'Found multiple entries of non-list attribute')
+            # Sanity check:  no more than one entry in del list
+            if len(changes['delattr'].get(key,[])) > 1:
+                self._fail(key, 'Found multiple entries of non-list attribute')
+            # Pop key from del list
+            changes['delattr'].pop(key,None)
+            # Move key from add list to set list
+            changes['setattr'][key] = changes['addattr'].pop(key)
 
+        self.changes = changes
+        self.changed = bool(changes['addattr'] or changes['delattr']
+                            or changes['setattr'])
+        return request
+
+    def expand_changes(self):
+        expanded_changes = {'addattr':[], 'delattr':[], 'setattr':[],
+                            'all':True}
+        for op in self.changes:
+            for attr, val_list in self.changes[op].items():
+                for val in val_list:
+                    expanded_changes[op].append("%s=%s" % (attr, val))
+            expanded_changes[op].sort() # Sort for unit tests
+        return expanded_changes
+
+    def add_or_mod(self):
+
+        # Compute list of items to modify/add/delete
+        request = self.compute_changes()
+
+        if self.module.check_mode: return
+        
+        request['item'] = self.expand_changes()
+
+        self.new_obj = self._post_json(**request)
+        
     def rem(self):
-        self.changed = True
         if self.module.check_mode: return
 
-        params, name = self.param_slice()
-        self.new_obj = self._post_json(
-            method=self._methods['rem'],
-            name=name,
-            item=params)
-
-    def list_mod(self, name, method, action):
-        self.changed = True
-        if self.module.check_mode: return
-
-        self.new_obj = self._post_json(
-            method=method, name=name, item=action)
-
+        request = self.clean(self.module.params, 'rem')
+        self.new_obj = self._post_json(**request)
 
     def ensure(self):
 
         # Find any existing objects
         self.find()
 
-        self.diff = self.diff_class(
-            self.current_obj, self.module.params, self.method_map,
-            self.method_trans, self.action_type,
-        )
-
         if self.state == 'absent':
             if not self.current_obj:
                 # Object is already absent; do nothing
-                return self.changed, self.new_obj
+                return False, {}
 
-            # Existing object:
-            if not self.diff.has_list_keys():
-                # No list keys in request:  remove whole object
+            request = self.clean(self.module.params, 'rem')
+            if not request['item']:
+                # No keys in request:  remove whole object
                 self.rem()
-                return self.changed, self.new_obj
+                return True, {}
             # Otherwise, 'absent' means to remove items from list keys
 
-        # Compute list of items to modify/add/delete
-        actions_scalar, actions_add, actions_rem = self.diff.state(
-            self.state)
-
-        # Scalars first; they may bring base object into existence
-        if actions_scalar:
-            self.add_or_mod(actions_scalar)
-
-        # Enable/disable
-        if self.state == 'enabled':
-            self.enable()
-        if self.state == 'disabled':
-            self.disable()
-
-        # List parameter add/remove actions grouped by method;
-        # additions come first, since removals may inadvertently
-        # delete object
-        for method_type, actions in (('add', actions_add),
-                                     ('rem', actions_rem)):
-            action_map = {}
-            for key, val in actions.items():
-                action_map.setdefault(
-                    self.method_map[key][method_type], {})[key] = val
-            for method, action in action_map.items():
-                self.list_mod(
-                    name=self.request_name_value,
-                    method=method, action=action)
+        # Effect changes
+        self.add_or_mod()
 
         return self.changed, self.new_obj
 
     def main(self):
 
-        # self.login()
-        # changed, obj = self.ensure()
-        # result = {
-        #     'changed': changed,
-        #     self.name: obj,
-        # }
-        # self.module.exit_json(**result)
-        try:
-            self.login()
-            changed, obj = self.ensure()
-            result = {
-                'changed': changed,
-                self.name: obj,
-            }
-            self.module.exit_json(**result)
-        except Exception:
-            e = get_exception()
-            self.module.fail_json(msg=str(e))
+        self.login()
+        changed, obj = self.ensure()
+        result = {
+            'changed': changed,
+            self.name: obj,
+        }
+        self.module.exit_json(**result)
+        # try:
+        #     self.login()
+        #     changed, obj = self.ensure()
+        #     result = {
+        #         'changed': changed,
+        #         self.name: obj,
+        #     }
+        #     self.module.exit_json(**result)
+        # except Exception:
+        #     e = get_exception()
+        #     self.module.fail_json(msg=str(e), debug=self.debug)
 

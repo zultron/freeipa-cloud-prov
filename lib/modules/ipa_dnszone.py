@@ -135,9 +135,10 @@ class DNSZoneIPAClient(IPAClient):
     name = 'dnszone'
 
     kw_args = dict(
+        # common params
         idnsname = dict(
             type='str', required=True,
-            aliases=['name'], when_name=['add','mod','rem'], when=['find']),
+            aliases=['name'], when_name=['add', 'mod','rem'], when=['find']),
         idnssoarname = dict(
             type='str', required=False),
         idnssoamname = dict(
