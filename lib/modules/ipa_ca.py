@@ -84,39 +84,38 @@ ca:
 '''
 
 from ansible.module_utils.pycompat24 import get_exception
-# from ansible.module_utils.ipa import IPAClient
-from ipa import IPAClient
+from ansible.module_utils.ipa import IPAClient
 
-class CAClient(IPAClient):
-    methods = dict(
-        add = 'ca_add',
-        rem = 'ca_del',
-        mod = 'ca_mod',
-        find = 'ca_find',
-        show = 'ca_show',
-    )
-    pos_args = [
-        dict(name = 'cn',
-             spec = dict(type='str', required=True, aliases=['name'])),
-    ]
+class CAIPAClient(IPAClient):
+    name = 'ca'
+
+    param_keys = set(('cn',))
+
     kw_args = dict(
-        ipacasubjectdn = dict(
-            type='str', required=False),
-        description = dict(
-            type='str', required=False),
+        cn =             dict(type='str', required=True, aliases=['name']),
+        ipacasubjectdn = dict(type='str', required=False),
+        description =    dict(type='str', required=False),
     )
+
+    def mod_rewrite_list_changes(self, request):
+        # Once the CA is created, nothing may be modified except the
+        # description
+        super(CAIPAClient, self).mod_rewrite_list_changes(request)
+
+        # Only applies to ca_mod operation
+        if request['method'] != 'ca_mod':  return
+
+        # Raise error for any keys other than 'description' (and
+        # auto-added 'all')
+        keys = set(request['item'].keys())
+        keys.discard('all'); keys.discard('description');
+        if len(keys) > 0:
+            self._fail(tuple(keys),
+                       'Unable to modify CA parameters other than description')
+
 
 def main():
-    client = CAClient()
-
-    try:
-        client.login()
-        changed, ca = client.ensure()
-        client.module.exit_json(changed=changed, ca=ca)
-    except Exception:
-        e = get_exception()
-        client.module.fail_json(msg=str(e))
-
+    CAIPAClient().main()
 
 if __name__ == '__main__':
     main()

@@ -100,77 +100,109 @@ cert:
 '''
 
 from ansible.module_utils.pycompat24 import get_exception
-# from ansible.module_utils.ipa import IPAClient
-from ipa import IPAClient, IPAObjectDiff
+from ansible.module_utils.ipa import IPAClient
 
 import re
 
-class CertClient(IPAClient):
+class CertIPAClient(IPAClient):
 
     # Object name
     name = 'cert'
 
-    # Searching for existing objects
-    extra_find_args = dict(exactly=True)
-    find_filter = lambda self,x: (x['status'] == 'VALID')
-    # Parameters for adding and modifying objects
-    add_or_mod_name = 'req'
-    # Parameters for removing objects
-    rem_name = 'serial_number'
-
+    # cert_request/cert_revoke instead of cert_add/cert_del
     methods = dict(
-        add = 'cert_request',
-        rem = 'cert_revoke',
-        find = 'cert_find',
-        show = 'cert_show',
+        add = '{}_request',
+        mod = '{}_request',
+        rem = '{}_revoke',
+        find = '{}_find',
+        show = '{}_show',
     )
 
-    # 'subject' param goes in as 'host1' but comes out 'CN=host1,O=EXAMPLE.COM'
-    dn_to_cn_re = re.compile(r'CN=([^,]*),')
-    def dn_to_cn(x):
-        m = CertClient.dn_to_cn_re.match(x)
-        return m.group(1) if m else None
+    # Filter out expired or revoked certs
+    def find_filter(self, i):
+        return i['status'] == 'VALID'
+
+    param_keys = set(['serial_number','req'])
 
     kw_args = dict(
         # common params
-        principal = dict(
-            type='str', required=True, when=['add', 'find'],
-            value_filter=dn_to_cn, from_result_attr='subject'),
-        cacn = dict(
-            type='str', default='ipa'),
+        principal =         dict(type='str', required=True),
+        cacn =              dict(type='str', default='ipa'),
         # "request" params
-        req = dict(
-            type='str', required=False, when=['add']),
+        req =               dict(type='str', required=False),
         # "revoke" params
-        revocation_reason = dict(
-            type='int', required=False, when=['rem'], choices=range(11)),
-        serial_number = dict(
-            type='str', required=False, when=['rem']),
+        serial_number =     dict(type='str', required=False),
+        revocation_reason = dict(type='int', required=False,
+                                 when=['rem'], choices=range(11)),
     )
 
-def main():
-    client = CertClient()
+    def mod_request_params(self):
+        # cert_request method wants request in PEM format as name
+        if 'req' not in self.module.params:
+            self._fail('req',
+                       'Certificate requests must include "req" parameter')
 
-    client.login()
-    changed, obj = client.ensure()
-    result = {
-        'changed': changed,
-        client.name: obj,
-        'debug': client.debug,
-    }
-    client.module.exit_json(**result)
-    # try:
-    #     client.login()
-    #     changed, obj = client.ensure()
-    #     result = {
-    #         'changed': changed,
-    #         client.name: obj,
-    #         'debug': client.debug,
-    #     }
-    #     client.module.exit_json(**result)
-    # except Exception:
-    #     e = get_exception()
-    #     client.module.fail_json(msg=str(e), debug=client.debug)
+        return [self.module.params['req']]
+
+    def rem_request_params(self):
+        return [self.response_cleaned['serial_number']]
+
+    def rem_request_item(self):
+        if 'revocation_reason' not in self.canon_params:
+            self._fail('revoke certificate',
+                       'revocation_reason parameter required')
+
+        return dict(
+            cacn = self.response_cleaned['cacn'],
+            revocation_reason = self.canon_params['revocation_reason'])
+
+    def find_request_item(self):
+        # cert_find uses 'subject' as key rather than 'principal'
+        item = {'all': True,
+                'subject': self.module.params['principal'],
+                'cacn': self.module.params['cacn'],
+        }
+
+        # If serial number is specified, add it to query with
+        # min/max_serial_number params
+        if 'serial_number' in self.module.params:
+            sn = self.module.params['serial_number']
+            item['min_serial_number'] = item['max_serial_number'] = sn
+
+        return item
+
+    def munge_response(self, item):
+        item = item.copy()
+        # Extract 'principal' from 'subject' attribute
+        if 'subject' in item:
+            m = re.match(r'CN=([^,]*),O=', item['subject'])
+            item['principal'] = item['subject'] if m is None else m.group(1)
+        return item
+
+    def is_rem_param_request(self):
+        # Because request and revoke are completely different, and
+        # because it doesn't make sense to remove individual params
+        # from a cert with state=absent, it's easier to assume that
+        # any time state=absent then it means to remove the whole
+        # object.
+        return False
+
+    def compute_changes(self, change_params, curr_params):
+        changes = super(CertIPAClient, self).compute_changes(
+            change_params, curr_params)
+
+        # Because request and revoke are completely different, and
+        # because it doesn't make sense to remove individual params
+        # from a cert with state=absent, it's easier to assume that
+        # any time state=absent then it means to remove the whole
+        # object.
+        if self.state == 'absent':
+            changes['scalars'] = {}
+
+        return changes
+
+def main():
+    client = CertIPAClient().main()
 
 
 if __name__ == '__main__':

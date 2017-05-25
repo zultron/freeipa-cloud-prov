@@ -110,84 +110,106 @@ caacl:
 '''
 
 from ansible.module_utils.pycompat24 import get_exception
-# from ansible.module_utils.ipa import IPAClient
-from ipa import IPAClient
+from ansible.module_utils.ipa import EnablableIPAClient
 
-class CAACLClient(IPAClient):
-
+class CAACLIPAClient(EnablableIPAClient):
     name = 'caacl'
 
-    # Parameters for adding and modifying objects
-    add_or_mod_name = 'cn'
-    # Parameters for removing objects
-    rem_name = 'cn'
+    param_keys = set(('cn',))
+    enablekey = 'ipaenabledflag'
 
+    # Only description may be modified from the base caacl_mod method
+    base_keys = set(['description'])
+
+    # Adding and removing other items from list parameters can't be
+    # done in the base caacl_mod method's addattr/delattr arguments,
+    # as it can in e.g. dnsrecord objects.
+    change_functions = tuple(
+        list(EnablableIPAClient.change_functions) +
+        ['add_remove_list_items'] )
 
     kw_args = dict(
-        # common params
-        cn = dict(
-            type='str', required=True, aliases=['name'],
-            when_name=['add', 'mod', 'rem']),
-        # add/mod params
-        description = dict(
-            type='str', required=False, when=['add', 'mod'],
-            value_filter=lambda x: x[0] if x else None),
+        # request key param
+        cn =             dict(type='str',  required=True, aliases=['name']),
+        # add/mod method param
+        description =    dict(type='str',  required=False),
+        # enable/disable method param
+        ipaenabledflag = dict(type='bool', required=False),
         # add/rem list params
-        user = dict(
-            type='list', required=False,
-            ipa_name='memberuser_user',
-            add='caacl_add_user', rem='caacl_remove_user'),
-        group = dict(
-            type='list', required=False,
-            ipa_name='memberuser_group',
-            add='caacl_add_user', rem='caacl_remove_user'),
-        host = dict(
-            type='list', required=False,
-            ipa_name='memberhost_host',
-            add='caacl_add_host', rem='caacl_remove_host'),
-        hostgroup = dict(
-            type='list', required=False,
-            ipa_name='memberhost_hostgroup',
-            add='caacl_add_host', rem='caacl_remove_host'),
-        service = dict(
-            type='list', required=False,
-            ipa_name='memberservice_service',
-            add='caacl_add_service', rem='caacl_remove_service'),
-        certprofile = dict(
-            type='list', required=False,
-            ipa_name='ipamembercertprofile_certprofile',
-            add='caacl_add_profile', rem='caacl_remove_profile'),
-        ca = dict(
-            type='list', required=False,
-            ipa_name='ipamemberca_ca',
-            add='caacl_add_ca', rem='caacl_remove_ca'),
+        user =           dict(type='list', required=False),
+        group =          dict(type='list', required=False),
+        host =           dict(type='list', required=False),
+        hostgroup =      dict(type='list', required=False),
+        service =        dict(type='list', required=False),
+        certprofile =    dict(type='list', required=False),
+        ca =             dict(type='list', required=False),
     )
 
+    def munge_response_keys(self, item):
+        # Response keys for list items look like 'memberuser_user' and
+        # 'memberuser_group'; translate to simply 'user' and 'group'
+        for key in item.keys():
+            if key.startswith('memberuser_') or \
+               key.startswith('memberhost_') or \
+               key.startswith('memberservice_') or \
+               key.startswith('ipamembercertprofile_') or \
+               key.startswith('ipamemberca_'):
+                new_key = key.split('_')[1]
+                item[new_key] = item.pop(key)
+        return item
+
+    def munge_response(self, item):
+        item = self.munge_response_keys(item.copy())
+        item = super(CAACLIPAClient, self).munge_response(item)
+        return item
+
+    def add_remove_list_items(self):
+        # caacl user/host/service/etc. list attributes can't be
+        # manipulated with addattr/delattr, and need separate requests
+        # with separate methods for each
+
+        # Values in 'addattr' will go to caacl_add_*, and 'delattr' to
+        # caacl_remove_*
+        for from_list, method_op in (('list_add','add'),
+                                     ('list_del','remove')):
+            # Methods e.g. caacl_add_host have parameters e.g. user
+            # and group
+            for method_item, attrs in (
+                    ('user',('user','group')),
+                    ('host',('host','hostgroup')),
+                    ('profile',('certprofile',)),
+                    ('ca',('ca',)),
+                    ('service',('service',))):
+                # Construct request item
+                item = {}
+                for attr in attrs:
+                    val = self.diffs[from_list].get(attr,None)
+                    if val is not None:
+                        item[attr] = sorted(val)
+
+                # If no changes needed, do nothing
+                if not item:  continue
+
+                # Mark object changed
+                self.changed = True
+
+                # If in check mode, do nothing
+                if self.module.check_mode:  continue
+
+                # Construct request
+                item['all'] = True
+                request = dict(
+                    method = 'caacl_%s_%s' % (method_op, method_item),
+                    name = self.mod_request_params(),
+                    item = item)
+
+                self.requests.append(dict(
+                    name = '%s_%s' % (method_op, method_item),
+                    request = request ))
+        
 
 def main():
-    client = CAACLClient()
-    client.debug['init_kw_args'] = CAACLClient.kw_args.copy()
-
-    client.login()
-    changed, obj = client.ensure()
-    result = {
-        'changed': changed,
-        client.name: obj,
-        # 'debug': client.debug,
-    }
-    client.module.exit_json(**result)
-    # try:
-    #     client.login()
-    #     changed, obj = client.ensure()
-    #     result = {
-    #         'changed': changed,
-    #         client.name: obj,
-    #         'debug': client.debug,
-    #     }
-    #     client.module.exit_json(**result)
-    # except Exception:
-    #     e = get_exception()
-    #     client.module.fail_json(msg=str(e), debug=client.debug)
+    CAACLIPAClient().main()
 
 if __name__ == '__main__':
     main()
