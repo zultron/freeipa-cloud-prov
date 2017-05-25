@@ -106,7 +106,7 @@ dnsrecord:
   type: dict
 '''
 
-from ansible.module_utils.ipa import IPAClient
+from ipa import IPAClient
 
 class DNSRecordIPAClient(IPAClient):
     name = 'dnsrecord'

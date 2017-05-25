@@ -84,7 +84,7 @@ ca:
 '''
 
 from ansible.module_utils.pycompat24 import get_exception
-from ansible.module_utils.ipa import IPAClient
+from ipa import IPAClient
 
 class CAIPAClient(IPAClient):
     name = 'ca'

@@ -140,7 +140,7 @@ user:
 
 import re
 
-from ansible.module_utils.ipa import EnablableIPAClient
+from ipa import EnablableIPAClient
 
 class UserIPAClient(EnablableIPAClient):
     name = 'user'
