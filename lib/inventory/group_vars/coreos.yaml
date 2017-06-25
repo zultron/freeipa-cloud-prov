@@ -32,6 +32,8 @@ docker_ssl_dir: "{{data_volume_path}}/docker"
 docker_ssl_cacert: "{{docker_ssl_dir}}/ca.pem"
 docker_ssl_cert: "{{docker_ssl_dir}}/cert.pem"
 docker_ssl_key: "{{docker_ssl_dir}}/key.pem"
+docker_ca: "docker"
+docker_ca_subject: "Docker Certificate Authority"
 
 # Docker TCP port
 docker_tcp_port: "tcp://{{ip_addr}}:2375"
@@ -57,7 +59,6 @@ swap_device:  "{{ data_volume_block_device }}-part1"
 # Systemd unit file names for paths
 swap_device_systemd_unit: "{{swap_device|systemd_escape}}.swap"
 data_volume_systemd_unit: "{{data_volume_path|systemd_escape}}.mount"
-
 
 #################################
 # Cluster configuration
