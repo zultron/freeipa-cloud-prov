@@ -31,10 +31,10 @@
 # Set up IPA client DNS
 
 - name: "Add IPA client IP {{freeipa_client_network_addr}} to
-         {{fqdn}} zone ipaclient entry"
+         {{freeipa_client_dns_zone}} zone {{freeipa_client_hostname}} entry"
   ipa_dnsrecord:
-    name: ipaclient
-    zone: "{{fqdn}}"
+    name: "{{freeipa_client_hostname}}"
+    zone: "{{freeipa_client_dns_zone}}"
     arecord: "{{freeipa_client_network_addr}}"
     state: present
     ipa_host: "{{fqdn}}"
@@ -50,7 +50,7 @@
   ipa_dnszone:
     idnsname: "{{container_network_prefix|reverse_zone}}"
     state: present
-    ipa_host: "{{fqdn}}"
+    ipa_host: "{{ipa_host}}"
     ipa_user: "{{ipa_user}}"
     ipa_pass: "{{freeipa_admin_password}}"
   delegate_to: localhost
@@ -63,9 +63,9 @@
   ipa_dnsrecord:
     name: "{{freeipa_client_network_addr|last_octet}}"
     zone: "{{container_network_prefix|reverse_zone}}"
-    ptrrecord: "ipaclient.{{fqdn}}."
+    ptrrecord: "ipaclient.{{freeipa_client_dns_zone}}."
     state: exact
-    ipa_host: "{{fqdn}}"
+    ipa_host: "{{ipa_host}}"
     ipa_user: "{{ipa_user}}"
     ipa_pass: "{{freeipa_admin_password}}"
   delegate_to: localhost
@@ -79,7 +79,7 @@
 - name: Run FreeIPA client install in Docker container
   docker_container:
     name: ipaclient
-    hostname: "ipaclient.{{fqdn}}"
+    hostname: "{{freeipa_client_fqdn}}"
     image: "{{freeipa_docker_client_image}}"
     volumes:
       - "{{data_volume_path}}:{{data_volume_path}}"
@@ -107,11 +107,12 @@
     command: "-s"
     etc_hosts: "{
       '{{fqdn}}': '{{ip_addr}}',
-      'ipa.{{fqdn}}': '{{freeipa_network_addr}}',
+      '{{freeipa_fqdn}}': '{{freeipa_network_addr}}',
     }"
   register: docker_run
   tags:
     - install
+    - client_container_install
 
 
 - name: Wait for FreeIPA client install to complete
