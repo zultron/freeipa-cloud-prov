@@ -68,6 +68,9 @@ RUN apt-get update
 RUN apt-get install -y \
         docker-ce
 
+# Python testing
+RUN pip install nose mock
+
 RUN ansible-galaxy install defunctzombie.coreos-bootstrap
 
 ENV PYTHONPATH=/data/lib/python
