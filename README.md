@@ -8,43 +8,65 @@
         # Optionally build container if not pulling from docker hub
 		./container -b
 
+        # Start shell in container; following commands should all be
+        # run in the container
+        ./container
+
         # Install required roles from Ansible Galaxy, if not running
         # Docker container
-        ./container ansible-galaxy install -p ./roles -r lib/requirements.yaml
+        ansible-galaxy install -p ./roles -r lib/requirements.yaml
 
-        # Set up password vault once
-        echo "mySecretVaultPass" > .vault_pass
-        ./container ansible-playbook playbooks/init.yaml
+        # Set up password vault once; will prompt for FreeIPA admin
+        # and directory passwords
+        ansible-playbook playbooks/init.yaml
 
 - Install commands:
 
         # Provision host1 droplet on DigitalOcean and configure storage
-        ./container ansible-playbook provision.yaml -l host1
+        ansible-playbook playbooks/provision.yaml
 
         # Install FreeIPA server and client containers on host1
         # - tags:  setup,configure,install
-        ./container ansible-playbook playbooks/freeipa-install.yaml -l host1
+        ansible-playbook playbooks/freeipa-install.yaml
 
-        # Configure FreeIPA server on host1
-        # - tags:  setup,configure,install
-        ./container ansible-playbook playbooks/freeipa-config.yaml -l host1
+        # Post-FreeIPA docker configuration on host1
+        # - tags:  cert, docker-tls
+        ansible-playbook playbooks/docker-tls.yaml
+
+- After restarting container, once:
+
+        # Re-initialize container /etc/hosts and certs
+        ansible-playbook playbooks/init-container.yaml
 
 - Misc commands:
 
-        # Interactive shell in container
-        ./container
-
         # Re-collect facts about host
-        ./container ansible h01 -m setup \
+        ansible h01 -m setup \
             -e ansible_python_interpreter=/home/core/bin/python \
             -e ansible_ssh_user=core
 
         # Destroy host1
-        ./container ansible-playbook playbooks/destroy.yaml -l host1 -e confirm=true
+        ansible-playbook playbooks/destroy.yaml -e confirm=yes
 
         # List all variables for a host
-        ./container ansible host1 -m debug -a "var=hostvars[inventory_hostname]"
+        ansible host1 -m debug -a "var=hostvars[inventory_hostname]"
         # Also vars, environment, group_names, groups
+
+- Ansible ipa_* tests:
+  - Testing against live IPA server
+  ```
+      env \
+        PYTHONPATH=$(pwd)/lib \
+        IPA_HOST=host1.example.com \
+        IPA_USER=admin \
+        IPA_PASS=mysecretpw \
+        IPA_DOMAIN=example.com \
+        IPA_NSRECORD=host1.example.com. \
+        nosetests -v test/units/modules/identity/ipa/
+    ```
+
+- Run nosetests in ansible repo
+  - `PYTHONPATH=$(pwd)/lib nosetests -v test/units/modules/identity/ipa/`
 
 - Depends on `defunctzombie.coreos-bootstrap`, installed in Docker
 
@@ -89,6 +111,11 @@
   - Recommendation to run etcd3 in a container
 	- https://groups.google.com/forum/#!topic/coreos-user/Lfd1tmkwmRg
 
+- Local facts
+  - http://docs.ansible.com/ansible/playbooks_variables.html#local-facts-facts-d
+  - ansibl.cfg `fact_path = /home/centos/ansible_facts.d`
+  - Providing cached facts from modules
+    - http://docs.ansible.com/ansible/dev_guide/developing_modules_general.html#module-provided-facts
 
 # FreeIPA in Docker on CoreOS on DigitalOcean
 
