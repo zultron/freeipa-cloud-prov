@@ -34,12 +34,8 @@
       mount_path: "{{freeipa_volume_path}}"
       tags: freeipa-volume
 
-    # Install FreeIPA
+    # Install FreeIPA in Docker container
     - role: freeipa-install
-      tags: freeipa-install
-
-    # Install SSL certs locally
-    - role: local-ca-certs
       tags: freeipa-install
 
     # Configure FreeIPA:  hardening, http, DNS, CA
@@ -48,14 +44,14 @@
         - freeipa-install
         - freeipa-configure
 
+    # Configure CoreOS Docker:  SSL CA, server and client certs
+    - role: bootstrap-user
+      tags:
+        - freeipa-install
+        - freeipa-bootstrap-user
+
     # Install FreeIPA client
     - role: freeipa-client-install
       tags:
         - freeipa-install
         - freeipa-client-install
-
-    # Generate docker client certs
-    - role: bootstrap-user
-      tags:
-        - freeipa-install
-        - freeipa-bootstrap-user

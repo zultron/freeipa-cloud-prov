@@ -65,28 +65,33 @@
 #
 # Generate client cert
 #
-- name: "Check if cert already exists locally in {{local_docker_client_dir}}"
-  stat:
-    path: "{{local_docker_client_cert}}"
-  register: local_docker_client_cert_stat
-  changed_when: not local_docker_client_cert_stat.stat.exists
-  delegate_to: localhost
-  run_once: True
-  tags: bootstrap-client-cert
+- block:
+    # Check for local, valid cert to avoid lots of unneeded remote
+    # work in next block
 
-- name: "Verify docker cert"
-  shell: "openssl verify
-  -CAfile {{local_docker_client_cert}}
-  {{local_docker_client_cacert}} > /dev/null
-  && echo yes || echo no"
+    - name: "Check if cert already exists locally in {{local_docker_client_dir}}"
+      stat:
+        path: "{{local_docker_client_cert}}"
+      register: local_docker_client_cert_stat
+      changed_when: not local_docker_client_cert_stat.stat.exists
+
+    - name: "Verify docker cert"
+      shell: "openssl verify
+      -CAfile {{local_docker_client_cert}}
+      {{local_docker_client_cacert}} > /dev/null
+      && echo yes || echo no"
+      register: local_docker_client_cert_verify
+      changed_when: local_docker_client_cert_verify.stdout == "no"
+
   delegate_to: localhost
-  register: local_docker_client_cert_verify
-  changed_when: local_docker_client_cert_verify.stdout == "no"
   run_once: True
   tags: bootstrap-client-cert
 
 - block:
 
+    #
+    # Create client cert on FreeIPA server
+    #
     - name: "Create remote bootstrap client cert directory
              {{bootstrap_client_cert_dir}}"
       file:
@@ -141,33 +146,36 @@
       delegate_to: localhost
       register: client_cert_req
 
-    - name: "Create local docker directory {{local_docker_client_dir}}"
+    #
+    # Copy client cert to local container
+    #
+    - name: "Create local docker directory {{docker_client_ssl_dir}}"
       file:
-        path: "{{local_docker_client_dir}}"
+        path: "../{{docker_client_ssl_dir}}"
         state: directory
       delegate_to: localhost
 
-    - name: "Dump bootstrap client certificate into {{local_docker_client_cert}}"
+    - name: "Dump bootstrap client certificate into {{docker_client_ssl_cert}}"
       copy:
         content: |
           -----BEGIN CERTIFICATE-----
           {{client_cert_req.cert.certificate}}
           -----END CERTIFICATE-----
-        dest: "{{local_docker_client_cert}}"
+        dest: "{{docker_client_ssl_cert}}"
         force: yes
       delegate_to: localhost
 
     - name: "Fetch bootstrap docker client SSL key to
-                 {{local_docker_client_key}}"
+                 {{docker_client_ssl_key}}"
       fetch:
         src: "{{bootstrap_client_key}}"
-        dest: "{{local_docker_client_key}}"
+        dest: "{{docker_client_ssl_key}}"
         flat: yes
       become: true
 
-    - name: "Restrict read permission on {{local_docker_client_key}}"
+    - name: "Restrict read permission on {{docker_client_ssl_key}}"
       file:
-        path: "{{local_docker_client_key}}"
+        path: "{{docker_client_ssl_key}}"
         mode: 0600
       delegate_to: localhost
 
@@ -181,23 +189,23 @@
         ipa_pass: "{{freeipa_admin_password}}"
       delegate_to: localhost
       # Don't actually create, just read
-      # check_mode: yes
+      check_mode: yes
       register: docker_ca_cert
 
-    - name: "Dump docker CA cert into {{local_docker_client_cacert}}"
+    - name: "Dump docker CA cert into {{docker_client_ssl_cacert}}"
       copy:
         content: |
           -----BEGIN CERTIFICATE-----
           {{docker_ca_cert.cert.certificate}}
           -----END CERTIFICATE-----
-        dest: "{{local_docker_client_cacert}}"
+        dest: "{{docker_client_ssl_cacert}}"
         force: yes
       delegate_to: localhost
 
     - name: "Verify docker cert again"
       command: "openssl verify
-      -CAfile {{local_docker_client_cert}}
-      {{local_docker_client_cacert}}"
+      -CAfile {{docker_client_ssl_cacert}}
+      {{docker_client_ssl_cert}}"
       delegate_to: localhost
       changed_when: False
 
@@ -206,3 +214,9 @@
     local_docker_client_cert_verify.changed
   run_once: True
   tags: bootstrap-client-cert
+
+#
+# Generate and install server cert
+#
+
+# FIXME todo

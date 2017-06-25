@@ -12,14 +12,3 @@ bootstrap_client_key: "{{bootstrap_client_cert_dir}}/key.pem"
 bootstrap_client_req: "{{bootstrap_client_cert_dir}}/req.pem"
 bootstrap_client_openssl_conf:
      "{{bootstrap_client_cert_dir}}/openssl-bootstrap-client.conf"
-
-
-
-#
-# Local locations for bootstrap docker client SSL cert
-#
-# These aren't needed outside this playbook
-local_docker_client_dir: "~/.docker"
-local_docker_client_cacert: "{{local_docker_client_dir}}/ca.pem"
-local_docker_client_cert: "{{local_docker_client_dir}}/cert.pem"
-local_docker_client_key: "{{local_docker_client_dir}}/key.pem"

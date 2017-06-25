@@ -24,19 +24,31 @@ freeipa_client_network_addr: "{{container_network_prefix}}.2"
 ##################################
 # Docker
 
-# FreeIPA service principal
+# TLS
+# - FreeIPA sub-CA
+docker_ca: "docker"
+docker_ca_subject: "Docker Certificate Authority"
+# - FreeIPA service principal
 docker_service_principal: "docker/{{fqdn}}"
-
-# Docker certs
+# - Server-side cert locations
 docker_ssl_dir: "{{data_volume_path}}/docker"
 docker_ssl_cacert: "{{docker_ssl_dir}}/ca.pem"
 docker_ssl_cert: "{{docker_ssl_dir}}/cert.pem"
 docker_ssl_key: "{{docker_ssl_dir}}/key.pem"
-docker_ca: "docker"
-docker_ca_subject: "Docker Certificate Authority"
-
-# Docker TCP port
+# - Client-side cert locations (instead of ~/.docker)
+docker_client_ssl_dir: "var/docker"
+docker_client_ssl_cacert: "{{docker_client_ssl_dir}}/ca.pem"
+docker_client_ssl_cert: "{{docker_client_ssl_dir}}/cert.pem"
+docker_client_ssl_key: "{{docker_client_ssl_dir}}/key.pem"
+# - Docker host remote URL
 docker_tcp_port: "tcp://{{ip_addr}}:2375"
+# - Client-side extra args
+docker_client_extra_args: "--config=../{{docker_client_ssl_dir}} --tlsverify"
+#   - Alternatively,
+#docker_client_extra_args: "--tlsverify
+#       --tlscacert={{docker_client_ssl_cacert}}
+#       --tlscert={{docker_client_ssl_cert}}
+#       --tlskey={{docker_client_ssl_key}}"
 
 
 ##################################
