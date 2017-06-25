@@ -100,6 +100,7 @@ cert:
 '''
 
 from ansible.module_utils.pycompat24 import get_exception
+#from ansible.module_utils.ipa import IPAClient
 from ipa import IPAClient
 
 import re
@@ -156,16 +157,22 @@ class CertIPAClient(IPAClient):
             cacn = self.response_cleaned['cacn'],
             revocation_reason = self.canon_params['revocation_reason'])
 
+    def subject_to_principal(self, subject):
+        m = re.match(r'CN=([^,]*),O=', subject)
+        principal = subject if m is None else m.group(1)
+        return principal
+
     def find_request_item(self):
         # cert_find uses 'subject' as key rather than 'principal'
         item = {'all': True,
                 'subject': self.module.params['principal'],
                 'cacn': self.module.params['cacn'],
+                'exactly': True,
         }
 
         # If serial number is specified, add it to query with
         # min/max_serial_number params
-        if 'serial_number' in self.module.params:
+        if self.module.params.get('serial_number',None):
             sn = self.module.params['serial_number']
             item['min_serial_number'] = item['max_serial_number'] = sn
 
@@ -175,8 +182,7 @@ class CertIPAClient(IPAClient):
         item = item.copy()
         # Extract 'principal' from 'subject' attribute
         if 'subject' in item:
-            m = re.match(r'CN=([^,]*),O=', item['subject'])
-            item['principal'] = item['subject'] if m is None else m.group(1)
+            item['principal'] = self.subject_to_principal(item['subject'])
         return item
 
     def is_rem_param_request(self):

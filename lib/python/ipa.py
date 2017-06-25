@@ -98,6 +98,7 @@ class IPAClient(object):
 
         # Init some attributes
         self.requests = []
+        self.responses = {}
 
         # Init module object
         self.init_module()
@@ -201,12 +202,14 @@ class IPAClient(object):
             err_string = e.get('message')
         else:
             err_string = e
-        self.module.fail_json(msg='%s: %s' % (msg, err_string))
+        self.module.fail_json(
+            msg='%s: %s' % (msg, err_string),
+            requests=self.requests,
+            responses=self.responses)
 
     def _post_json(self, method, name, item=None, item_filter=None):
         url = '%s/session/json' % self.get_base_url()
         data = {'method': method, 'params': [name, item]}
-        from pprint import pprint; print "data:"; pprint(data)
         try:
             resp, info = fetch_url(
                 module=self.module, url=url,
@@ -226,10 +229,9 @@ class IPAClient(object):
                 charset = response_charset
             else:
                 charset = 'latin-1'
-        resp = json.loads(to_text(resp.read(), encoding=charset),
-                          encoding=charset)
+        resp = self.responses[method] = json.loads(
+            to_text(resp.read(), encoding=charset), encoding=charset)
         err = resp.get('error')
-        from pprint import pprint; print "resp:"; pprint(resp); print "err:"; pprint(err)
         if err is not None:
             self._fail('response %s' % method, err)
 
@@ -253,6 +255,11 @@ class IPAClient(object):
     @property
     def response_cleaned(self):
         return self.requests[0].get('response_cleaned',None)
+
+    @property
+    def exists(self):
+        find_response = self.responses[self._methods['find']]
+        return (find_response.get('result',{}).get('count',0)) > 0
 
     #########
     # munging responses
@@ -376,6 +383,8 @@ class IPAClient(object):
     # module params
 
     def munge_module_params(self):
+        # Make adjustments to module parameters to get them into a
+        # canonical dict that can be compared with the `find` response
         item = self.clean(self.module.params)
         item = self.munge_pop_request_keys(item)
         return item
@@ -397,6 +406,8 @@ class IPAClient(object):
     # response
 
     def munge_response(self, response):
+        # Make adjustments to `find` response to get it into a
+        # canonical dict that can be compared with module params
         item = self.clean(response)
         item = self.munge_pop_request_keys(item)
         return item
@@ -474,8 +485,8 @@ class IPAClient(object):
                 item[k] = v
 
 
-        # Do nothing if no changes in item
-        if not item:  return
+        # Do nothing if item already exists and no changes
+        if not item and self.exists:  return
 
         # Construct request and queue it up
         item['all'] = True

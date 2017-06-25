@@ -106,6 +106,7 @@ dnsrecord:
   type: dict
 '''
 
+# from ansible.module_utils.ipa import IPAClient
 from ipa import IPAClient
 
 class DNSRecordIPAClient(IPAClient):
@@ -165,15 +166,29 @@ class DNSRecordIPAClient(IPAClient):
     # ]
     def find_request_params(self):
         cleaned_params = self.clean(self.module.params)
-        print "cleaned_params = %s" % cleaned_params
         return [cleaned_params['zone']]
 
     def find_request_item(self):
         cleaned_params = self.clean(self.module.params)
-        item = {'all': True,
-                'idnsname': { '__dns_name__': cleaned_params['idnsname'] },
-            }
+        self.is_origin = cleaned_params['idnsname'] == '@'
+        if self.is_origin:
+            # Origin '@':  no find args; filter results in find_filter()
+            item = {'all': True}
+        else:
+            item = {'all': True,
+                    'idnsname': { '__dns_name__': cleaned_params['idnsname'] },
+                }
         return item
+
+    def find_filter(self, item):
+        if not self.is_origin:
+            # Don't filter if not origin
+            return True
+        # Origin:  filter for '@'
+        if item['idnsname'] == ['@']:
+            return True
+        else:
+            return False
 
     def mod_request_params(self):
         # dnsrecord wants add()/mod() request params like these:
@@ -182,7 +197,6 @@ class DNSRecordIPAClient(IPAClient):
         # ]
 
         cleaned_params = self.clean(self.module.params)
-        print "cleaned_params = %s" % cleaned_params
         return [cleaned_params['zone'],
                 { '__dns_name__': cleaned_params['idnsname'] },
             ]
