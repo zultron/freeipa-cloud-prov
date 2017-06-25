@@ -4,19 +4,17 @@
 # Called from main.yaml, once for each partition
 #
 # May set these parted mkpart options:
-#   fs_type:  default ext4; linux-swap, ...
-#   part_start: default 0
-#   part_end:  default 100%
-
-- name: Show partition data
-  debug:
-    msg: "Partition number {{partition.number}}"
+#   partition.number:  1...
+#   partition.part_type:  default primary
+#   partition.fs_type:  default ext4; linux-swap, ...
+#   partition.part_start: default 0
+#   partition.part_end:  default 100%
 
 # - name: Debug create partition inputs
 #   debug:
-#     var: item
+#     var: partition
 
-- name: Create partition
+- name: "Device {{device}}, create partition {{partition.number}}"
   parted:
     align: "{{ align|default('optimal') }}"
     device: "{{ device }}"

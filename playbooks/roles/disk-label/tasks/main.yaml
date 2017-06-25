@@ -21,7 +21,7 @@
 ##############################
 # Label volume
 
-- name: Collect volume info
+- name: "Collect volume info for {{ device }}"
   parted:
     device: "{{ device }}"
     state: info
@@ -37,7 +37,7 @@
 #   tags:
 #     - setup
 
-- name: Create volume label
+- name: "Create device {{ device }} volume label {{ label|default('gpt') }}"
   parted:
     device: "{{ device }}"
     label: "{{ label|default('gpt') }}"
@@ -59,7 +59,8 @@
 ##############################
 # Create partitions
 
-- name: Init partition_map facts
+- name: (Init partition_map facts)
+  # Used in include: partition.yaml below
   set_fact:
     partition_map: {}
   tags:
