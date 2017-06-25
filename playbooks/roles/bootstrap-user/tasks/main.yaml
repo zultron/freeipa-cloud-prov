@@ -21,22 +21,46 @@
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
 
-    - name: "Check if bootstrap user is in CA ACL {{user_cert_acl}}"
-      shell: "{{ipaclient_exec}} ipa caacl-show --all --raw {{user_cert_acl}}
-                      | grep -q 'memberuser. uid=bootstrap,'
-                      && echo 'yes' || echo 'no'"
-      register: check_user_in_acl
-      changed_when: check_user_in_acl.stdout == 'no'
-
     - name: "Add bootstrap user to CA ACL {{user_cert_acl}}"
-      command: "{{ipaclient_exec}} ipa caacl-add-user {{user_cert_acl}}
-                     --users bootstrap"
-      when: check_user_in_acl.changed
-      delegate_to: "{{hostname}}"
+      ipa_caacl:
+        name: "{{user_cert_acl}}"
+        user: "bootstrap"
+        state: present
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
 
   delegate_to: localhost
-  tags:
-    - bootstrap-user
+  run_once: True
+  tags: bootstrap-user
+
+#
+# Create docker sub-CA for Docker authentication
+#
+- block:
+
+    - name: "Create Docker CA"
+      ipa_ca:
+        name: "{{docker_ca}}"
+        ipacasubjectdn: "{{docker_ca_subject}}"
+        description: "Docker cluster CA"
+        state: present
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+
+    - name: "Add Docker CA to CA ACL '{{user_cert_acl}}'"
+      ipa_caacl:
+        name: "{{user_cert_acl}}"
+        ca: "{{docker_ca}}"
+        state: present
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+
+  delegate_to: localhost
+  run_once: True
+  tags: docker-ca
 
 #
 # Generate client cert
@@ -45,8 +69,21 @@
   stat:
     path: "{{local_docker_client_cert}}"
   register: local_docker_client_cert_stat
-  tags:
-    - bootstrap-client-cert
+  changed_when: not local_docker_client_cert_stat.stat.exists
+  delegate_to: localhost
+  run_once: True
+  tags: bootstrap-client-cert
+
+- name: "Verify docker cert"
+  shell: "openssl verify
+  -CAfile {{local_docker_client_cert}}
+  {{local_docker_client_cacert}} > /dev/null
+  && echo yes || echo no"
+  delegate_to: localhost
+  register: local_docker_client_cert_verify
+  changed_when: local_docker_client_cert_verify.stdout == "no"
+  run_once: True
+  tags: bootstrap-client-cert
 
 - block:
 
@@ -70,26 +107,39 @@
         creates: "{{bootstrap_client_key}}"
       become: true
 
-    - name: "Generate bootstrap client certificate request in {{bootstrap_client_req}}"
+    - name: "Generate bootstrap client certificate request in
+                  {{bootstrap_client_req}}"
       command: "openssl req -new
-                  -key {{bootstrap_client_key}}
-                  -out {{bootstrap_client_req}}
-                  -config {{bootstrap_client_openssl_conf}}"
+                  -key {{bootstrap_client_key|quote}}
+                  -out {{bootstrap_client_req|quote}}
+                  -config {{bootstrap_client_openssl_conf|quote}}"
       args:
         creates: "{{bootstrap_client_req}}"
       become: true
 
-    - name: "Generate bootstrap client certificate in IPA"
-      shell: "{{ipaclient_exec}} ipa cert-request {{bootstrap_client_req}}
-                     --principal bootstrap@{{kerberos_realm}}
-                     --profile-id IECUserRoles --raw
-                     | awk '/serial_number. / { print $2 }'"
-      register: client_cert_req
-
-    - name: "Dump bootstrap client certificate into {{bootstrap_client_cert}}"
-      command: "{{ipaclient_exec}} ipa cert-show {{client_cert_req.stdout}}
-                     --out {{bootstrap_client_cert}}"
+    - name: "Fetch cert request from {{bootstrap_client_req}} to
+                 /tmp/bootstrap_req.pem"
+      fetch:
+        src: "{{bootstrap_client_req}}"
+        dest: "/tmp/bootstrap_req.pem"
+        flat: yes
       become: true
+
+    - name: "Read client cert request fact"
+      set_fact:
+        cert_req: "{{ lookup('file', '/tmp/bootstrap_req.pem') }}"
+
+    - name: "Generate bootstrap client certificate in IPA"
+      ipa_cert:
+        req: "{{cert_req}}"
+        principal: bootstrap
+        cacn: "{{docker_ca}}"
+        state: present
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      delegate_to: localhost
+      register: client_cert_req
 
     - name: "Create local docker directory {{local_docker_client_dir}}"
       file:
@@ -97,13 +147,15 @@
         state: directory
       delegate_to: localhost
 
-    - name: "Fetch bootstrap docker client cert to
-                 {{local_docker_client_cert}}"
-      fetch:
-        src: "{{bootstrap_client_cert}}"
+    - name: "Dump bootstrap client certificate into {{local_docker_client_cert}}"
+      copy:
+        content: |
+          -----BEGIN CERTIFICATE-----
+          {{client_cert_req.cert.certificate}}
+          -----END CERTIFICATE-----
         dest: "{{local_docker_client_cert}}"
-        flat: yes
-      become: true
+        force: yes
+      delegate_to: localhost
 
     - name: "Fetch bootstrap docker client SSL key to
                  {{local_docker_client_key}}"
@@ -113,19 +165,44 @@
         flat: yes
       become: true
 
-    - name: "Fetch docker CA cert to
-                 {{local_docker_client_cacert}}"
-      fetch:
-        src: "{{bootstrap_client_cacert}}"
-        dest: "{{local_docker_client_cacert}}"
-        flat: yes
-      become: true
-
     - name: "Restrict read permission on {{local_docker_client_key}}"
-    - file:
+      file:
         path: "{{local_docker_client_key}}"
         mode: 0600
+      delegate_to: localhost
 
-  when: not local_docker_client_cert_stat.stat.exists
-  tags:
-    - bootstrap-client-cert
+    - name: "Read docker CA cert"
+      ipa_cert:
+        cacn: ipa
+        principal: "{{docker_ca_subject}}"
+        state: present
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      delegate_to: localhost
+      # Don't actually create, just read
+      # check_mode: yes
+      register: docker_ca_cert
+
+    - name: "Dump docker CA cert into {{local_docker_client_cacert}}"
+      copy:
+        content: |
+          -----BEGIN CERTIFICATE-----
+          {{docker_ca_cert.cert.certificate}}
+          -----END CERTIFICATE-----
+        dest: "{{local_docker_client_cacert}}"
+        force: yes
+      delegate_to: localhost
+
+    - name: "Verify docker cert again"
+      command: "openssl verify
+      -CAfile {{local_docker_client_cert}}
+      {{local_docker_client_cacert}}"
+      delegate_to: localhost
+      changed_when: False
+
+  when:
+    not local_docker_client_cert_stat.stat.exists or
+    local_docker_client_cert_verify.changed
+  run_once: True
+  tags: bootstrap-client-cert
