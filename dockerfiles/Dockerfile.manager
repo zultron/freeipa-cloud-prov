@@ -49,6 +49,8 @@ RUN apt-get -y install ldap-utils
 RUN useradd -s /bin/bash user
 
 RUN apt-get -y install git
+# For generating vault passwords automatically
+RUN apt-get -y install apg
 
 # Install docker
 # https://docs.docker.com/engine/installation/linux/debian/

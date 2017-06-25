@@ -1,6 +1,18 @@
 ---
 # Create Ansible vault file
 
+- name: Ensure .vault_pass file exists
+  # Single password, 30 chars long
+  command: bash -c "apg -n 1 -m 30 > .vault_pass"
+  args:
+    chdir: ..
+    creates: .vault_pass
+
+- name: Ensure .vault_pass mode is 0600
+  file:
+    path: ../.vault_pass
+    mode: "0600"
+
 - name: Check if Ansible vault file exists
   stat:
     path: ../var/vault.yaml
