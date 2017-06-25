@@ -4,29 +4,11 @@
 
 - name: Fetch CA cert
   fetch:
-    src: "{{freeipa_volume_path}}/root/cacert.p12"
-    dest: "../var/cacert.p12"
+    src: "{{freeipa_volume_path}}/etc/ipa/ca.crt"
+    dest: "../var/cacert.pem"
     flat: yes
   when: hostname == master_host
   register: fetch_ca_cert
-  tags:
-    - local-setup
-
-- name: Convert CA cert to pem format
-  command: "openssl pkcs12 -in ../var/cacert.p12 -clcerts -nokeys
-            -passin pass:{{freeipa_ds_password}} -passout pass:
-            -out ../var/cacert.pem"
-  delegate_to: localhost
-  when: fetch_ca_cert.changed
-  tags:
-    - local-setup
-
-- name: Convert CA cert to pem format
-  command: "openssl pkcs12 -in ../var/cacert.p12 -clcerts -nokeys
-            -passin pass:{{freeipa_ds_password}} -passout pass:
-            -out ../var/cacert.pem"
-  delegate_to: localhost
-  when: fetch_ca_cert.changed
   tags:
     - local-setup
 
