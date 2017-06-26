@@ -27,7 +27,7 @@ freeipa_client_network_addr: "{{container_network_prefix}}.2"
 # TLS
 # - FreeIPA sub-CA
 docker_ca: "docker"
-docker_ca_subject: "Docker Certificate Authority"
+docker_ca_subject: "CN=Docker Certificate Authority,O={{kerberos_realm}}"
 # - FreeIPA service principal
 docker_service_principal: "docker/{{fqdn}}"
 # - Server-side cert locations
@@ -58,6 +58,7 @@ docker_client_extra_args: "--config=../{{docker_client_ssl_dir}} --tlsverify"
 
 # Data volume block device
 data_volume_block_device:  "{{ block_device_path_pat % 'data' }}"
+# - Size in GB
 data_volume_size: 4
 
 # Data volume partition
