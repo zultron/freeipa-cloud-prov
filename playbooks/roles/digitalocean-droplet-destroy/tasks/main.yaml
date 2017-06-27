@@ -20,6 +20,12 @@
     state: absent
   delegate_to: localhost
 
+- name:  "Destroy docker certs in {{docker_client_ssl_dir}}"
+  file:
+    path: "../{{docker_client_ssl_dir}}"
+    state: absent
+  delegate_to: localhost
+
 - name:  "Destroy data volume {{data_volume_name}}"
   digital_ocean_block_storage:
     volume_name: "{{data_volume_name}}"
