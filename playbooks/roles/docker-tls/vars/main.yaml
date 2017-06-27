@@ -1,0 +1,16 @@
+# Variables for creating bootstrap client cert
+
+docker_client_id: "docker_client"
+
+#
+# Remote locations for bootstrap docker client SSL cert
+#
+# Cert dir is in the data volume, accessible to ipaclient
+docker_client_cert_dir: "{{data_volume_path}}/bootstrap-cert"
+
+docker_client_cacert: "{{docker_ssl_cacert}}"
+docker_client_cert: "{{docker_ssl_cacert}}"
+docker_client_key: "{{docker_client_cert_dir}}/key.pem"
+docker_client_req: "{{docker_client_cert_dir}}/req.pem"
+docker_client_openssl_conf:
+     "{{docker_client_cert_dir}}/openssl-bootstrap-client.conf"

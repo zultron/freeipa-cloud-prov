@@ -1,6 +1,6 @@
 ---
 #################################
-# Configure Docker server TLS
+# Configure Docker server and client TLS
 #
 # Enable TLS service on port 2375; afterwards, run docker remotely like this
 #
@@ -17,6 +17,226 @@
 # https://coreos.com/os/docs/latest/customizing-docker.html#enable-the-remote-api-with-tls-authentication
 
 #
+# Create docker sub-CA for Docker authentication
+#
+- block:
+
+    - name: "Create Docker CA"
+      ipa_ca:
+        name: "{{docker_ca}}"
+        ipacasubjectdn: "{{docker_ca_subject}}"
+        description: "Docker cluster CA"
+        state: present
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      register:  docker_ca_cert
+
+    - name: "Add Docker CA to CA ACL '{{user_cert_acl}}'"
+      ipa_caacl:
+        name: "{{user_cert_acl}}"
+        ca: "{{docker_ca}}"
+        state: present
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+
+  delegate_to: localhost
+  run_once: True
+  tags: docker-ca
+
+#
+# Create docker client user
+#
+- block:
+
+    - name: "Create docker client user"
+      ipa_user:
+        name: "{{docker_client_id}}"
+        state: present
+        givenname: Docker
+        sn: Client
+        # password: "{{freeipa_admin_password}}"
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      register:  create_docker_client_user
+
+    - name: "Add docker user to CA ACL {{user_cert_acl}}"
+      ipa_caacl:
+        name: "{{user_cert_acl}}"
+        user: "{{docker_client_id}}"
+        state: present
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+
+  delegate_to: localhost
+  run_once: True
+  tags: docker-client
+
+#
+# Generate docker client cert
+#
+- block:
+    # Check for local, valid cert to avoid lots of unneeded remote
+    # work in next block
+
+    - name: "Check if docker client cert already exists locally in
+      {{docker_client_ssl_cert}}"
+      stat:
+        path: "../{{docker_client_ssl_cert}}"
+      register: local_docker_client_cert_stat
+      changed_when: not local_docker_client_cert_stat.stat.exists
+
+    - name: "Verify docker client cert validity"
+      shell: "openssl verify
+      -CAfile ../{{docker_client_ssl_cacert}}
+      ../{{docker_client_ssl_cert}} > /dev/null
+      && echo yes || echo no"
+      register: local_docker_client_cert_verify
+      changed_when: local_docker_client_cert_verify.stdout == "no"
+      when: not local_docker_client_cert_stat.changed
+
+  delegate_to: localhost
+  run_once: True
+  tags: docker-client-cert
+
+- block:
+
+    #
+    # Create docker client cert on FreeIPA server
+    #
+    # FIXME use ansible openssl_privatekey module
+    # FIXME use ansible openssl_csr module
+    - name: "Create remote docker client cert directory
+             {{docker_client_cert_dir}}"
+      file:
+        path: "{{docker_client_cert_dir}}"
+        state: directory
+        mode: 0700
+      become: true
+
+    - name: "Create openssl.conf for docker client cert"
+      template:
+        src: openssl-docker-client.conf.j2
+        dest: "{{docker_client_openssl_conf}}"
+      become: true
+
+    - name: "Generate docker client cert key in {{docker_client_key}}"
+      command: "openssl genrsa -out {{docker_client_key}} 2048"
+      args:
+        creates: "{{docker_client_key}}"
+      become: true
+
+    - name: "Generate docker client certificate request in
+                  {{docker_client_req}}"
+      command: "openssl req -new
+                  -key {{docker_client_key|quote}}
+                  -out {{docker_client_req|quote}}
+                  -config {{docker_client_openssl_conf|quote}}"
+      args:
+        creates: "{{docker_client_req}}"
+      become: true
+
+    - name: "Fetch cert request from {{docker_client_req}} to
+                 /tmp/docker_client_req.pem"
+      fetch:
+        src: "{{docker_client_req}}"
+        dest: "/tmp/docker_client_req.pem"
+        flat: yes
+      become: true
+
+    - name: "Read client cert request fact"
+      set_fact:
+        cert_req: "{{ lookup('file', '/tmp/docker_client_req.pem') }}"
+
+    - name: "Generate docker client certificate in IPA"
+      ipa_cert:
+        req: "{{cert_req}}"
+        principal: "{{docker_client_id}}"
+        cacn: "{{docker_ca}}"
+        state: present
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      delegate_to: localhost
+      register: client_cert_req
+
+    #
+    # Copy client cert to local container
+    #
+    - name: "Create local docker directory {{docker_client_ssl_dir}}"
+      file:
+        path: "../{{docker_client_ssl_dir}}"
+        state: directory
+      delegate_to: localhost
+
+    - name: "Dump docker client certificate into {{docker_client_ssl_cert}}"
+      copy:
+        content: |
+          -----BEGIN CERTIFICATE-----
+          {{client_cert_req.cert.certificate}}
+          -----END CERTIFICATE-----
+        dest: "../{{docker_client_ssl_cert}}"
+        force: yes
+      delegate_to: localhost
+
+    - name: "Fetch docker client SSL key to
+                 {{docker_client_ssl_key}}"
+      fetch:
+        src: "{{docker_client_key}}"
+        dest: "../{{docker_client_ssl_key}}"
+        flat: yes
+      become: true
+
+    - name: "Restrict read permission on {{docker_client_ssl_key}}"
+      file:
+        path: "../{{docker_client_ssl_key}}"
+        mode: 0600
+      delegate_to: localhost
+
+    - name: "Read Docker CA cert"
+      ipa_cert:
+        cacn: ipa
+        # principal: "CN=Docker Certificate Authority,O={{kerberos_realm}}"
+        principal: "Docker Certificate Authority"
+        state: present
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      delegate_to: localhost
+      # Don't actually create, just read
+      check_mode: yes
+      changed_when: False
+      register: docker_ca_cert
+
+    - name: "Dump docker CA cert into {{docker_client_ssl_cacert}}"
+      copy:
+        content: |
+          -----BEGIN CERTIFICATE-----
+          {{docker_ca_cert.cert.certificate}}
+          -----END CERTIFICATE-----
+          {{ lookup('file', '../var/cacert.pem') }}
+        dest: "../{{docker_client_ssl_cacert}}"
+        force: yes
+      delegate_to: localhost
+
+    - name: "Verify docker cert again"
+      command: "openssl verify
+      -CAfile ../{{docker_client_ssl_cacert}}
+      ../{{docker_client_ssl_cert}}"
+      delegate_to: localhost
+      changed_when: False
+
+  when:
+    not local_docker_client_cert_stat.stat.exists or
+    local_docker_client_cert_verify.changed
+  run_once: True
+  tags: docker-client-cert
+
+
+#
 # Docker service certs
 #
 # Configure service in FreeIPA and use certmonger to generate certs
@@ -25,45 +245,42 @@
               add managed by {{freeipa_client_fqdn}} host"
   ipa_service:
     name: "{{docker_service_principal}}"
-    host:
-      - "{{freeipa_client_fqdn}}"
+    managedby_host: "{{freeipa_client_fqdn}}"
     state: present
     ipa_host: "{{fqdn}}"
     ipa_user: "{{ipa_user}}"
     ipa_pass: "{{freeipa_admin_password}}"
   delegate_to: localhost
-  tags:
-    - cert
+  tags: docker-service-cert
 
-- name: "Check if cert exists in {{docker_ssl_cert}}"
+- name: "Check if docker server cert exists in {{docker_ssl_cert}}"
   stat:
     path: "{{docker_ssl_cert}}"
-  register: docker_ssl_cert_stat
-  tags:
-    - cert
-
-- name: "Create cert directory {{docker_ssl_dir}}"
-  file:
-    path: "{{docker_ssl_dir}}"
-    state: directory
-    mode: 0700
   become: true
-  when: not docker_ssl_cert_stat.stat.exists
-  tags:
-    - cert
+  register: docker_ssl_cert_stat
+  tags: docker-service-cert
 
-- name:  "Create pem cert for {{docker_service_principal}}"
-  # The cert is actually created and maintained by certmonger running
-  # in ipaclient.  The {{docker_ssl_dir}} has been bind-mounted in the
-  # container for this purpose.
-  shell: "{{ipaclient_exec}} ipa-getcert request -w
-              -f '{{docker_ssl_cert}}' -k '{{docker_ssl_key}}'
-              -F '{{docker_ssl_cacert}}'
-              -K {{docker_service_principal}} -N '{{fqdn}}' -g 2048"
+- block:
+
+    - name: "Create docker server cert directory {{docker_ssl_dir}}"
+      file:
+        path: "{{docker_ssl_dir}}"
+        state: directory
+        mode: 0700
+      become: true
+
+    - name:  "Create docker server cert for {{docker_service_principal}}"
+      # The cert is actually created and maintained by certmonger running
+      # in ipaclient.  The {{docker_ssl_dir}} has been bind-mounted in the
+      # container for this purpose.
+      shell: "{{ipaclient_exec}} ipa-getcert request -w
+                  -f '{{docker_ssl_cert}}' -k '{{docker_ssl_key}}'
+                  -F '{{docker_ssl_cacert}}'
+                  -K {{docker_service_principal}} -N '{{fqdn}}' -g 2048"
+      register: docker_ssl_cert_create
+
   when: not docker_ssl_cert_stat.stat.exists
-  register: docker_ssl_cert_create
-  tags:
-    - cert
+  tags: docker-service-cert
 
 
 #
@@ -84,34 +301,30 @@
 # systemd socket unit docs
 # https://www.freedesktop.org/software/systemd/man/systemd.socket.html
 
-- name: "Install docker.socket systemd dropin directory"
-  file:
-    path: "/etc/systemd/system/docker.socket.d"
-    state: directory
-    mode: 0755
-  become: true
-  tags:
-    - docker-tls
+- block:
 
-- name: "Install docker.socket dropin file to add TCP port 2375"
-  template:
-    src: 10-docker-tcp-socket.conf.j2
-    dest: "/etc/systemd/system/docker.socket.d/10-docker-tcp-socket.conf"
-  become: true
-  register: systemd_docker_socket
-  tags:
-    - docker-tls
+    - name: "Install docker.socket systemd dropin directory"
+      file:
+        path: "/etc/systemd/system/docker.socket.d"
+        state: directory
+        mode: 0755
 
-- name: "Restart docker.socket systemd unit"
-  systemd:
-    name: docker.socket
-    daemon_reload: yes
-    enabled: true
-    state: restarted
+    - name: "Install docker.socket dropin file to add TCP port 2375"
+      template:
+        src: 10-docker-tcp-socket.conf.j2
+        dest: "/etc/systemd/system/docker.socket.d/10-docker-tcp-socket.conf"
+      register: systemd_docker_socket
+
+    - name: "Restart docker.socket systemd unit"
+      systemd:
+        name: docker.socket
+        daemon_reload: yes
+        enabled: true
+        state: restarted
+      when: systemd_docker_socket.changed
+
   become: true
-  when: systemd_docker_socket.changed
-  tags:
-    - docker-tls
+  tags: dockerd-tls
 
 #
 # Configure dockerd TLS command line args
@@ -120,30 +333,27 @@
 # https://docs.docker.com/engine/reference/commandline/dockerd/
 #
 
-- name: "Install docker.service systemd dropin directory"
-  file:
-    path: "/etc/systemd/system/docker.service.d"
-    state: directory
-    mode: 0755
-  become: true
-  tags:
-    - docker-tls
+- block:
 
-- name: "Install docker.service systemd dropin to add dockerd TLS options"
-  template:
-    src: 10-dockerd-tls.conf.j2
-    dest: "/etc/systemd/system/docker.service.d/10-dockerd-tls.conf"
-  become: true
-  register: systemd_docker_dropin
-  tags:
-    - docker-tls
+    - name: "Install docker.service systemd dropin directory"
+      file:
+        path: "/etc/systemd/system/docker.service.d"
+        state: directory
+        mode: 0755
 
-- name: "Restart docker service"
-  systemd:
-    name: docker.service
-    daemon_reload: yes
-    state: restarted
+    - name: "Install docker.service systemd dropin to add dockerd TLS options"
+      template:
+        src: 10-dockerd-tls.conf.j2
+        dest: "/etc/systemd/system/docker.service.d/10-dockerd-tls.conf"
+      register: systemd_docker_dropin
+
+    - name: "Restart docker service"
+      systemd:
+        name: docker.service
+        daemon_reload: yes
+        state: restarted
+      when: systemd_docker_socket.changed or systemd_docker_dropin.changed
+
   become: true
-  when: systemd_docker_socket.changed or systemd_docker_dropin.changed
-  tags:
-    - docker-tls
+  tags: dockerd-tls
+

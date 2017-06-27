@@ -44,14 +44,14 @@
         - freeipa-install
         - freeipa-configure
 
-    # Configure CoreOS Docker:  SSL CA, server and client certs
-    - role: bootstrap-user
-      tags:
-        - freeipa-install
-        - freeipa-bootstrap-user
-
     # Install FreeIPA client
     - role: freeipa-client-install
       tags:
         - freeipa-install
         - freeipa-client-install
+
+    # Configure CoreOS Docker TLS:  SSL CA, server and client certs
+    - role: docker-tls
+      tags:
+        - freeipa-install
+        - docker-tls

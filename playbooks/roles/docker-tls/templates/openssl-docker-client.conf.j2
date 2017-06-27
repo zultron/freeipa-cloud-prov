@@ -6,7 +6,7 @@ distinguished_name = dn
 req_extensions = exts
 
 [ dn ]
-commonName = "bootstrap"
+commonName = "{{docker_client_id}}"
 
 [ exts ]
-subjectAltName=email:bootstrap@{{domain_name}}
+subjectAltName=email:{{docker_client_id}}@{{domain_name}}
