@@ -131,6 +131,11 @@
   tags:
     - configure
 
+- name: Wait for httpd service
+  wait_for:
+    port:  443
+    delay: 10
+
 #################################
 # Misc
 
