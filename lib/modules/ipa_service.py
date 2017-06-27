@@ -97,7 +97,7 @@ service:
   type: dict
 '''
 
-from ansible.module_utils.pycompat24 import get_exception
+#from ansible.module_utils.ipa import IPAClient
 from ipa import IPAClient
 import re
 
@@ -117,21 +117,20 @@ class ServiceIPAClient(IPAClient):
 
     kw_args = dict(
         krbcanonicalname = dict(
-            type='str', required=True, aliases=['name'],
-            when=['find'], when_name=['add', 'mod', 'rem']),
+            type='str', required=True, aliases=['name']),
         usercertificate = dict(
-            type='str', required=False),
+            type='str', required=False, aliases=['certificate']),
         krbprincipalauthind = dict(
-            type='str', required=False),
+            type='str', required=False, aliases=['auth_ind']),
 
         # The next three booleans are bits broken out of the
         # krbticketflags param; see filter_value() and request_cleanup()
         ipakrbrequirespreauth = dict(
-            type='bool', required=False),
+            type='bool', default=True, aliases=['requires_pre_auth']),
         ipakrbokasdelegate = dict(
-            type='bool', required=False),
+            type='bool', default=False, aliases=['ok_as_delegate']),
         ipakrboktoauthasdelegate = dict(
-            type='bool', required=False),
+            type='bool', default=False, aliases=['ok_to_auth_as_delegate']),
 
         # service-add-principal CANONICAL-PRINCIPAL PRINCIPAL...
         krbprincipalname = dict(
@@ -150,7 +149,7 @@ class ServiceIPAClient(IPAClient):
         # ipaAllowedToPerform;read_keys:
         #     fqdn=host1.example.com,cn=computers,cn=accounts,dc=example,dc=com
         directory_base_dn = dict(
-            type='str', required=False, when=[]),
+            type='str', required=False),
 
         # managedby attribute value
         host = dict(type='list', required=False),
@@ -177,6 +176,11 @@ class ServiceIPAClient(IPAClient):
         read_keytab_hostgroups = dict(
             type='list', required=False),
     )
+
+    def munge_module_params(self):
+        item = super(ServiceIPAClient, self).munge_module_params()
+        self.directory_base_dn = item.pop('directory_base_dn',None)
+        return item
 
     def munge_response_usercertificate(self, response):
         # Replace dict value with string:
@@ -305,7 +309,6 @@ class ServiceIPAClient(IPAClient):
             request['item']['delattr'].pop('krbticketflags',None)
 
         # ipaAllowedToPerform;(read|write)_keys:
-        directory_base_dn = self.module.params.get('directory_base_dn',None)
         dn_pat = '%s=%s,cn=%s,cn=accounts,%s'
         type_map = dict(users='uid', groups='cn', hosts='fqdn', hostgroups='cn')
         for thing in ('users', 'groups', 'hosts', 'hostgroups'):
@@ -316,14 +319,14 @@ class ServiceIPAClient(IPAClient):
                                request['item']['delattr']):
                     if key not in req_op: continue
                     # directory_base_dn must be defined
-                    if directory_base_dn is None:
+                    if self.directory_base_dn is None:
                         self._fail(key, 'directory_base_dn param undefined')
                     # Patch values into ipaallowedtoperform;read/write_keys
                     dest_key = 'ipaallowedtoperform;%s_keys'%perm
                     for val in req_op.pop(key):
                         req_op.setdefault(dest_key,[]).append(
                             dn_pat % (type_map[thing], val, thing_trans,
-                                      directory_base_dn))
+                                      self.directory_base_dn))
 
         # host -> managedby:
         for act_key, acts in request['item'].items():

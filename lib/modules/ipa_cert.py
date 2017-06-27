@@ -134,9 +134,9 @@ class CertIPAClient(IPAClient):
         # "revoke" params
         serial_number =     dict(type='str', required=False),
         revocation_reason = dict(type='int', required=False,
-                                 when=['rem'], choices=range(11)),
+                                 choices=range(11)),
     )
-
+        
     def mod_request_params(self):
         # cert_request method wants request in PEM format as name
         if 'req' not in self.module.params:
@@ -165,7 +165,8 @@ class CertIPAClient(IPAClient):
     def find_request_item(self):
         # cert_find uses 'subject' as key rather than 'principal'
         item = {'all': True,
-                'subject': self.module.params['principal'],
+                'subject': self.subject_to_principal(
+                    self.module.params['principal']),
                 'cacn': self.module.params['cacn'],
                 'exactly': True,
         }

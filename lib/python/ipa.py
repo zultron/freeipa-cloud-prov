@@ -135,7 +135,6 @@ class IPAClient(object):
             spec = spec_orig.copy()
             self.param_data[name] = dict(
                 type = spec['type'],
-                when = spec.pop('when', ['add','mod']),
                 value_filter_func = spec.pop('value_filter_func', None),
                 value_filter_re = (re.compile(spec.pop('value_filter_re')) \
                                    if 'value_filter_re' in spec else None),
@@ -302,13 +301,6 @@ class IPAClient(object):
             item[key] = val
         return item
 
-    def filter_params_on_when(self, item, when):
-        item = item.copy()
-        for key in item.keys():
-            if when not in self.param_data.get(key,{}).get('when',[]):
-                item.pop(key)
-        return item
-
     #######################################################
     # diffs
 
@@ -325,12 +317,6 @@ class IPAClient(object):
         keys = set(self.param_data.keys())
         res = {}
         for key in set(a) | set(b):
-            # if key not in self.param_data: continue
-            # FIXME can we treat scalars this way?
-            # if self.param_data[key]['type'] != 'list': continue
-            # FIXME
-            # if 'add' not in self.param_data[key]['when']: continue
-            # => res_val = a[key] <op> b[key]
             res_val = list(getattr(set(a.get(key, [])), op)(set(b.get(key, []))))
             if res_val: res.setdefault(key,[]).extend(res_val)
         return res
@@ -341,13 +327,18 @@ class IPAClient(object):
         curr_slice = self.get_slice(curr_params)
 
         changes = dict(scalars = {}, list_add = {}, list_del = {})
+
+        # Compute changes for list parameters
         if self.state != 'absent':
+            # Calculate values to add:  desired state - current state
             changes['list_add'].update(
                 self.op(change_slice['list'], curr_slice['list'], 'difference'))
         if self.state == 'exact':
+            # Calculate values to remove:  current state - desired state
             changes['list_del'].update(
                 self.op(curr_slice['list'], change_slice['list'], 'difference'))
         if self.state == 'absent':
+            # Calculate values to remove:  desired state & current state
             changes['list_del'].update(
                 self.op(change_slice['list'], curr_slice['list'], 'intersection'))
 
@@ -365,14 +356,18 @@ class IPAClient(object):
             if self.state == 'exact':
                 # Deleted scalar keys
                 scalar_keys |= (set(curr_slice['scalar'].keys()) -
-                                set(change_slice['scalar'].keys()))
+                                (set(change_slice['scalar'].keys()) |
+                                 set([k for k in self.argument_spec
+                                      if 'default' in self.argument_spec[k]])))
             for k in scalar_keys:
-                changes['scalars'][k] = change_params.get(k,None)
+                changes['scalars'][k] = change_params.get(
+                    k,self.argument_spec[k].get('default',None))
         if self.state == 'absent':
             for k in change_slice['scalar']:
                 if change_slice['scalar'][k] == \
                    curr_slice['scalar'].get(k,None):
-                    changes['scalars'][k] = None
+                    changes['scalars'][k] = self.argument_spec[k].get(
+                        'default',None)
 
         return changes
 
@@ -382,11 +377,19 @@ class IPAClient(object):
     #########
     # module params
 
+    def munge_state_exact_add_defaults(self, item):
+        if self.state != 'exact':
+            return item
+        for k, v in self.argument_spec.items():
+            if k in item:  continue
+            if 'default' not in v:  continue
+            item[k] = v['default']
+        return item
+
     def munge_module_params(self):
-        # Make adjustments to module parameters to get them into a
-        # canonical dict that can be compared with the `find` response
         item = self.clean(self.module.params)
         item = self.munge_pop_request_keys(item)
+        item = self.munge_state_exact_add_defaults(item)
         return item
 
     #########
@@ -406,8 +409,6 @@ class IPAClient(object):
     # response
 
     def munge_response(self, response):
-        # Make adjustments to `find` response to get it into a
-        # canonical dict that can be compared with module params
         item = self.clean(response)
         item = self.munge_pop_request_keys(item)
         return item
@@ -589,6 +590,7 @@ class IPAClient(object):
             result = {
                 'changed': changed,
                 self.name: obj,
+                'debug': self.requests,
             }
             self.module.exit_json(**result)
         except Exception:

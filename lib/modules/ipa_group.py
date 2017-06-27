@@ -140,6 +140,7 @@ group:
   type: dict
 '''
 
+#from ansible.module_utils.ipa import IPAClient
 from ipa import IPAClient
 
 
