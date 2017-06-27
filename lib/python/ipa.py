@@ -387,6 +387,8 @@ class IPAClient(object):
         return item
 
     def munge_module_params(self):
+        # Make adjustments to module parameters to get them into a
+        # canonical dict that can be compared with the `find` response
         item = self.clean(self.module.params)
         item = self.munge_pop_request_keys(item)
         item = self.munge_state_exact_add_defaults(item)
@@ -409,6 +411,8 @@ class IPAClient(object):
     # response
 
     def munge_response(self, response):
+        # Make adjustments to `find` response to get it into a
+        # canonical dict that can be compared with module params
         item = self.clean(response)
         item = self.munge_pop_request_keys(item)
         return item
@@ -590,7 +594,7 @@ class IPAClient(object):
             result = {
                 'changed': changed,
                 self.name: obj,
-                'debug': self.requests,
+                # 'debug': self.requests,
             }
             self.module.exit_json(**result)
         except Exception:

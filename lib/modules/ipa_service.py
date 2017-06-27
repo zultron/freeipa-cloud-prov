@@ -113,7 +113,20 @@ class ServiceIPAClient(IPAClient):
         show = '{}_show',
         )
 
+    change_functions = tuple(
+        list(IPAClient.change_functions) +
+        ['handle_managedby_host', 'handle_allow_keytab'] )
+
     param_keys = set(('krbcanonicalname',))
+    base_keys = set([
+        'krbcanonicalname', 'usercertificate', 'krbprincipalauthind',
+        'ipakrbrequirespreauth', 'ipakrbokasdelegate',
+        'ipakrboktoauthasdelegate', 'krbprincipalname',
+        'write_keytab_users', 'write_keytab_groups',
+        'write_keytab_hosts', 'write_keytab_hostgroups',
+        'read_keytab_users', 'read_keytab_groups',
+        'read_keytab_hosts', 'read_keytab_hostgroups',
+    ])
 
     kw_args = dict(
         krbcanonicalname = dict(
@@ -123,8 +136,6 @@ class ServiceIPAClient(IPAClient):
         krbprincipalauthind = dict(
             type='str', required=False, aliases=['auth_ind']),
 
-        # The next three booleans are bits broken out of the
-        # krbticketflags param; see filter_value() and request_cleanup()
         ipakrbrequirespreauth = dict(
             type='bool', default=True, aliases=['requires_pre_auth']),
         ipakrbokasdelegate = dict(
@@ -132,55 +143,33 @@ class ServiceIPAClient(IPAClient):
         ipakrboktoauthasdelegate = dict(
             type='bool', default=False, aliases=['ok_to_auth_as_delegate']),
 
-        # service-add-principal CANONICAL-PRINCIPAL PRINCIPAL...
+        # ipa service-add-principal CANONICAL-PRINCIPAL PRINCIPAL...
         krbprincipalname = dict(
             type='list', required=False),
 
-        # The host and create/retrieve_keytab_* params require the DIT
-        # base DN (e.g. 'dc=example,dc=com') to reconstruct
-        # user/group/host/hostgroup DNs from uid/cn/fqdn/cn ; see
-        # filter_value() and request_cleanup(); e.g.:
-        #
-        # write_keytab_users: admin ->
-        # ipaAllowedToPerform;write_keys:
-        #     uid=admin,cn=users,cn=accounts,dc=example,dc=com
-        #
-        # read_keytab_hosts: host1.example.com ->
-        # ipaAllowedToPerform;read_keys:
-        #     fqdn=host1.example.com,cn=computers,cn=accounts,dc=example,dc=com
-        directory_base_dn = dict(
-            type='str', required=False),
+        # ipa service-add-host/service-remove-host
+        managedby_host = dict(type='list', required=False),
 
-        # managedby attribute value
-        host = dict(type='list', required=False),
-
-        # service-allow-create-keytab users/groups/hosts/hostgroups
-        # ipaAllowedToPerform;write_keys:
-        write_keytab_users = dict(
+        # ipa service-(dis)allow-create-keytab users/groups/hosts/hostgroups
+        ipaallowedtoperform_write_keys_user = dict(
             type='list', required=False),
-        write_keytab_groups = dict(
+        ipaallowedtoperform_write_keys_group = dict(
             type='list', required=False),
-        write_keytab_hosts = dict(
+        ipaallowedtoperform_write_keys_host = dict(
             type='list', required=False),
-        write_keytab_hostgroups = dict(
+        ipaallowedtoperform_write_keys_hostgroup = dict(
             type='list', required=False),
 
-        # service-allow-read-keytab  users/groups/hosts/hostgroups
-        # ipaAllowedToPerform;read_keys:  as above
-        read_keytab_users = dict(
+        # ipa service-(dis)allow-read-keytab  users/groups/hosts/hostgroups
+        ipaallowedtoperform_read_keys_user = dict(
             type='list', required=False),
-        read_keytab_groups = dict(
+        ipaallowedtoperform_read_keys_group = dict(
             type='list', required=False),
-        read_keytab_hosts = dict(
+        ipaallowedtoperform_read_keys_host = dict(
             type='list', required=False),
-        read_keytab_hostgroups = dict(
+        ipaallowedtoperform_read_keys_hostgroup = dict(
             type='list', required=False),
     )
-
-    def munge_module_params(self):
-        item = super(ServiceIPAClient, self).munge_module_params()
-        self.directory_base_dn = item.pop('directory_base_dn',None)
-        return item
 
     def munge_response_usercertificate(self, response):
         # Replace dict value with string:
@@ -201,142 +190,73 @@ class ServiceIPAClient(IPAClient):
         # specified in this list should avoid touching that value.
 
         if 'krbprincipalname' not in response:  return response
-        # Duplicate original list
+        # Pop response attribute, copy and remove principal canonical name
         new_val = list(response.pop('krbprincipalname'))
-        # Remove principal canonical name
         new_val.remove(
             self.module.params.get('krbcanonicalname'))
-        # Add back
+        # If anything left, add back
         if new_val:
             response['krbprincipalname'] = new_val
 
         return response
-
-    def munge_response_ipaallowedtoperform(self, response):
-        # Filter account DNs of the right type and return the uid/cn/fqdn
-        #
-        # uid=admin,cn=users,cn=accounts,dc=example,dc=com
-        # cn=editors,cn=groups,cn=accounts,dc=example,dc=com
-        # fqdn=host1.example.com,cn=computers,cn=accounts,dc=example,dc=com
-        # cn=ipaservers,cn=hostgroups,cn=accounts,dc=example,dc=com
-
-        for key in response:
-            if not key.startswith('ipaallowedtoperform;'): continue
-
-            val = response.pop(key)
-            op = re.match(r'ipaallowedtoperform;(.*)_keys', key).group(1)
-            for v in val:
-                m = re.match(
-                    r'^(?:fqdn|cn|uid)=([^,]*),cn=([^,]*),cn=accounts,', v)
-                if m is not None:
-                    name, acct_type = m.groups()
-                    if acct_type == 'computers':  acct_type = 'hosts'
-                    response.setdefault(
-                        '%s_keytab_%s' % (op, acct_type), []).append(name)
-        return response
-
-    def munge_response_managedby(self, response):
-        # managedby attribute value:
-        # fqdn=host1.example.com,cn=computers,cn=accounts,dc=example,dc=com
-        if 'managedby' not in response:  return response
-
-        for v in response.pop('managedby'):
-            m = re.match( r'fqdn=([^,]*),cn=computers,cn=accounts', v)
-            if m is not None:
-                response.setdefault('host',[]).append(m.group(1))
-        return response
-
-    # def munge_response_krbticketflags(self, response):
-    #     # These are broken out of the krbticketflags param of the reply
-    #     if key == 'krbticketflags':
-    #         for new_key, bit in (('ipakrbrequirespreauth', 128),
-    #                              ('ipakrbokasdelegate', 1048576),
-    #                              ('ipakrboktoauthasdelegate', 2097152)):
-    #             new_v = bool( val[0] & bit )
-    #             if new_v is False and \
-    #                self.module.params['state'] in ('absent', 'exact'):
-    #                 # ipakrb* : False doesn't make sense in 'absent'
-    #                 # and superfluous in 'exact'
-    #                 continue
-    #             item[new_key] = [new_v]
-    #         return True
 
     def munge_response(self, response):
         item = super(ServiceIPAClient, self).munge_response(response)
 
         item = self.munge_response_usercertificate(item)
         item = self.munge_response_krbprincipalname(item)
-        item = self.munge_response_ipaallowedtoperform(item)
-        item = self.munge_response_managedby(item)
-        # item = self.munge_response_krbticketflags(item)
         return item
 
+    def handle_managedby_host(self):
+        # service_add_host/service_remove_host methods
+        for from_list, method in (
+                ('list_add', 'service_add_host'),
+                ('list_del', 'service_remove_host')):
+            hosts = self.diffs[from_list].get('managedby_host',None)
 
-    def request_cleanup(self, request):
+            # If no changes in check mode, do nothing
+            if (not hosts) or self.module.check_mode:  continue
 
-        # Allow krbticketflags and ipaAllowedToPerform;read/write_keys
-        # request parameters to be composed from multiple other params
-        # that are simpler to deal with in a task spec
+            # Construct and queue request
+            self.requests.append(dict(
+                name = method,
+                request = dict(
+                    method = method,
+                    name = self.mod_request_params(),
+                    item = dict( all = True,
+                                 host = hosts ),
+                )))
 
-        # krbticketflags:
-        # Don't add this to the request unless there was a change
-        have_krbticketflags = False
-        ktf_old = krbticketflags = self.found_obj.get('krbticketflags',[0])[0]
-        for req_op, is_del in ((request['item']['setattr'], False),
-                               (request['item']['delattr'], True)):
-            for key, mult in (('ipakrbrequirespreauth', 128),
-                              ('ipakrbokasdelegate', 1048576),
-                              ('ipakrboktoauthasdelegate', 2097152)):
-                if key in req_op:
-                    val = req_op.pop(key)[0]
-                    if not val: complement = not is_del
-                    else: complement = is_del
-                    if is_del and val is False:
-                        # Deleting 'ipakrb*: False' doesn't make
-                        # sense, since the bit is still there
-                        if self.module.params['state'] == 'absent' and not val:
-                            # state = absent:  call this an error
-                            self._fail(key, 'False value when state=absent')
-                        else:
-                            pass # otherwise just ignore
-                    elif complement:
-                        krbticketflags &= ~(mult)
-                    else:
-                        krbticketflags |= (mult)
-                    have_krbticketflags = True
-        if have_krbticketflags and krbticketflags != ktf_old:
-            request['item']['setattr']['krbticketflags'] = [krbticketflags]
-            request['item']['delattr'].pop('krbticketflags',None)
+    def handle_allow_keytab(self):
+        # service_add_host/service_remove_host methods
+        for from_list, method, r_w in (
+                ('list_add', 'service_allow_create_keytab', 'write'),
+                ('list_del', 'service_disallow_create_keytab', 'write'),
+                ('list_add', 'service_allow_retrieve_keytab', 'read'),
+                ('list_del', 'service_disallow_retrieve_keytab', 'read')):
+            item = dict()
+            for objtype in ('user','group','host','hostgroup'):
+                attr_name = 'ipaallowedtoperform_%s_keys_%s' % (r_w, objtype)
+                attr_val = self.diffs[from_list].get(attr_name, None)
 
-        # ipaAllowedToPerform;(read|write)_keys:
-        dn_pat = '%s=%s,cn=%s,cn=accounts,%s'
-        type_map = dict(users='uid', groups='cn', hosts='fqdn', hostgroups='cn')
-        for thing in ('users', 'groups', 'hosts', 'hostgroups'):
-            for perm in ('read', 'write'):
-                key = '%s_keytab_%s' % (perm, thing)
-                thing_trans = 'computers' if thing == 'hosts' else thing
-                for req_op in (request['item']['addattr'],
-                               request['item']['delattr']):
-                    if key not in req_op: continue
-                    # directory_base_dn must be defined
-                    if self.directory_base_dn is None:
-                        self._fail(key, 'directory_base_dn param undefined')
-                    # Patch values into ipaallowedtoperform;read/write_keys
-                    dest_key = 'ipaallowedtoperform;%s_keys'%perm
-                    for val in req_op.pop(key):
-                        req_op.setdefault(dest_key,[]).append(
-                            dn_pat % (type_map[thing], val, thing_trans,
-                                      self.directory_base_dn))
+                # If no changes needed, do nothing
+                if attr_val is None:  continue
 
-        # host -> managedby:
-        for act_key, acts in request['item'].items():
-            for host in acts.pop('host',[]):
-                if 'directory_base_dn' not in self.module.params:
-                    self._fail('host', 'Must specify directory_base_dn with host')
-                    break
-                acts.setdefault('managedby',[]).append(
-                    'fqdn=%s,cn=computers,cn=accounts,%s' %
-                    (host, self.module.params['directory_base_dn']))
+                item[objtype] = attr_val
+
+            # If no changes in check mode, do nothing
+            if (not item) or self.module.check_mode:  continue
+
+            # Construct and queue request
+            item['all'] = True
+            self.requests.append(dict(
+                name = method,
+                request = dict(
+                    method = method,
+                    name = self.mod_request_params(),
+                    item = item,
+                )))
+
 
 def main():
     client = ServiceIPAClient().main()
