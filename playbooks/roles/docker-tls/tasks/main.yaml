@@ -323,14 +323,6 @@
         dest: "/etc/systemd/system/docker.socket.d/10-docker-tcp-socket.conf"
       register: systemd_docker_socket
 
-    - name: "Restart docker.socket systemd unit"
-      systemd:
-        name: docker.socket
-        daemon_reload: yes
-        enabled: true
-        state: restarted
-      when: systemd_docker_socket.changed
-
   become: true
   tags: dockerd-tls
 
