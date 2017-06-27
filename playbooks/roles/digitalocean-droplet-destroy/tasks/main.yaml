@@ -19,3 +19,20 @@
     path: "../var/cache/{{hostname}}"
     state: absent
   delegate_to: localhost
+
+- name:  "Destroy data volume {{data_volume_name}}"
+  digital_ocean_block_storage:
+    volume_name: "{{data_volume_name}}"
+    region: "{{ region_id }}"
+    state: absent
+    command: create
+    api_token:  "{{ do_token }}"
+
+- name:  "Destroy freeipa volume {{freeipa_block_storage_name}}"
+  digital_ocean_block_storage:
+    volume_name: "{{freeipa_block_storage_name}}"
+    region: "{{ region_id }}"
+    state: absent
+    command: create
+    api_token:  "{{ do_token }}"
+  when: '"freeipa" in group_names'
