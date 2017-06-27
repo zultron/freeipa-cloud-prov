@@ -30,7 +30,6 @@
         ipa_host: "{{fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
-      register:  docker_ca_cert
 
     - name: "Add Docker CA to CA ACL '{{user_cert_acl}}'"
       ipa_caacl:
@@ -174,10 +173,7 @@
 
     - name: "Dump docker client certificate into {{docker_client_ssl_cert}}"
       copy:
-        content: |
-          -----BEGIN CERTIFICATE-----
-          {{client_cert_req.cert.certificate}}
-          -----END CERTIFICATE-----
+        content: "{{client_cert_req.cert.certificate | ipa_cert_to_pem}}"
         dest: "../{{docker_client_ssl_cert}}"
         force: yes
       delegate_to: localhost
@@ -199,7 +195,6 @@
     - name: "Read Docker CA cert"
       ipa_cert:
         cacn: ipa
-        # principal: "CN=Docker Certificate Authority,O={{kerberos_realm}}"
         principal: "Docker Certificate Authority"
         state: present
         ipa_host: "{{fqdn}}"
@@ -214,9 +209,7 @@
     - name: "Dump docker CA cert into {{docker_client_ssl_cacert}}"
       copy:
         content: |
-          -----BEGIN CERTIFICATE-----
-          {{docker_ca_cert.cert.certificate}}
-          -----END CERTIFICATE-----
+          {{docker_ca_cert.cert.certificate | ipa_cert_to_pem}}
           {{ lookup('file', '../var/cacert.pem') }}
         dest: "../{{docker_client_ssl_cacert}}"
         force: yes
@@ -241,26 +234,18 @@
 #
 # Configure service in FreeIPA and use certmonger to generate certs
 #
-- name:  "Create {{docker_service_principal}} service principal and
-              add managed by {{freeipa_client_fqdn}} host"
-  ipa_service:
-    name: "{{docker_service_principal}}"
-    managedby_host: "{{freeipa_client_fqdn}}"
-    state: present
-    ipa_host: "{{fqdn}}"
-    ipa_user: "{{ipa_user}}"
-    ipa_pass: "{{freeipa_admin_password}}"
-  delegate_to: localhost
-  tags: docker-service-cert
-
-- name: "Check if docker server cert exists in {{docker_ssl_cert}}"
-  stat:
-    path: "{{docker_ssl_cert}}"
-  become: true
-  register: docker_ssl_cert_stat
-  tags: docker-service-cert
-
 - block:
+
+    - name:  "Create {{docker_service_principal}} service principal and
+                  add managed by {{freeipa_client_fqdn}} host"
+      ipa_service:
+        name: "{{docker_service_principal}}"
+        managedby_host: "{{freeipa_client_fqdn}}"
+        state: present
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      delegate_to: localhost
 
     - name: "Create docker server cert directory {{docker_ssl_dir}}"
       file:
@@ -269,18 +254,41 @@
         mode: 0700
       become: true
 
-    - name:  "Create docker server cert for {{docker_service_principal}}"
+    - name: "Read Docker CA cert (again)"
+      # Repeat of above to work around tag mess
+      ipa_cert:
+        cacn: ipa
+        principal: "Docker Certificate Authority"
+        state: present
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      delegate_to: localhost
+      # Don't actually create, just read
+      check_mode: yes
+      changed_when: False
+      register: docker_ca_cert
+
+    - name: "Dump docker CA cert into {{docker_ssl_cacert}}"
+      copy:
+        content: "{{docker_ca_cert.cert.certificate | ipa_cert_to_pem}}"
+        dest: "{{docker_ssl_cacert}}"
+        force: yes
+      become: true
+      register: docker_ssl_cacert_create
+
+    - name:  "Start tracking docker server cert in {{docker_ssl_cert}}"
       # The cert is actually created and maintained by certmonger running
       # in ipaclient.  The {{docker_ssl_dir}} has been bind-mounted in the
       # container for this purpose.
       shell: "{{ipaclient_exec}} ipa-getcert request -w
                   -f '{{docker_ssl_cert}}' -k '{{docker_ssl_key}}'
-                  -F '{{docker_ssl_cacert}}'
-                  -K {{docker_service_principal}} -N '{{fqdn}}' -g 2048"
+                  -K {{docker_service_principal}} -N '{{fqdn}}' -g 2048 1>&2
+                  && echo yes || echo no"
       register: docker_ssl_cert_create
+      changed_when: docker_ssl_cert_create.stdout == "yes"
 
-  when: not docker_ssl_cert_stat.stat.exists
-  tags: docker-service-cert
+  tags: dockerd-tls
 
 
 #
@@ -341,18 +349,28 @@
         state: directory
         mode: 0755
 
-    - name: "Install docker.service systemd dropin to add dockerd TLS options"
+    - name: "Install dockerd daemon.json with TLS and live-restore enabled"
       template:
-        src: 10-dockerd-tls.conf.j2
-        dest: "/etc/systemd/system/docker.service.d/10-dockerd-tls.conf"
-      register: systemd_docker_dropin
+        src: daemon.json.j2
+        dest: "/etc/docker/daemon.json"
+      register: dockerd_conf
 
-    - name: "Restart docker service"
+    - name: "Reload dockerd configuration to pick up live-restore option"
+      systemd:
+        name: docker.service
+        state: reloaded
+      when: dockerd_conf.changed
+
+    - name: "Restart docker service to pick up TLS configuration"
       systemd:
         name: docker.service
         daemon_reload: yes
         state: restarted
-      when: systemd_docker_socket.changed or systemd_docker_dropin.changed
+      when:
+        systemd_docker_socket.changed
+        or docker_ssl_cacert_create.changed
+        or docker_ssl_cert_create.changed
+        
 
   become: true
   tags: dockerd-tls
