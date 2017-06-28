@@ -8,5 +8,7 @@
 /.docker-extra-args
 # Ansible-generated files
 /var/*
-!/var/.exists
+!/var/retries/
+/var/retries/*
+!/var/retries/.exists
 *.retry
