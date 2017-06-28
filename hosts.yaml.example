@@ -4,7 +4,7 @@ all:
   vars:
     # Top-level domain name of cluster
     domain_name: example.com
-    # Kerberos realm
+    # Kerberos realm; usually domain_name in upper-case
     kerberos_realm: EXAMPLE.COM
     # etcd2 "initial cluster token" must be unique
     etcd2_cluster_token: c1
@@ -33,18 +33,22 @@ coreos:
 
 # DigitalOcean hosts must be defined here
 digitalocean:
-  hosts:
-    host1:
-    host2:
-    host3:
-# If all CoreOS hosts are on DigitalOcean, alternatively
-# digitalocean:
-#   children:
-#     coreos:
+  # Assume all CoreOS hosts are on DigitalOcean
+  children:
+    coreos:
+  # Otherwise, list individually
+  # hosts:
+  #   host1:
+  #   host2:
+  #   host3:
 
+# FreeIPA server and replicas must be listed here
 freeipa:
-  # List FreeIPA nodes
-  hosts:
-    host1:
-    host2:
-    host3:
+  # Assume all CoreOS hosts are FreeIPA servers
+  children:
+    coreos:
+  # If not all hosts are FreeIPA servers, list individually
+  # hosts:
+  #   host1:
+  #   host2:
+  #   host3:
