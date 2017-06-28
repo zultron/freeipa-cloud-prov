@@ -277,16 +277,20 @@
       become: true
       register: docker_ssl_cacert_create
 
+    - name:  "Check cert tracking status of {{docker_ssl_cert}}"
+      shell: "{{ipaclient_exec}} ipa-getcert status -f {{docker_ssl_cert}} |
+                 grep -q 'No request found' && echo no || echo yes"
+      register: docker_ssl_cert_tracking
+      changed_when:  docker_ssl_cert_tracking.stdout == "no"
+
     - name:  "Start tracking docker server cert in {{docker_ssl_cert}}"
       # The cert is actually created and maintained by certmonger running
       # in ipaclient.  The {{docker_ssl_dir}} has been bind-mounted in the
       # container for this purpose.
       shell: "{{ipaclient_exec}} ipa-getcert request -w
                   -f '{{docker_ssl_cert}}' -k '{{docker_ssl_key}}'
-                  -K {{docker_service_principal}} -N '{{fqdn}}' -g 2048 1>&2
-                  && echo yes || echo no"
-      register: docker_ssl_cert_create
-      changed_when: docker_ssl_cert_create.stdout == "yes"
+                  -K {{docker_service_principal}} -N '{{fqdn}}' -g 2048"
+      when: docker_ssl_cert_tracking.changed
 
   tags: dockerd-tls
 
@@ -361,7 +365,7 @@
       when:
         systemd_docker_socket.changed
         or docker_ssl_cacert_create.changed
-        or docker_ssl_cert_create.changed
+        or docker_ssl_cert_tracking.changed
         
 
   become: true
