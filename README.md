@@ -174,11 +174,14 @@ First step is to provision DigitalOcean droplets with CoreOS image.
 - [Python DigitalOcean API][py-do]
 - And Ansible:
   - [DigitalOcean API with Ansible][DO-ansible]
+- And CoreOS:
+  - [Running CoreOS on DigitalOcean tutorial][coreos-do]
 
 [digitalocean]: https://cloud.digitalocean.com/
 [do-api]: https://developers.digitalocean.com/documentation/v2/
 [py-do]: https://github.com/koalalorenzo/python-digitalocean
 [DO-ansible]: https://www.digitalocean.com/community/tutorials/how-to-use-the-digitalocean-api-v2-with-ansible-2-0-on-ubuntu-16-04
+[coreos-do]: https://www.digitalocean.com/community/tutorials/how-to-set-up-a-coreos-cluster-on-digitalocean
 
 ### [FreeIPA][freeipa]:
 
@@ -221,47 +224,41 @@ The CoreOS Container Linux needs to be configured for clustering after
 FreeIPA is bootstrapped.
 
 - Basic configuration:
-  - [Running CoreOS on DigitalOcean tutorial][coreos-do]
   - [CoreOS `cloud-config`][cloud-config] and
     [validator][coreos-cloud-config-validate]
-  - [`etcd2` options][etcd2-options]
+  - [`etcd3` options][etcd3-options]
   - [CoreOS clustering][coreos-clustering]:  "static" section
   - [CoreOS cluster reconfiguration][coreos-cluster-reconfig]
-  - [etcd3 will replace etcd2][coreos-etcd2-deprecated]; run etcd3 in
-    container
-  - cloud-config `fleet` and `etcd2` sections [will disappear][coreos-cloud-config-fleet-etcd2]
+  - [`etcd3` will replace `etcd2`][coreos-etcd2-deprecated]; run
+    `etcd3` in container
+  - cloud-config `fleet` and `etcd2` sections
+    [will disappear][coreos-cloud-config-fleet-etcd2]
 
 - SSL on CoreOS:
-  - [SSL Certificate Authority][coreos-ca]
-  - [`etcd2` SSL][coreos-etcd-ssl]
+  - [`etcd` SSL][coreos-etcd-ssl]
   - [CoreOS client ssl][coreos-clients-ssl]
-  - [CoreOS SSL and iptables on DigitalOcean][do-coreos-ssl]
-    (somewhat outdated)
+  - [CoreOS SSL and iptables on DigitalOcean][do-coreos-ssl] (somewhat
+    outdated)
 
 - Launching containers in CoreOS:
   - See Kubernetes below
-  - [Unit files][unit-files]
 
 - IPA integration
   - [CoreOS SSSD integration][coreos-sssd]
   
 
 [coreos]: https://coreos.com/
-[coreos-do]: https://www.digitalocean.com/community/tutorials/how-to-set-up-a-coreos-cluster-on-digitalocean
 [cloud-config]: https://coreos.com/os/docs/latest/cloud-config.html
 [coreos-cloud-config-validate]: https://coreos.com/validate/
-[etcd2-options]: https://coreos.com/etcd/docs/latest/configuration.html
+[etcd3-options]: https://coreos.com/etcd/docs/latest/op-guide/configuration.html
 [coreos-clustering]: https://coreos.com/etcd/docs/latest/clustering.html
 [coreos-cluster-reconfig]: https://coreos.com/etcd/docs/latest/etcd-live-cluster-reconfiguration.html
 [coreos-etcd2-deprecated]: https://groups.google.com/forum/#!topic/coreos-user/Lfd1tmkwmRg
 [coreos-cloud-config-fleet-etcd2]:  https://groups.google.com/forum/#!topic/coreos-user/Lfd1tmkwmRg
 
-[coreos-ca]: https://coreos.com/os/docs/latest/generate-self-signed-certificates.html
 [coreos-etcd-ssl]: https://coreos.com/etcd/docs/latest/etcd-live-http-to-https-migration.html
 [coreos-clients-ssl]: https://coreos.com/etcd/docs/latest/tls-etcd-clients.html
 [do-coreos-ssl]: https://www.digitalocean.com/community/tutorials/how-to-secure-your-coreos-cluster-with-tls-ssl-and-firewall-rules
-
-[unit-files]: https://coreos.com/fleet/docs/latest/unit-files-and-scheduling.html
 
 [coreos-sssd]: https://coreos.com/os/docs/latest/sssd.html
 
@@ -271,7 +268,7 @@ Install Kubernetes after the Container Linux cluster is configured.
 
 - [Ansible examples][kub-ansible] incl. etcd2, docker in kubernetes
 
-- Kubernetes is replacing fleet; examples w/CoreOS
+- Kubernetes is replacing fleet
 - Other projects to set up Kubernetes on CoreOS with Ansible
   - [GH thesamet/ansible-kubernetes-coreos][kubernetes-coreos-ansible-1]
   - [GH sebiwi/kubernetes-coreos][kubernetes-coreos-ansible-2]; adds Vagrant
