@@ -62,16 +62,12 @@ this work in any critical scenario.**
         # Install FreeIPA server+client containers
         ansible-playbook playbooks/freeipa-install.yaml -l host1
 
-        # Configure remote Docker TLS access on master
-        ansible-playbook playbooks/docker-tls.yaml -l host1
-
         # Install and configure etcd3 and Kubernetes on master
         ansible-playbook playbooks/coreos-kubernetes.yaml -l host1
 
         # Install other cluster nodes
         ansible-playbook playbooks/provision.yaml -l host2,host3
         ansible-playbook playbooks/freeipa-install.yaml -l host2,host3
-        ansible-playbook playbooks/docker-tls.yaml -l host2,host3
         ansible-playbook playbooks/coreos-kubernetes.yaml -l host2,host3
 
         # Install services on all hosts:  email, PBX, web, etc.
@@ -220,8 +216,8 @@ Next step is to install and configure FreeIPA in a Docker container.
 
 ### [CoreOS][coreos]
 
-The CoreOS Container Linux needs to be configured for clustering after
-FreeIPA is bootstrapped.
+CoreOS Container Linux must be configured for clustering with etcd3
+and Kubernetes.  This depends on FreeIPA being bootstrapped.
 
 - Basic configuration:
   - [CoreOS `cloud-config`][cloud-config] and
