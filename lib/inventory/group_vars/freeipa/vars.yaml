@@ -3,7 +3,10 @@
 
 # Docker images
 freeipa_docker_image: "adelton/freeipa-server:centos-7"
-freeipa_docker_client_image: "zultron/freeipa-cloud-prov:ipaclient"
+freeipa_docker_client_image_base: "zultron/freeipa-cloud-prov"
+freeipa_docker_client_image_tag: "ipaclient"
+freeipa_docker_client_image:
+  "{{freeipa_docker_client_image_base}}:{{freeipa_docker_client_image_tag}}"
 
 # FreeIPA container network
 freeipa_network_prefix: "{{network_prefix}}.128"
