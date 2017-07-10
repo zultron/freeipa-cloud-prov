@@ -5,13 +5,6 @@
 - name: Install etcd3 cluster
   hosts: coreos
 
-  vars:
-    ansible_python_interpreter: /home/core/bin/python
-
-  environment:
-    # Path for python
-    PATH: "/usr/sbin:/usr/bin:/home/core/bin:/bin:/sbin"
-
   roles:
 
     # Set up etcd3
@@ -23,13 +16,6 @@
 - name: Install Kubernetes cluster
   hosts: coreos
 
-  vars:
-    ansible_python_interpreter: /home/core/bin/python
-
-  environment:
-    # Path for python
-    PATH: "/usr/sbin:/usr/bin:/home/core/bin:/bin:/sbin"
-
   roles:
 
     # Set up kubernetes
@@ -37,13 +23,6 @@
 ############################################
 - name: Add FreeIPA to Kubernetes
   hosts: coreos
-
-  vars:
-    ansible_python_interpreter: /home/core/bin/python
-
-  environment:
-    # Path for python
-    PATH: "/usr/sbin:/usr/bin:/home/core/bin:/bin:/sbin"
 
   roles:
 

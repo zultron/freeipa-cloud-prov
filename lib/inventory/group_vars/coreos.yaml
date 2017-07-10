@@ -1,6 +1,9 @@
 ---
 # coreos group vars
 
+# Python interpreter installed in non-standard location on CoreOS
+ansible_python_interpreter: /home/core/bin/python
+
 # Droplet creation settings
 size_id: 1gb
 image_id: coreos-stable

@@ -5,13 +5,6 @@
 - name: Provision FreeIPA in Docker
   hosts: freeipa
 
-  vars:
-    ansible_python_interpreter: /home/core/bin/python
-
-  environment:
-    # Path for python
-    PATH: "/usr/sbin:/usr/bin:/home/core/bin:/bin:/sbin"
-
   roles:
     # Create and attach block storage
     - role: digitalocean-block-storage

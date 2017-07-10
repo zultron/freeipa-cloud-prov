@@ -33,12 +33,6 @@
   hosts: coreos
   # No python on host yet; don't run setup
   gather_facts: False
-  vars:
-     ansible_python_interpreter: /home/core/bin/python
-
-  environment:
-    # Path for python
-    PATH: "/usr/sbin:/usr/bin:/home/core/bin"
 
   roles:
     # Install python and modules needed by Ansible
@@ -51,13 +45,6 @@
 ############################################
 - name: Configure CoreOS block storage
   hosts: coreos
-
-  vars:
-    ansible_python_interpreter: /home/core/bin/python
-
-  environment:
-    # Path for python
-    PATH: "/usr/sbin:/usr/bin:/home/core/bin"
 
   roles:
     # Partition attached disks
