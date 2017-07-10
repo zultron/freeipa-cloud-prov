@@ -1,33 +1,197 @@
 ---
-# Configure etcd2 on CoreOS
+#################################
+# Configure etcd on CoreOS
+#
 
-- name:  Check if etcd2 is bootstrapped
-  # shell:  "test -f ~/.etcd2-bootstrapped && echo yes || echo no"
-  shell:  "etcdctl member list | grep -q 'name={{hostname|quote}} '
-             && echo yes || echo no"
-  register:  etcd2_check
-  changed_when:  False
+- block:
+    # Create SRV records for etcd service discovery
 
-- name:  Set etcd2 fact
-  set_fact:
-    etcd2_configured:  "{{ etcd2_check.stdout == 'yes' }}"
+    - name:  Create SRV records for etcd servers
+      ipa_dnsrecord:
+        name: "_etcd-server-ssl._tcp"
+        zone: "{{domain_name}}"
+        srvrecord: "0 100 2380 {{fqdn}}."
+        state: present
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
 
-- name: Debug etcd2 configured
-  debug:
-    var: etcd2_configured
+    - name:  Create SRV records for etcd clients
+      ipa_dnsrecord:
+        name: "_etcd-client-ssl._tcp"
+        zone: "{{domain_name}}"
+        srvrecord: "0 100 2379 {{fqdn}}."
+        state: present
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
 
-- name:  Check if fleet is running
-  shell:  "fleetctl list-machines >&/dev/null && echo yes || echo no"
-  register:  fleet_check
-  changed_when:  False
-  when:  etcd2_check
+  delegate_to: localhost
+  tags:
+    - configure-etcd
+    - etcd-dns-srv
 
-- name:  Set fleet fact
-  set_fact:
-    fleet_configured:  "{{ etcd2_check and fleet_check.stdout == 'yes' }}"
+#
+# Create etcd sub-CA and etcd user
+#
+- block:
 
-- name: Debug fleet configured
-  debug:
-    var: fleet_configured
+    - name: "Create Etcd CA"
+      ipa_ca:
+        name: "{{etcd_ca}}"
+        ipacasubjectdn: "{{etcd_ca_subject}}"
+        description: "Etcd Cluster CA"
+        state: present
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
 
-- include: "{{ operation }}.yaml"
+    - name: "Add Etcd CA to CA ACL '{{user_cert_acl}}'"
+      ipa_caacl:
+        name: "{{user_cert_acl}}"
+        ca: "{{etcd_ca}}"
+        state: present
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+
+  delegate_to: localhost
+  run_once: True
+  tags:
+    - configure-etcd
+    - etcd-ca
+
+
+#
+# Etcd service certs
+#
+# Configure service in FreeIPA and use certmonger to generate certs
+#
+- block:
+
+    - name: "Create etcd cert directory {{etcd_cert_dir}}"
+      file:
+        path: "{{etcd_cert_dir}}"
+        state: directory
+        mode: 0755
+      become: true
+
+    - name:  "Create {{etcd_service_principal}} service principal and
+                  add managed by {{freeipa_client_fqdn}} host"
+      ipa_service:
+        name: "{{etcd_service_principal}}"
+        managedby_host: "{{freeipa_client_fqdn}}"
+        state: present
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      delegate_to: localhost
+
+    - name: "Read Etcd CA cert"
+      ipa_cert:
+        cacn: ipa
+        principal: "{{etcd_ca_subject_short}}"
+        state: present
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      delegate_to: localhost
+      # Don't actually create, just read
+      check_mode: yes
+      changed_when: False
+      register: etcd_ca_cert
+
+    - name: "Dump etcd CA cert into {{etcd_ssl_cacert}}"
+      copy:
+        content: |
+          {{etcd_ca_cert.cert.certificate | ipa_cert_to_pem}}
+          {{ lookup('file', '../var/cacert.pem') }}
+        dest: "{{etcd_ssl_cacert}}"
+        force: yes
+      become: true
+      register: etcd_ssl_cacert_create
+
+    - name: "Copy chown_certs.sh"
+      template:
+        src: chown_certs.sh.j2
+        dest: "{{etcd_cert_dir}}/chown_certs.sh"
+        mode: 0755
+      become: true
+
+    - name:  "Check cert tracking status of {{etcd_ssl_cert}}"
+      shell: "{{ipaclient_exec}}
+                 ipa-getcert status -f {{etcd_ssl_cert}} |
+                 grep -q 'No request found' && echo no || echo yes"
+      register: etcd_ssl_cert_tracking
+      changed_when:  etcd_ssl_cert_tracking.stdout == "no"
+
+    - name:  "Start tracking etcd server cert in {{etcd_ssl_cert}}"
+      # The cert is actually created and maintained by certmonger running
+      # in ipaclient.  The {{etcd_ssl_dir}} has been bind-mounted in the
+      # container for this purpose.
+      shell: "{{ipaclient_exec}} ipa-getcert request -w
+                  -I etcd_ssl_cert
+                  -f {{etcd_ssl_cert}} -k {{etcd_ssl_key}}
+                  -K {{etcd_service_principal}} -N '{{fqdn}}' -g 2048
+                  -C {{etcd_cert_dir}}/chown_certs.sh"
+      when: etcd_ssl_cert_tracking.changed
+
+  tags:
+    - configure-etcd
+    - etcd-server-cert
+
+#
+# Install etcd-member service
+#
+- block:
+    - name:  Set CoreOS DNS resolvers with systemd resolved.conf
+      template:
+        src: resolved.conf.j2
+        dest: /etc/systemd/resolved.conf
+      register:  resolved_conf
+
+    - name:  Reload systemd and restart systemd-resolved.service
+      systemd:
+        name: systemd-resolved
+        daemon_reload: yes
+        state: restarted
+      when:  resolved_conf.changed
+
+    - name:  Install etcd-member service dropin directory
+      file:
+        path: "{{ dropin_dir_pat % 'etcd-member' }}"
+        state: directory
+        mode: 0755
+
+    - name: Install etcd-member service dropin
+      template:
+        src: 20-etcd-cert-dir.conf.j2
+        dest: "{{ dropin_dir_pat % 'etcd-member' }}/20-etcd-cert-dir.conf"
+      register:  bootstrap_etcd_dropin
+
+    - name: Install etcd-member service dropin FIXME
+      # This is temporary; should happen in cloud-config
+      template:
+        src: 10-etcd-config-FIXME.conf.j2
+        dest: "{{ dropin_dir_pat % 'etcd-member' }}/10-etcd-config-FIXME.conf"
+      register:  bootstrap_etcd_dropin1
+
+    - name:  Reload systemd and restart etcd-member
+      systemd:
+        name: etcd-member
+        daemon_reload: yes
+        state: restarted
+      when:  bootstrap_etcd_dropin.changed or bootstrap_etcd_dropin1.changed
+
+    # - name:  Add etcdctl command as alias
+    #   lineinfile:
+    #     dest: "/home/core/.bashrc"
+    #     state: present
+    #     line: "alias etcdctl='sudo etcdctl --ca-file {{etcd_ssl_cacert}}
+    #     --cert-file {{etcd_ssl_cert}} --key-file {{etcd_ssl_key}}
+    #     --endpoints=https://{{fqdn}}:2379'"
+
+  become: true
+  tags:
+    - configure-etcd
+    - etcd-member-service

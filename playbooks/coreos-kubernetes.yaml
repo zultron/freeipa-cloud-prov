@@ -1,0 +1,50 @@
+---
+# Install and configure etcd3 and kubernetes on CoreOS
+
+############################################
+- name: Install etcd3 cluster
+  hosts: coreos
+
+  vars:
+    ansible_python_interpreter: /home/core/bin/python
+
+  environment:
+    # Path for python
+    PATH: "/usr/sbin:/usr/bin:/home/core/bin:/bin:/sbin"
+
+  roles:
+
+    # Set up etcd3
+    - role: etcd3-bootstrap
+      tags: etcd3
+
+
+############################################
+- name: Install Kubernetes cluster
+  hosts: coreos
+
+  vars:
+    ansible_python_interpreter: /home/core/bin/python
+
+  environment:
+    # Path for python
+    PATH: "/usr/sbin:/usr/bin:/home/core/bin:/bin:/sbin"
+
+  roles:
+
+    # Set up kubernetes
+
+############################################
+- name: Add FreeIPA to Kubernetes
+  hosts: coreos
+
+  vars:
+    ansible_python_interpreter: /home/core/bin/python
+
+  environment:
+    # Path for python
+    PATH: "/usr/sbin:/usr/bin:/home/core/bin:/bin:/sbin"
+
+  roles:
+
+    # Add ipa and ipaclient containers to kubernetes

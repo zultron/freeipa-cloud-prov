@@ -1,0 +1,5 @@
+---
+dependencies:
+  - role: local-etc-hosts
+  - role: local-ca-certs
+  - role: kinit

@@ -54,7 +54,7 @@ docker_client_extra_args: "--config=../{{docker_client_ssl_dir}} --tlsverify"
 ##################################
 # Data volume
 #
-# Used for swap and etcd2 state
+# Used for swap and etcd state
 
 # Data volume block device
 data_volume_block_device:  "{{ block_device_path_pat % 'data' }}"
@@ -74,15 +74,24 @@ swap_device_systemd_unit: "{{swap_device|systemd_escape}}.swap"
 data_volume_systemd_unit: "{{data_volume_path|systemd_escape}}.mount"
 
 #################################
-# Cluster configuration
+# etcd configuration
 
-# etcd2 configuration
-etcd2_config_path: "{{ data_volume_path }}/etcd"
-serv_cert_file_path: "{{ etcd2_config_path }}/etcd.pem"
-serv_key_file_path: "{{ etcd2_config_path }}/etcd-key.pem"
-clnt_cert_file_path: "{{ etcd2_config_path }}/client.pem"
-clnt_key_file_path: "{{ etcd2_config_path }}/client-key.pem"
-ca_cert_file_path: "{{ etcd2_config_path }}/ca.pem"
+# TLS
+# - FreeIPA sub-CA
+etcd_ca: "etcd"
+etcd_ca_subject_short: "Etcd Certificate Authority"
+etcd_ca_subject: "CN={{etcd_ca_subject_short}},O={{kerberos_realm}}"
+# - FreeIPA service principal
+etcd_service_principal: "etcd/{{fqdn}}@{{kerberos_realm}}"
+# - Cert locations; accessible from mount in etcd-member-wrapper
+etcd_cert_dir: "{{ data_volume_path }}/etcd"
+etcd_ssl_cert: "{{ etcd_cert_dir }}/cert.pem"
+etcd_ssl_key: "{{ etcd_cert_dir }}/key.pem"
+etcd_ssl_cacert: "{{ etcd_cert_dir }}/ca.pem"
+
+
+#################################
+# Cluster configuration
 
 # Cluster configuration
 initial_cluster:

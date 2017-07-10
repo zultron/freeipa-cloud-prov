@@ -1,0 +1,12 @@
+# https://www.freedesktop.org/software/systemd/man/resolved.conf.html
+
+[Resolve]
+# FIXME this must be updated later with all cluster DNS server IPs
+DNS={{ip_addr}}
+Domains={{domain_name}}
+Cache=no
+# Hrm, how to remove Google servers from here?
+FallbackDNS={{ip_addr}}
+#LLMNR=yes
+#DNSSEC=allow-downgrade
+#DNSStubListener=udp

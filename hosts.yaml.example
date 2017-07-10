@@ -6,8 +6,8 @@ all:
     domain_name: example.com
     # Kerberos realm; usually domain_name in upper-case
     kerberos_realm: EXAMPLE.COM
-    # etcd2 "initial cluster token" must be unique
-    etcd2_cluster_token: c1
+    # etcd "initial cluster token" must be unique
+    etcd_cluster_token: c1
     # Name of master host
     master_host: host1
     # Docker detach keys:  uncomment to redefine
