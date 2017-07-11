@@ -15,7 +15,8 @@ fi
 
 if test "$1" = "-b"; then
     set -x
-    exec docker build -t ${DOCKER_IMG} .
+    exec docker build -t ${DOCKER_IMG} -f dockerfiles/Dockerfile.manager \
+	dockerfiles
 
 elif test "${1:0:1}" = "-"; then
     {
