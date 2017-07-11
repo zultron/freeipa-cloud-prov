@@ -81,6 +81,7 @@ RUN mkdir -p /home/core/bin && ln -s /usr/bin/python /home/core/bin/python
 # Get CoreOS config transpiler
 ADD https://github.com/coreos/container-linux-config-transpiler/releases/download/v0.3.1/ct-v0.3.1-x86_64-unknown-linux-gnu \
     /usr/local/bin/ct
+RUN chmod 755 /usr/local/bin/ct
 
 VOLUME /data
 WORKDIR /data
