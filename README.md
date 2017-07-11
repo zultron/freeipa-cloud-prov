@@ -78,7 +78,7 @@ this work in any critical scenario.**
 - Misc commands:
 
         # Re-collect facts about host
-        ansible h01 -m setup \
+        ansible host1 -m setup \
             -e ansible_python_interpreter=/home/core/bin/python \
             -e ansible_ssh_user=core
 
@@ -258,6 +258,14 @@ and Kubernetes.  This depends on FreeIPA being bootstrapped.
 
 [coreos-sssd]: https://coreos.com/os/docs/latest/sssd.html
 
+### Flannel
+
+Kubernetes depends on Flannel networking.
+
+- [CoreOS Flannel docs][coreos-flannel]
+
+[coreos-flannel]: https://coreos.com/flannel/docs/latest/flannel-config.html
+
 ### Kubernetes
 
 Install Kubernetes after the Container Linux cluster is configured.
@@ -311,9 +319,9 @@ web services on a single IP.
 
 These should be added to automation
 
-- Connect replica servers to eliminate h00 as SPOF
+- Connect replica servers to eliminate host1 as SPOF
 
-        ipa-replica-manage connect h10.zultron.com h20.zultron.com
+        ipa-replica-manage connect host2.example.com host3.example.com
 
 - Create ipa sidekick `/etc/resolv.conf` service to install
   FreeIPA/Google DNS servers at start/stop
