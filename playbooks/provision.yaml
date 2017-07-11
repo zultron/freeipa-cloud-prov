@@ -34,6 +34,10 @@
   # No python on host yet; don't run setup
   gather_facts: False
 
+  environment:
+    # Path for python utilities from defunctzombie.coreos-bootstrap
+    PATH: "/usr/sbin:/usr/bin:/home/core/bin"
+
   roles:
     # Install python and modules needed by Ansible
     - role: defunctzombie.coreos-bootstrap
