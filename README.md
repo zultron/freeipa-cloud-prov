@@ -229,40 +229,40 @@ Next step is to install and configure FreeIPA in a Docker container.
 CoreOS Container Linux must be configured for clustering with etcd3
 and Kubernetes.  This depends on FreeIPA being bootstrapped.
 
+The etcd cluster will be bootstrapped from DNS with the
+`--discovery-srv` flag.
+
+All communication will be over TLS with certs generated from FreeIPA
+(in a dedicated sub-CA) and monitored with certmonger.
+
 - Basic configuration:
-  - [CoreOS `cloud-config`][cloud-config] and
-    [validator][coreos-cloud-config-validate]
+  - [CoreOS Provisioning][coreos-provisioning]
+  - [CoreOS on DigitalOcean][coreos-do]
+  - [Ignition config validator][coreos-ignition-config-validate]
   - [`etcd3` options][etcd3-options]
-  - [CoreOS clustering][coreos-clustering]:  "static" section
   - [CoreOS cluster reconfiguration][coreos-cluster-reconfig]
-  - [`etcd3` will replace `etcd2`][coreos-etcd2-deprecated]; run
-    `etcd3` in container
-  - cloud-config `fleet` and `etcd2` sections
-    [will disappear][coreos-cloud-config-fleet-etcd2]
 
 - SSL on CoreOS:
-  - [`etcd` SSL][coreos-etcd-ssl]
   - [CoreOS client ssl][coreos-clients-ssl]
   - [CoreOS SSL and iptables on DigitalOcean][do-coreos-ssl] (somewhat
     outdated)
 
 - Launching containers in CoreOS:
   - See Kubernetes below
+  - Fleet is deprecated
 
 - IPA integration
   - [CoreOS SSSD integration][coreos-sssd]
   
 
 [coreos]: https://coreos.com/
-[cloud-config]: https://coreos.com/os/docs/latest/cloud-config.html
-[coreos-cloud-config-validate]: https://coreos.com/validate/
-[etcd3-options]: https://coreos.com/etcd/docs/latest/op-guide/configuration.html
-[coreos-clustering]: https://coreos.com/etcd/docs/latest/clustering.html
-[coreos-cluster-reconfig]: https://coreos.com/etcd/docs/latest/etcd-live-cluster-reconfiguration.html
-[coreos-etcd2-deprecated]: https://groups.google.com/forum/#!topic/coreos-user/Lfd1tmkwmRg
-[coreos-cloud-config-fleet-etcd2]:  https://groups.google.com/forum/#!topic/coreos-user/Lfd1tmkwmRg
 
-[coreos-etcd-ssl]: https://coreos.com/etcd/docs/latest/etcd-live-http-to-https-migration.html
+[coreos-provisioning]: https://coreos.com/os/docs/latest/provisioning.html
+[coreos-do]: https://coreos.com/os/docs/latest/booting-on-digitalocean.html
+[coreos-ignition-config-validate]: https://coreos.com/validate/
+[etcd3-options]: https://coreos.com/etcd/docs/latest/op-guide/configuration.html
+[coreos-cluster-reconfig]: https://coreos.com/etcd/docs/latest/etcd-live-cluster-reconfiguration.html
+
 [coreos-clients-ssl]: https://coreos.com/etcd/docs/latest/tls-etcd-clients.html
 [do-coreos-ssl]: https://www.digitalocean.com/community/tutorials/how-to-secure-your-coreos-cluster-with-tls-ssl-and-firewall-rules
 
@@ -324,6 +324,12 @@ web services on a single IP.
 
 
 ## TODO
+
+### Is certmonger actually running in ipaclient?
+
+- Should a new ipaclient Docker image be written from scratch?
+  - The fake systemd stuff is pretty irritating; why not a real
+    systemd like the `ipa` container seems to have?
 
 ### IPA configuration
 
