@@ -11,6 +11,10 @@
     - role: etcd3-bootstrap
       tags: etcd3
 
+    # Set up flannel
+    - role: flannel-bootstrap
+      tags: flannel
+
 
 ############################################
 - name: Install Kubernetes cluster
