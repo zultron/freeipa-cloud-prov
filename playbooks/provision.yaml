@@ -11,7 +11,7 @@
 
   roles:
     # Generate cloud-config for next step
-    - role: coreos-cloud-config
+    - role: coreos-ignition-config
       tags: create-droplet
 
     # Create DigitalOcean droplet
