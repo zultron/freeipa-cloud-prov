@@ -131,7 +131,7 @@
                   -X {{etcd_ca}}"
       when: etcd_ssl_cert_tracking.changed
 
-    # Instal dropin to chown certs to etcd; the `ipa-getcert request
+    # Install dropin to chown certs to etcd; the `ipa-getcert request
     # -C` arg didn't seem to work, so do it this way instead
     - name:  "Install etcd-member dropin directory"
       file:
@@ -156,13 +156,13 @@
 - block:
     # Point CoreOS resolver at FreeIPA to read etcd SRV records and
     # resolve member names
-    - name:  Set CoreOS DNS resolvers with systemd resolved.conf
+    - name:  "Set CoreOS DNS resolvers with systemd resolved.conf"
       template:
         src: resolved.conf.j2
         dest: /etc/systemd/resolved.conf
       register:  resolved_conf
 
-    - name:  Reload systemd and restart systemd-resolved.service
+    - name:  "Reload systemd and restart systemd-resolved.service"
       systemd:
         name: systemd-resolved
         daemon_reload: yes
