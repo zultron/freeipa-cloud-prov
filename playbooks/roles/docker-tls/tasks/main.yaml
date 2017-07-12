@@ -288,6 +288,7 @@
       # in ipaclient.  The {{docker_ssl_dir}} has been bind-mounted in the
       # container for this purpose.
       shell: "{{ipaclient_exec}} ipa-getcert request -w
+                  -I docker_ssl_cert
                   -f '{{docker_ssl_cert}}' -k '{{docker_ssl_key}}'
                   -K {{docker_service_principal}} -N '{{fqdn}}' -g 2048"
       when: docker_ssl_cert_tracking.changed
@@ -339,23 +340,11 @@
 
 - block:
 
-    - name: "Install docker.service systemd dropin directory"
-      file:
-        path: "/etc/systemd/system/docker.service.d"
-        state: directory
-        mode: 0755
-
-    - name: "Install dockerd daemon.json with TLS and live-restore enabled"
+    - name: "Install dockerd daemon.json with TLS enabled"
       template:
         src: daemon.json.j2
         dest: "/etc/docker/daemon.json"
       register: dockerd_conf
-
-    - name: "Reload dockerd configuration to pick up live-restore option"
-      systemd:
-        name: docker.service
-        state: reloaded
-      when: dockerd_conf.changed
 
     - name: "Restart docker service to pick up TLS configuration"
       systemd:
