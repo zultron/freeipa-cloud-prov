@@ -254,6 +254,10 @@
         mode: 0700
       become: true
 
+    # Write the CA cert
+    #
+    # FIXME this should be done by `ipa-getcert request -F
+    # {{docker_ssl_cacert}}`, but only the top-level cert is written
     - name: "Read Docker CA cert (again)"
       # Repeat of above to work around tag mess
       ipa_cert:
@@ -287,10 +291,14 @@
       # The cert is actually created and maintained by certmonger running
       # in ipaclient.  The {{docker_ssl_dir}} has been bind-mounted in the
       # container for this purpose.
+      #
+      # FIXME the cert this creates is not from the sub-CA; this may
+      # also explain why the sub-CA CA cert is wrong (see above)
       shell: "{{ipaclient_exec}} ipa-getcert request -w
                   -I docker_ssl_cert
                   -f '{{docker_ssl_cert}}' -k '{{docker_ssl_key}}'
-                  -K {{docker_service_principal}} -N '{{fqdn}}' -g 2048"
+                  -K {{docker_service_principal}} -N '{{fqdn}}' -g 2048
+                  -X {{docker_ca}}"
       when: docker_ssl_cert_tracking.changed
 
   tags: dockerd-tls
@@ -318,14 +326,14 @@
 
     - name: "Install docker.socket systemd dropin directory"
       file:
-        path: "/etc/systemd/system/docker.socket.d"
+        path: "{{dropin_dir_pat % 'docker.socket'}}"
         state: directory
         mode: 0755
 
     - name: "Install docker.socket dropin file to add TCP port 2375"
       template:
         src: 10-docker-tcp-socket.conf.j2
-        dest: "/etc/systemd/system/docker.socket.d/10-docker-tcp-socket.conf"
+        dest: "{{dropin_dir_pat % 'docker.socket'}}/10-docker-tcp-socket.conf"
       register: systemd_docker_socket
 
   become: true
