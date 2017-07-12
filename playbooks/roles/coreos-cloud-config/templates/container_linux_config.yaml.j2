@@ -1,0 +1,222 @@
+# This config is meant to be consumed by the config transpiler, which will
+# generate the corresponding Ignition config. Do not pass this config directly
+# to instances of Container Linux.
+
+# Docs:
+#    https://coreos.com/os/docs/latest/migrating-to-clcs.html
+#    https://coreos.com/os/docs/latest/configuration.html
+# `drop-ins`:
+#   https://coreos.com/os/docs/latest/using-systemd-drop-in-units.html
+
+etcd:
+  # https://coreos.com/etcd/docs/latest/op-guide/runtime-configuration.html
+  #
+  # Member name
+  name: {{hostname}}
+  # URLs to listen on for peer and client traffic; use SSL on
+  # external interfaces
+  listen_client_urls: https://$public_ipv4:2379
+  listen_peer_urls: https://$public_ipv4:2380
+  #
+  # List of member client URLs to advertise to the rest of the
+  # cluster
+  advertise_client_urls: https://{{fqdn}}:2379
+  #
+  # Initial flags for bootstrapping new member (not used in
+  # restarts); use either DNS srv records or manually
+  # specify the initial cluster members
+  discovery_srv: {{domain_name}}
+  #initial_cluster: {{initial_cluster}}
+  initial_cluster_state: {{initial_cluster_state}}
+  initial_cluster_token: cluster_{{etcd_cluster_token}}
+  initial_advertise_peer_urls: https://{{fqdn}}:2380
+  #
+  # Exit (do not proxy) when discovery fails
+  discovery_fallback: exit
+  #
+  # SSL cert file locations for client and peer servers; enable
+  # cert-based authentication
+  cert_file: {{etcd_ssl_cert}}
+  key_file: {{etcd_ssl_key}}
+  client_cert_auth: true
+  trusted_ca_file: {{etcd_ssl_cacert}}
+  peer_cert_file: {{etcd_ssl_cert}}
+  peer_key_file: {{etcd_ssl_key}}
+  peer_client_cert_auth: true
+  peer_trusted_ca_file: {{etcd_ssl_cacert}}
+  #
+  # Reject reconfiguration requests that would cause quorum loss
+  strict_reconfig_check: true
+  #
+  # Tune raft elections
+  # https://coreos.com/etcd/docs/latest/tuning.html#time-parameters
+  heartbeat_interval: 300
+  election_timeout: 3000
+  #
+  # Drop the default log level to DEBUG for all subpackages
+  #debug: 1
+  #
+  # Set individual etcd subpackages to specific log levels
+  #log_package_levels: etcdserver=WARNING,security=DEBUG
+
+flannel:
+  # The version of flannel to be run
+  #version: 3.1.1
+  # The endpoints of etcd flanneld should use
+  etcd_endpoints: "{{etcd_endpoints}}"
+  # The tls files to use when communicating with etcd
+  etcd_cafile:    {{etcd_ssl_cacert}}
+  etcd_certfile:  {{etcd_ssl_cert}}
+  etcd_keyfile:   {{etcd_ssl_key}}
+
+docker:
+  # Additional flags to pass to the docker daemon when it is started
+  flags:
+    - "--live-restore"
+
+locksmith:
+  # The reboot strategy for locksmithd to follow.  Must be one of:
+  # reboot, etcd-lock, off.
+  reboot_strategy: "etcd-lock"
+  # The endpoints of etcd locksmith should use
+  etcd_endpoints: "{{etcd_endpoints}}"
+  # The tls files to use when communicating with etcd
+  etcd_cafile: {{etcd_ssl_cacert}}
+  etcd_certfile: {{etcd_ssl_cert}}
+  etcd_keyfile: {{etcd_ssl_key}}
+  # The start of the window that locksmithd can reboot the machine during
+  #window_start: "Sun 1:00"
+  # The duration of the window that locksmithd can reboot the machine during
+  #window_length: "2h"
+  # The locksmith etcd group to be part of for reboot control
+  #group: webhosts
+
+update:
+  # The update group to follow. Most users will want one of: stable,
+  # beta, alpha.
+  group:  "{{coreos_update_group}}"
+  # The server to fetch updates from.
+  server: "https://public.update.core-os.net/v1/update/"
+
+systemd:
+  units:
+    #######################################
+    # base daemons
+    - name: etcd-member.service
+      # FIXME:  not necessary?
+      # enable: true
+      dropins:
+        - name: 10-etcd-config.conf
+          contents: |
+            [Service]
+            #
+            # Mount a non-standard directory containing SSL certs
+            Environment="RKT_RUN_ARGS=--uuid-file-save=/var/lib/coreos/etcd-member-wrapper.uuid --volume etcd-certs,kind=host,source={{etcd_cert_dir}},readOnly=true --mount volume=etcd-certs,target={{etcd_cert_dir}}"
+
+    # FIXME unnecessary?
+    # # Mask legacy etcd v1/v2 services so they do not accidentally start
+    # - name: etcd.service
+    #   mask: true
+    # - name: etcd2.service
+    #   mask: true
+
+    # FIXME unnecessary?
+    # # Configure and start flannel service
+    # - name: flanneld.service
+    #   enable: true
+    # Restore iptables configuration
+    - name: iptables-restore.service
+      enable: true
+      dropins:
+        - name: 40-iptables-restore-source.conf
+          contents: |
+            [Unit]
+            Requires={{data_volume_systemd_unit}}
+            After={{data_volume_systemd_unit}}
+            [Service]
+            ExecStartPre=/usr/bin/ln -sf \
+                {{data_volume_path}}/iptables/rules-save \
+                /var/lib/iptables/rules-save
+    #######################################
+    # disk
+    #
+    # This requires a DO volume with two partitions, swap and ext4
+    # filesystem
+
+    - name: {{swap_device_systemd_unit}}
+      contents: |
+        [Swap]
+        What={{swap_device}}
+
+        [Install]
+        WantedBy=multi-user.target
+
+    - name: {{data_volume_systemd_unit}}
+      contents: |
+        [Mount]
+        What={{data_volume_device}}
+        Where={{data_volume_path}}
+        Type=ext4
+
+        [Install]
+        WantedBy=multi-user.target
+
+    #######################################
+    # Update-config
+    #
+    # FIXME can we get rid of this?
+    # - name: update-config.service
+    #   enable: true
+    #   contents: |
+    #     [Unit]
+    #     Description=Update configuration files from data directory
+    #     DefaultDependencies=no
+    #     After={{data_volume_systemd_unit}}
+    #     Before=sysinit.target
+    #
+    #     [Install]
+    #     WantedBy=sysinit.target
+    #
+    #     [Service]   
+    #     Type=oneshot
+    #     RemainAfterExit=yes
+    #     ExecStart={{data_volume_path}}/configs/update-config
+
+    #######################################
+    # Other system units
+    #
+    - name: ntpd.service
+      enable: true
+
+passwd:
+  users:
+    - name: core
+      ssh_authorized_keys:
+        - {{ ssh_pub_key }}
+
+storage:
+  files:
+    - filesystem: "root"
+      path:       "/etc/hostname"
+      mode:       0644
+      contents:
+        inline: {{fqdn}}
+
+    - filesystem: "root"
+      path: /home/core/.toolboxrc
+      # https://coreos.com/os/docs/latest/install-debugging-tools.html
+      contents:
+        inline: |
+          TOOLBOX_DOCKER_IMAGE={{freeipa_docker_client_image_base}}
+          TOOLBOX_DOCKER_TAG={{freeipa_docker_client_image_tag}}
+          TOOLBOX_USER=root
+
+    - filesystem: "root"
+      path: /home/core/.docker/config.json
+      # Allow default detachKeys to be overridden
+      contents:
+        inline: |
+          {
+          "detachKeys": "{{docker_detach_keys|default('ctrl-p,ctrl-q')}}"
+          }
+

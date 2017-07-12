@@ -1,4 +1,4 @@
 ---
 dependencies:
+  - role: local-etc-hosts
   - role: ssh-key
-    tags: deps

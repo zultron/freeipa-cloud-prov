@@ -1,14 +1,48 @@
 ---
-# CoreOS cloud-config tasks
+# CoreOS Ignition Config
 
-# CoreOS needs cloud-config for DigitalOcean user_data
-- name: generate cloud-config
-  set_fact:
-    user_data: "{{ lookup('template', 'cloud-config.yaml.j2') }}"
-  tags: cloud-config
+# Generate human-readable Container Linux Config
+- block:
 
-- name: debug cloud-config
-  debug:
-    var: user_data
-    verbosity: 1
-  tags: debug-cloud-config
+    - name: store SSH key value
+      set_fact:
+        ssh_pub_key: "{{ lookup('file', '../var/ssh_id_rsa.pub') }}"
+
+    - name: "Generate human-readable Container Linux Config"
+      template:
+        src: "container_linux_config.yaml.j2"
+        dest: "{{clc_tmp}}"
+      register: clc_gen
+
+    - name: "Debug Container Linux Config"
+      debug:
+        msg: "{{ lookup('file', '{{clc_tmp}}') }}"
+        verbosity: 1
+
+    - name: "Generate Ignition Config for DigitalOcean"
+      command:
+        "ct {{ct_args}} -in-file {{clc_tmp}} -out-file {{ic_tmp}}"
+      register:  ct_cmd
+      when: clc_gen.changed
+
+    - name: "Save Ignition Config fact"
+      slurp:
+        src: "{{ic_tmp}}"
+      register:  ic_tmp_contents
+
+    - name: "Debug Ignition Config"
+      debug:
+        msg: "Ignition config:  {{ic_tmp_contents.content | b64decode}}"
+        verbosity: 1
+
+    - name: "Set DigitalOcean user_data fact from ignition config"
+      set_fact:
+        user_data: " {{ic_tmp_contents.content | b64decode}}"
+
+    - name: "Debug user_data"
+      debug:
+        var: user_data
+        verbosity: 1
+
+  tags: container-linux-config
+  delegate_to:  localhost

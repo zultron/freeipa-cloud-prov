@@ -1,0 +1,6 @@
+# Temp file to save container linux config in
+clc_tmp: "../var/container_linux_config-{{hostname}}.yaml"
+# Temp file to save ignition config in
+ic_tmp: "../var/ignition_config-{{hostname}}.json"
+# Args to ct
+ct_args: "-pretty -platform digitalocean"

@@ -1,12 +1,11 @@
 ---
 # SSH key
 
-- name: ensure SSH key exists at ~/.ssh/id_rsa
-  user:
-    name: user
-    generate_ssh_key: yes
-    ssh_key_file: .ssh/id_rsa
-
-- name: store SSH key value
-  set_fact:
-    ssh_pub_key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+- name: ensure SSH key exists at var/ssh_id_rsa
+  command: "ssh-keygen -t rsa -N '' -C 'ansible manager' -f var/ssh_id_rsa"
+  args:
+    chdir: ..
+    creates: var/ssh_id_rsa
+  register: create_ssh_key
+  delegate_to: localhost
+  run_once: true
