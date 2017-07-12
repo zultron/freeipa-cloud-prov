@@ -178,6 +178,11 @@ storage:
           TOOLBOX_DOCKER_IMAGE={{freeipa_docker_client_image_base}}
           TOOLBOX_DOCKER_TAG={{freeipa_docker_client_image_tag}}
           TOOLBOX_USER=root
+      mode: 0644
+      user:
+        id: 500
+      group:
+        id: 500
 
     - filesystem: "root"
       path: /home/core/.docker/config.json
@@ -187,4 +192,8 @@ storage:
           {
           "detachKeys": "{{docker_detach_keys|default('ctrl-p,ctrl-q')}}"
           }
-
+      mode: 0644
+      user:
+        id: 500
+      group:
+        id: 500
