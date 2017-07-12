@@ -15,8 +15,8 @@ etcd:
   name: {{hostname}}
   # URLs to listen on for peer and client traffic; use SSL on
   # external interfaces
-  listen_client_urls: https://$public_ipv4:2379
-  listen_peer_urls: https://$public_ipv4:2380
+  listen_client_urls: https://{PUBLIC_IPV4}:2379
+  listen_peer_urls: https://{PUBLIC_IPV4}:2380
   #
   # List of member client URLs to advertise to the rest of the
   # cluster
