@@ -59,8 +59,30 @@
   debug:
     msg: "{{hostname}} IP={{droplet_ip}}; ID={{droplet_id}}"
 
-- name: Wait for host to come up
+- name: Wait for SSH port to come up
   wait_for:
     host: "{{droplet_ip}}"
     port: 22
-  # when: do_create.changed
+
+- name: Wait for logins to be accepted
+  # The `wait_for` module stopped working at some version of CoreOS,
+  # because the ssh port was open, but login was rejected with the
+  # message `System is booting up. See pam_nologin(8)`.
+  shell: >-
+    tries=20;
+    while test $tries > 0; do
+        if ssh -o ConnectTimeout=10s -F ../lib/ssh.config \
+              -i ../var/ssh_id_rsa core@{{droplet_ip}} echo in; then
+            echo "try #${tries} succeeded";
+            break;
+        else
+            echo "try #${tries} failed";
+            tries=$(($tries -1));
+            if test $tries = 0; then
+                exit 255;
+            else
+                sleep 5;
+            fi;
+        fi;
+    done
+  changed_when:  false
