@@ -113,17 +113,6 @@ systemd:
             # Mount a non-standard directory containing SSL certs
             Environment="RKT_RUN_ARGS=--uuid-file-save=/var/lib/coreos/etcd-member-wrapper.uuid --volume etcd-certs,kind=host,source={{etcd_cert_dir}},readOnly=true --mount volume=etcd-certs,target={{etcd_cert_dir}}"
 
-    # FIXME unnecessary?
-    # # Mask legacy etcd v1/v2 services so they do not accidentally start
-    # - name: etcd.service
-    #   mask: true
-    # - name: etcd2.service
-    #   mask: true
-
-    # FIXME unnecessary?
-    # # Configure and start flannel service
-    # - name: flanneld.service
-    #   enable: true
     # Restore iptables configuration
     - name: iptables-restore.service
       enable: true
@@ -160,27 +149,6 @@ systemd:
 
         [Install]
         WantedBy=multi-user.target
-
-    #######################################
-    # Update-config
-    #
-    # FIXME can we get rid of this?
-    # - name: update-config.service
-    #   enable: true
-    #   contents: |
-    #     [Unit]
-    #     Description=Update configuration files from data directory
-    #     DefaultDependencies=no
-    #     After={{data_volume_systemd_unit}}
-    #     Before=sysinit.target
-    #
-    #     [Install]
-    #     WantedBy=sysinit.target
-    #
-    #     [Service]   
-    #     Type=oneshot
-    #     RemainAfterExit=yes
-    #     ExecStart={{data_volume_path}}/configs/update-config
 
     #######################################
     # Other system units
