@@ -103,8 +103,6 @@ systemd:
     #######################################
     # base daemons
     - name: etcd-member.service
-      # FIXME:  not necessary?
-      # enable: true
       dropins:
         - name: 10-etcd-config.conf
           contents: |
@@ -126,6 +124,12 @@ systemd:
             ExecStartPre=/usr/bin/ln -sf \
                 {{data_volume_path}}/iptables/rules-save \
                 /var/lib/iptables/rules-save
+ 
+    # The flannel-docker-opts.service blocks docker.service from
+    # running after boot; it'll be added back later
+    - name: flannel-docker-opts.service
+      mask: true
+
     #######################################
     # disk
     #
