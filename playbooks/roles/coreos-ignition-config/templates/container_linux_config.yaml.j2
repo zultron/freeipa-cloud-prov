@@ -104,7 +104,7 @@ systemd:
     # base daemons
     - name: etcd-member.service
       dropins:
-        - name: 10-etcd-config.conf
+        - name: 10-etcd-cert-dir.conf
           contents: |
             [Service]
             #
