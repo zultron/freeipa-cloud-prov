@@ -70,7 +70,7 @@
   # message `System is booting up. See pam_nologin(8)`.
   shell: >-
     tries=20;
-    while test $tries > 0; do
+    while test $tries -gt 0; do
         if ssh -o ConnectTimeout=10s -F ../lib/ssh.config \
               -i ../var/ssh_id_rsa core@{{droplet_ip}} echo in; then
             echo "try #${tries} succeeded";
