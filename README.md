@@ -137,6 +137,16 @@ Run shell in `ipaclient` container, ready to run emacs
 
 Ansible automates the bootstrapping before anything else.
 
+At this time, Ansible has an enormous number of modules that handle
+90% of our needs.  The missing 10% primarily handle FreeIPA object
+classes that the roles in this repo use extensively, such as the
+SSL-related objects CA, CA ACL, certificate and service, and also DNS
+zones and records.  There is also a parted module copied from upstream
+with bugfixes.
+
+It also turned out to simplify playbooks to write a number of filter
+plugins, some for specific purposes and some general.
+
 - [Glossary][ansible-glossary] of Play, Role, Block, Task directives
 - [Local actions][ansible-local] on stackoverflow, incl. nice syntax
 - and CoreOS Container Linux:
