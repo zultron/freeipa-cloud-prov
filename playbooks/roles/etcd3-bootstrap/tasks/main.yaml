@@ -111,13 +111,6 @@
       become: true
       register: etcd_ssl_cacert_create
 
-    - name: "Copy chown_certs.sh"
-      template:
-        src: chown_certs.sh.j2
-        dest: "{{etcd_cert_dir}}/chown_certs.sh"
-        mode: 0755
-      become: true
-
     - name:  "Check cert tracking status of {{etcd_ssl_cert}}"
       shell: "{{ipaclient_exec}}
                  ipa-getcert status -f {{etcd_ssl_cert}} |
@@ -129,12 +122,29 @@
       # The cert is actually created and maintained by certmonger running
       # in ipaclient.  The {{etcd_ssl_dir}} has been bind-mounted in the
       # container for this purpose.
+      #
+      # FIXME The -X arg doesn't actually work yet
       shell: "{{ipaclient_exec}} ipa-getcert request -w
                   -I etcd_ssl_cert
                   -f {{etcd_ssl_cert}} -k {{etcd_ssl_key}}
                   -K {{etcd_service_principal}} -N '{{fqdn}}' -g 2048
-                  -C {{etcd_cert_dir}}/chown_certs.sh"
+                  -X {{etcd_ca}}"
       when: etcd_ssl_cert_tracking.changed
+
+    # Instal dropin to chown certs to etcd; the `ipa-getcert request
+    # -C` arg didn't seem to work, so do it this way instead
+    - name:  "Install etcd-member dropin directory"
+      file:
+        path: "{{dropin_dir_pat % 'etcd-member.service'}}"
+        state: directory
+        mode: 0755
+      become: true
+
+    - name:  "Install etcd-member dropin to make certs readable by etcd user"
+      template:
+        src: 10-cert-owner.conf.j2
+        dest: "{{dropin_dir_pat % 'etcd-member.service'}}/10-cert-owner.conf"
+      become: true
 
   tags:
     - configure-etcd
@@ -144,6 +154,8 @@
 # Install etcd-member service
 #
 - block:
+    # Point CoreOS resolver at FreeIPA to read etcd SRV records and
+    # resolve member names
     - name:  Set CoreOS DNS resolvers with systemd resolved.conf
       template:
         src: resolved.conf.j2
@@ -157,41 +169,38 @@
         state: restarted
       when:  resolved_conf.changed
 
-    - name:  Install etcd-member service dropin directory
-      file:
-        path: "{{ dropin_dir_pat % 'etcd-member' }}"
-        state: directory
-        mode: 0755
-
-    - name: Install etcd-member service dropin
-      template:
-        src: 20-etcd-cert-dir.conf.j2
-        dest: "{{ dropin_dir_pat % 'etcd-member' }}/20-etcd-cert-dir.conf"
-      register:  bootstrap_etcd_dropin
-
-    - name: Install etcd-member service dropin FIXME
-      # This is temporary; should happen in cloud-config
-      template:
-        src: 10-etcd-config-FIXME.conf.j2
-        dest: "{{ dropin_dir_pat % 'etcd-member' }}/10-etcd-config-FIXME.conf"
-      register:  bootstrap_etcd_dropin1
-
-    - name:  Reload systemd and restart etcd-member
-      systemd:
-        name: etcd-member
-        daemon_reload: yes
-        state: restarted
-      when:  bootstrap_etcd_dropin.changed or bootstrap_etcd_dropin1.changed
-
-    # - name:  Add etcdctl command as alias
-    #   lineinfile:
-    #     dest: "/home/core/.bashrc"
-    #     state: present
-    #     line: "alias etcdctl='sudo etcdctl --ca-file {{etcd_ssl_cacert}}
-    #     --cert-file {{etcd_ssl_cert}} --key-file {{etcd_ssl_key}}
-    #     --endpoints=https://{{fqdn}}:2379'"
-
   become: true
   tags:
     - configure-etcd
     - etcd-member-service
+
+#
+# Add etcdctl command alias
+#
+- block:
+
+    - name:  "Check if ~core/.bashrc is a symlink"
+      stat:
+        path: "/home/core/.bashrc"
+      register:  bashrc_stat
+
+    - name:  "Delete ~core/.bashrc symlink"
+      file:
+        path: "/home/core/.bashrc"
+        state: absent
+      when:  bashrc_stat.stat.islnk
+
+    - name:  "Copy /usr/share/skel/.bashrc to ~core/.bashrc"
+      command: "cp /usr/share/skel/.bashrc /home/core/.bashrc"
+      when:  bashrc_stat.stat.islnk
+
+    - name:  Add etcdctl command as alias
+      lineinfile:
+        dest: "/home/core/.bashrc"
+        state: present
+        insertafter: EOF
+        line: "alias etcdctl='sudo {{etcdctl_command}}"
+
+  tags:
+    - configure-etcd
+    - etcdctl-alias

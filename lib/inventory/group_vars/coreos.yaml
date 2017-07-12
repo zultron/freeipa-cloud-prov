@@ -16,7 +16,7 @@ region_id: nyc1
 ansible_ssh_user: core
 
 # Where dropins live
-dropin_dir_pat: "/etc/systemd/system/%s.service.d"
+dropin_dir_pat: "/etc/systemd/system/%s.d"
 
 # Swap partition size, GiB
 swap_size:  2
@@ -95,6 +95,17 @@ etcd_ssl_cert: "{{ etcd_cert_dir }}/cert.pem"
 etcd_ssl_key: "{{ etcd_cert_dir }}/key.pem"
 etcd_ssl_cacert: "{{ etcd_cert_dir }}/ca.pem"
 
+# Endpoints
+etcd_endpoints:
+  "{{groups.coreos|formatmapstr('https://{0}.%s:2379' % domain_name,',')}}"
+
+# etcdctl
+etcdctl_command:
+  "etcdctl
+  --ca-file {{etcd_ssl_cacert}}
+  --cert-file {{etcd_ssl_cert}}
+  --key-file {{etcd_ssl_key}}
+  --endpoints={{etcd_endpoints}}"
 
 #################################
 # Cluster configuration
