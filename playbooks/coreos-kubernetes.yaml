@@ -23,6 +23,8 @@
   roles:
 
     # Set up kubernetes
+    - role: kubernetes-bootstrap
+      tags: kubernetes
 
 ############################################
 - name: Add FreeIPA to Kubernetes

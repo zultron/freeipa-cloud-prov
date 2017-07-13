@@ -1,0 +1,32 @@
+---
+
+- block:
+
+    - name:  "Create /etc/kubernetes directory"
+      file:
+        path: "/etc/kubernetes"
+        state: directory
+
+    - name:  "Create /etc/kubernetes/cni directory"
+      file:
+        path: "/etc/kubernetes/cni"
+        state: directory
+
+    - name:  "Create /etc/kubernetes/cni/net.d directory"
+      file:
+        path: "/etc/kubernetes/cni/net.d"
+        state: directory
+
+    - name:  "Create /etc/kubernetes/cni/net.d/10-flannel.conf"
+      copy:
+        path: "/etc/kubernetes/cni/net.d/10-flannel.conf"
+        content: |
+          {
+              "name": "podnet",
+              "type": "flannel",
+              "delegate": {
+                  "isDefaultGateway": true
+              }
+          }
+
+  become: true

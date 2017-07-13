@@ -108,6 +108,19 @@ etcdctl_command:
   --endpoints={{etcd_endpoints}}"
 
 #################################
+# Kubernetes configuration
+
+kubernetes_master: "{{master_host}}"
+kubernetes_network: "{{network_prefix}}.0.0/{{cidr_prefix}}"
+kubernetes_version: "v1.7.0_coreos.0"
+
+# FIXME
+kubernetes_pod_network:  10.2.0.0/16
+kubernetes_service_ip_range:  10.3.0.0/24
+kubernetes_service_ip: 10.3.0.1
+kubernetes_dns_service_ip: 10.3.0.10
+
+#################################
 # Cluster configuration
 
 # Cluster configuration
