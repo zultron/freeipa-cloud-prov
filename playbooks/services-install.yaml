@@ -1,0 +1,22 @@
+---
+# Install and configure Dockerized services in Kubernetes cluster
+
+############################################
+- name: Install service containers in Kubernetes
+  hosts: coreos
+
+  roles:
+
+    # Set up syslogd
+
+    # Set up FusionPBX
+
+    # Set up postfix
+
+    # Set up dovecot
+
+    # Set up HAProxy
+
+    # Set up Apache
+
+    # Set up VPN?
