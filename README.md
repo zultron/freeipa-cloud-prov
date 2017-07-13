@@ -280,6 +280,7 @@ Kubernetes depends on Flannel networking.
 
 Install Kubernetes after the Container Linux cluster is configured.
 
+- [CoreOS Kubernetes docs][coreos-kubernetes]
 - [Ansible examples][kub-ansible] incl. etcd2, docker in kubernetes
 
 - Kubernetes is replacing fleet
@@ -288,7 +289,6 @@ Install Kubernetes after the Container Linux cluster is configured.
   - [GH sebiwi/kubernetes-coreos][kubernetes-coreos-ansible-2]; adds Vagrant
   - [GH deimosfr/ansible-coreos-kubernetes][kubernetes-coreos-ansible-3];
     for "production usage"
-- [CoreOS Kubernetes docs][coreos-kubernetes]
 - [Kubernetes CoreOS docs][kubernetes-coreos]
   - Question:  Article calls for creating certs with IP addr altname
     attributes; how to do with FreeIPA?
@@ -297,11 +297,11 @@ Install Kubernetes after the Container Linux cluster is configured.
 - [Kubernetes module][ansible-kubernetes-module] in Ansible
 
 
+[coreos-kubernetes]:  https://coreos.com/kubernetes/docs/latest/
 [kub-ansible]: https://github.com/kubernetes/contrib/tree/master/ansible/roles
 [kubernetes-coreos-ansible-1]:  https://github.com/thesamet/ansible-kubernetes-coreos
 [kubernetes-coreos-ansible-2]:  https://github.com/sebiwi/kubernetes-coreos
 [kubernetes-coreos-ansible-3]:  https://github.com/deimosfr/ansible-coreos-kubernetes
-[coreos-kubernetes]:  https://coreos.com/kubernetes/docs/latest/
 [kubernetes-coreos]:  https://kubernetes.io/docs/getting-started-guides/coreos/
 [freeipa-no-ip-sans]:  https://www.redhat.com/archives/freeipa-users/2016-October/msg00053.html
 [kubernetes-no-ip-sans-email]:  https://groups.google.com/forum/#!topic/kubernetes-users/azpLUFHu_2I
@@ -324,6 +324,16 @@ web services on a single IP.
 
 
 ## TODO
+
+### Remove flannel version from `container_linux_config.yaml.j2`
+
+After [this bug][coreos-issue-2051] is fixed.
+
+[coreos-issue-2051]: https://github.com/coreos/bugs/issues/2051
+
+### Fix certmonger certs with sub-CA
+
+See message posted to freeipa-users list, 2017-07-12.
 
 ### Is certmonger actually running in ipaclient?
 
