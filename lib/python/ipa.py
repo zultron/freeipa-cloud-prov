@@ -86,6 +86,10 @@ class IPAClient(object):
     # )
     kw_args = dict()
 
+    # Some operations can take more than the
+    # ansible.module_utils.urls.fetch_url() default 10 second timeout
+    # to complete; allow that to be set here
+    fetch_url_timeout=10
 
     #######################################################
     # init
@@ -212,7 +216,8 @@ class IPAClient(object):
         try:
             resp, info = fetch_url(
                 module=self.module, url=url,
-                data=to_bytes(json.dumps(data)), headers=self.headers)
+                data=to_bytes(json.dumps(data)), headers=self.headers,
+                timeout=self.fetch_url_timeout)
             status_code = info['status']
             if status_code not in [200, 201, 204]:
                 self._fail(method, info['msg'])

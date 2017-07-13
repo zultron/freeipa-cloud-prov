@@ -97,6 +97,9 @@ class CAIPAClient(IPAClient):
         description =    dict(type='str', required=False),
     )
 
+    # Creating a sub-CA can exceed the default 10s timeout
+    fetch_url_timeout=30
+
     def mod_rewrite_list_changes(self, request):
         # Once the CA is created, nothing may be modified except the
         # description
