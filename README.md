@@ -229,6 +229,10 @@ Next step is to install and configure FreeIPA in a Docker container.
 CoreOS Container Linux must be configured for clustering with etcd3
 and Kubernetes.  This depends on FreeIPA being bootstrapped.
 
+The initial node will be bootstrapped with a static cluster
+configuration and no TLS.  TLS will be introduced after FreeIPA is
+running and DNS and the CA are available.
+
 The etcd cluster will be bootstrapped from DNS with the
 `--discovery-srv` flag.
 
@@ -243,6 +247,7 @@ All communication will be over TLS with certs generated from FreeIPA
   - [CoreOS cluster reconfiguration][coreos-cluster-reconfig]
 
 - SSL on CoreOS:
+  - [Enabling HTTPS in an existing etcd cluster][coreos-tls-existing]
   - [CoreOS client ssl][coreos-clients-ssl]
   - [CoreOS SSL and iptables on DigitalOcean][do-coreos-ssl] (somewhat
     outdated)
@@ -263,6 +268,7 @@ All communication will be over TLS with certs generated from FreeIPA
 [etcd3-options]: https://coreos.com/etcd/docs/latest/op-guide/configuration.html
 [coreos-cluster-reconfig]: https://coreos.com/etcd/docs/latest/etcd-live-cluster-reconfiguration.html
 
+[coreos-tls-existing]: https://coreos.com/etcd/docs/latest/etcd-live-http-to-https-migration.html
 [coreos-clients-ssl]: https://coreos.com/etcd/docs/latest/tls-etcd-clients.html
 [do-coreos-ssl]: https://www.digitalocean.com/community/tutorials/how-to-secure-your-coreos-cluster-with-tls-ssl-and-firewall-rules
 
@@ -324,6 +330,10 @@ web services on a single IP.
 
 
 ## TODO
+
+### Adjust etcd endpoints after cluster complete
+
+- Initial members may have incomplete endpoint list
 
 ### Is certmonger actually running in ipaclient?
 
