@@ -101,17 +101,12 @@ locksmith:
   # The reboot strategy for locksmithd to follow.  Must be one of:
   # reboot, etcd-lock, off.
   reboot_strategy: "etcd-lock"
-{% if hostname == master_host %}
-  # The endpoints of etcd locksmith should use
-  etcd_endpoints: "http://{PUBLIC_IPV4}:2379"
-{% else %}
   # The endpoints of etcd locksmith should use
   etcd_endpoints: "{{etcd_endpoints}}"
   # The tls files to use when communicating with etcd
   etcd_cafile: {{etcd_ssl_cacert}}
   etcd_certfile: {{etcd_ssl_cert}}
   etcd_keyfile: {{etcd_ssl_key}}
-{% endif %}
   # The start of the window that locksmithd can reboot the machine during
   #window_start: "Sun 1:00"
   # The duration of the window that locksmithd can reboot the machine during
