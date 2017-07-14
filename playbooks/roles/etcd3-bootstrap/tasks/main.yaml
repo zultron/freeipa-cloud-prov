@@ -32,6 +32,30 @@
     - etcd-dns-srv
 
 #
+# Configure DNS resolvers to point at FreeIPA
+#
+- block:
+    # Point CoreOS resolver at FreeIPA to read etcd SRV records and
+    # resolve member names
+    - name:  "Set CoreOS DNS resolvers with systemd resolved.conf"
+      template:
+        src: resolved.conf.j2
+        dest: /etc/systemd/resolved.conf
+      register:  resolved_conf
+
+    - name:  "Reload systemd and restart systemd-resolved.service"
+      systemd:
+        name: systemd-resolved
+        daemon_reload: yes
+        state: restarted
+      when:  resolved_conf.changed
+
+  become: true
+  tags:
+    - configure-etcd
+    - etcd-member-service
+
+#
 # Create etcd sub-CA and etcd user
 #
 - block:
@@ -49,6 +73,15 @@
     - name: "Add Etcd CA to CA ACL '{{user_cert_acl}}'"
       ipa_caacl:
         name: "{{user_cert_acl}}"
+        ca: "{{etcd_ca}}"
+        state: present
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+
+    - name: "Add Etcd CA to CA ACL 'hosts_services_caIPAserviceCert'"
+      ipa_caacl:
+        name: "hosts_services_caIPAserviceCert"
         ca: "{{etcd_ca}}"
         state: present
         ipa_host: "{{fqdn}}"
@@ -145,34 +178,66 @@
         src: 10-cert-owner.conf.j2
         dest: "{{dropin_dir_pat % 'etcd-member.service'}}/10-cert-owner.conf"
       become: true
+      register: cert_owner_dropin
 
   tags:
     - configure-etcd
     - etcd-server-cert
 
 #
-# Install etcd-member service
+# Enable TLS on initial member
 #
 - block:
-    # Point CoreOS resolver at FreeIPA to read etcd SRV records and
-    # resolve member names
-    - name:  "Set CoreOS DNS resolvers with systemd resolved.conf"
+
+    - name:  "Install etcd-member dropin to configure TLS on initial member"
       template:
-        src: resolved.conf.j2
-        dest: /etc/systemd/resolved.conf
-      register:  resolved_conf
+        src: 30-certs.conf.j2
+        dest: "{{dropin_dir_pat % 'etcd-member.service'}}/30-certs.conf"
+      become: true
+      when:  hostname == master_host
+      register:  certs_dropin
 
-    - name:  "Reload systemd and restart systemd-resolved.service"
-      systemd:
-        name: systemd-resolved
-        daemon_reload: yes
-        state: restarted
-      when:  resolved_conf.changed
+    - name:  "Read etcd member list"
+      # Setting field sep to `:`, $1 is member id, $3 is `//host` part
+      # of URL
+      shell: "etcdctl member list | awk -F : '{print $1; print $3}'"
+      changed_when: false
+      register:  etcd_member_list
 
-  become: true
+    - name:  "Set initial member facts"
+      set_fact:
+        initial_member_id:  "{{etcd_member_list.stdout_lines[0]|default('')}}"
+        # Cut off initial slashes
+        initial_member_host:
+          "{{etcd_member_list.stdout_lines[1]|default('//'[2:])}}"
+
+    - name:  "Fix etcd peer URL on initial member"
+      command:
+        "etcdctl member update {{initial_member_id}} https://{{fqdn}}:2380"
+      when:  "initial_member_host != fqdn and
+          initial_member_id and initial_member_host"
+
+  when:  hostname == master_host
   tags:
     - configure-etcd
-    - etcd-member-service
+    - etcd-initial-member
+
+#
+# Reload etcd-member service
+#
+- name:  "Reload systemd and restart etcd-member.service"
+  systemd:
+    name: etcd-member
+    daemon_reload: yes
+    state: restarted
+  become: true
+  when:  "etcd_ssl_cert_tracking.changed
+       or cert_owner_dropin.changed|default(True)
+       or certs_dropin.changed|default(True)
+       or initial_member_host != fqdn"
+
+  tags:
+    - configure-etcd
 
 #
 # Add etcdctl command alias
@@ -199,7 +264,7 @@
         dest: "/home/core/.bashrc"
         state: present
         insertafter: EOF
-        line: "alias etcdctl='sudo {{etcdctl_command}}"
+        line: "alias etcdctl='sudo {{etcdctl_command}}'"
 
   tags:
     - configure-etcd
