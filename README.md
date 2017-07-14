@@ -63,7 +63,7 @@ this work in any critical scenario.**
         ansible-playbook playbooks/freeipa-install.yaml -l host1
 
         # Install and configure etcd3 and Kubernetes on master
-        ansible-playbook playbooks/coreos-kubernetes.yaml -l host1
+        ansible-playbook playbooks/coreos-cluster.yaml -l host1
 
         # Install other cluster nodes
         ansible-playbook playbooks/provision.yaml -l host2,host3

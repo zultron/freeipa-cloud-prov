@@ -1,5 +1,5 @@
 ---
-# Install and configure etcd3 and kubernetes on CoreOS
+# Set up clustering on CoreOS
 
 ############################################
 - name: Install CoreOS cluster
@@ -7,9 +7,9 @@
 
   roles:
 
-    # Set up etcd3
+    # Set up etcd
     - role: etcd3-bootstrap
-      tags: etcd3
+      tags: etcd
 
     # Set up flannel
     - role: flannel-bootstrap
