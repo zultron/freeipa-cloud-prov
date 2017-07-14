@@ -88,6 +88,30 @@
   tags:
     - install
 
+- name: "Clean out any incomplete prior install--{{item}}"
+  # The next step *always* restarts the container for whatever broken
+  # reason, the FreeIPA install doesn't cleanly resume after
+  # restarting; deal with it by restarting from scratch
+  file:
+    state: absent
+    path: "{{freeipa_volume_path}}/{{item}}"
+  with_items:
+    - "build-id"
+    - "etc"
+    - "hostname"
+    - "root"
+    - "usr"
+    - "var"
+  become: true
+  when: not install_path_stat.stat.exists
+
+- name: "Remove any stale ipa container"
+  command:  "docker rm ipa"
+  failed_when:  false
+  register:  docker_rm_ipa
+  changed_when:  docker_rm_ipa.rc == 0
+  when: not install_path_stat.stat.exists
+
 - name: Run FreeIPA install in Docker container
   docker_container:
     name: ipa
