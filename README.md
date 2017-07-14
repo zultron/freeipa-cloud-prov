@@ -325,10 +325,6 @@ web services on a single IP.
 
 ## TODO
 
-### Fix certmonger certs with sub-CA
-
-See message posted to freeipa-users list, 2017-07-12.
-
 ### Is certmonger actually running in ipaclient?
 
 - Should a new ipaclient Docker image be written from scratch?
