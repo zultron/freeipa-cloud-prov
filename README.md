@@ -325,12 +325,6 @@ web services on a single IP.
 
 ## TODO
 
-### Remove flannel version from `container_linux_config.yaml.j2`
-
-After [this bug][coreos-issue-2051] is fixed.
-
-[coreos-issue-2051]: https://github.com/coreos/bugs/issues/2051
-
 ### Fix certmonger certs with sub-CA
 
 See message posted to freeipa-users list, 2017-07-12.
