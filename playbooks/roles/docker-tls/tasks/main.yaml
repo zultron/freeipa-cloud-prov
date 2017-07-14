@@ -40,39 +40,18 @@
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
 
+    - name: "Add Docker CA to CA ACL 'hosts_services_caIPAserviceCert'"
+      ipa_caacl:
+        name: "hosts_services_caIPAserviceCert"
+        ca: "{{docker_ca}}"
+        state: present
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+
   delegate_to: localhost
   run_once: True
   tags: docker-ca
-
-#
-# Create docker client user
-#
-- block:
-
-    - name: "Create docker client user"
-      ipa_user:
-        name: "{{docker_client_id}}"
-        state: present
-        givenname: Docker
-        sn: Client
-        # password: "{{freeipa_admin_password}}"
-        ipa_host: "{{fqdn}}"
-        ipa_user: "{{ipa_user}}"
-        ipa_pass: "{{freeipa_admin_password}}"
-      register:  create_docker_client_user
-
-    - name: "Add docker user to CA ACL {{user_cert_acl}}"
-      ipa_caacl:
-        name: "{{user_cert_acl}}"
-        user: "{{docker_client_id}}"
-        state: present
-        ipa_host: "{{fqdn}}"
-        ipa_user: "{{ipa_user}}"
-        ipa_pass: "{{freeipa_admin_password}}"
-
-  delegate_to: localhost
-  run_once: True
-  tags: docker-client
 
 #
 # Generate docker client cert
@@ -153,7 +132,7 @@
     - name: "Generate docker client certificate in IPA"
       ipa_cert:
         req: "{{cert_req}}"
-        principal: "{{docker_client_id}}"
+        principal: "{{manager_id}}"
         cacn: "{{docker_ca}}"
         state: present
         ipa_host: "{{fqdn}}"

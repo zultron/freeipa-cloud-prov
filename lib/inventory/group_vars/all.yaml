@@ -17,3 +17,6 @@ ip_addr: "{{ansible_default_ipv4.address}}"
 
 # Master host
 master_host: "{{groups.coreos_master[0]}}"
+
+# Manager user ID
+manager_id: "manager"

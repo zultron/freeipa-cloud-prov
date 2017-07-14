@@ -1,7 +1,4 @@
 # Variables for creating bootstrap client cert
-
-docker_client_id: "docker_client"
-
 #
 # Remote locations for bootstrap docker client SSL cert
 #

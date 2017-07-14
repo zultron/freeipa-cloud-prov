@@ -276,19 +276,46 @@
     - dns
 
 #################################
-# Set up CA ACL for IECUserRoles cert profile
+# Set up CA ACL for IECUserRoles cert profile and add manager user
 
-- name: "Create CA ACL {{user_cert_acl}}
-              with cert profile {{user_cert_profile}}"
-  ipa_caacl:
-    name: "{{user_cert_acl}}"
-    certprofile: "{{user_cert_profile}}"
-    state: enabled
-    ipa_host: "{{fqdn}}"
-    ipa_user: "{{ipa_user}}"
-    ipa_pass: "{{freeipa_admin_password}}"
+- block:
+
+    - name: "Create CA ACL {{user_cert_acl}}
+                  with cert profile {{user_cert_profile}}"
+      ipa_caacl:
+        name: "{{user_cert_acl}}"
+        certprofile: "{{user_cert_profile}}"
+        state: enabled
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      tags: ca-acl
+
+    - name: "Create manager user"
+      # The admin user can't do some things, like create user certs,
+      # dunno why, so add a 'manager' user to do it instead
+      ipa_user:
+        name: "{{manager_id}}"
+        state: present
+        givenname: Manager
+        sn: User
+        # password: "{{freeipa_admin_password}}"
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+
+    - name: "Add docker user to CA ACL {{user_cert_acl}}"
+      ipa_caacl:
+        name: "{{user_cert_acl}}"
+        user: "{{manager_id}}"
+        state: present
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      tags: manager-user
+
   delegate_to: localhost
+  run_once: True
   tags:
-    - configure
     - ca-acl
-
+    - configure
