@@ -2,7 +2,7 @@
 # Install and configure etcd3 and kubernetes on CoreOS
 
 ############################################
-- name: Install etcd3 cluster
+- name: Install CoreOS cluster
   hosts: coreos
 
   roles:
@@ -15,21 +15,8 @@
     - role: flannel-bootstrap
       tags: flannel
 
-
-############################################
-- name: Install Kubernetes cluster
-  hosts: coreos
-
-  roles:
-
     # Set up kubernetes
     - role: kubernetes-bootstrap
       tags: kubernetes
-
-############################################
-- name: Add FreeIPA to Kubernetes
-  hosts: coreos
-
-  roles:
 
     # Add ipa and ipaclient containers to kubernetes
