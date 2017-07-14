@@ -1,55 +1,32 @@
 ---
 
 #
-# Add flannel config to etcd
+# Initial member only:  Configure TLS
 #
 - block:
 
-    - name: "Check flannel config in etcd"
-      shell: >-
-        {{etcdctl_command}} get /coreos.com/network/config || echo no
-      register:  etcd_flannel_config
-      # This feels a little sketchy, but it seems to work
-      changed_when: etcd_flannel_config.stdout != flannel_network_config
+    - name:  "Install flanneld.service dropin to configure TLS on initial member"
+      template:
+        src: 30-certs.conf.j2
+        dest: "{{dropin_dir_pat % 'flanneld.service'}}/30-certs.conf"
+      register:  certs_dropin
 
-    - debug:
-        var: flannel_network_config
+    - name:  "Remove junk flanneld.service dropins"
+      file:
+        path: "{{dropin_dir_pat % 'flanneld.service'}}/{{item}}.conf"
+        state: absent
+      with_items:
+        - "20-clct-flannel"
+        - "50-network-config"
 
-    - name: "Publish flannel config to etcd"
-      command: |
-        {{etcdctl_command}} set /coreos.com/network/config
-        '{{flannel_network_config}}'
-      when: etcd_flannel_config.changed
+    - name:  "Reload systemd and restart flanneld.service"
+      systemd:
+        name: flanneld
+        daemon_reload: yes
+        state: restarted
+      when:  "certs_dropin.changed|default(True)"
 
+  when:  hostname == master_host
   become: true
   tags:
     - flannel-config
-    - flannel-etcd-config
-
-#
-# Get flanneld.service, flannel-docker-opts.service, docker.service
-# started/restarted
-#
-- block:
-
-    - name:  "Ensure flanneld.service unit is started"
-      systemd:
-        name: "flanneld.service"
-        state:  started
-
-    - name:  "Ensure flannel-docker-opts.service unit is unmasked and started"
-      systemd:
-        name: "flannel-docker-opts.service"
-        masked:  false
-        enabled:  true
-        state:  started
-
-    - name:  "Restart docker.service"
-      systemd:
-        name: "docker.service"
-        state:  restarted
-
-  become: true
-  tags:
-    - flannel-config
-    - flannel-docker-opts

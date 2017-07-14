@@ -1,3 +1,0 @@
-# Flannel network config
-# - Leading space prevents interpretation as json :P
-flannel_network_config: " { \"Network\": \"{{network_prefix}}.0.0/{{cidr_prefix}}\" }"
