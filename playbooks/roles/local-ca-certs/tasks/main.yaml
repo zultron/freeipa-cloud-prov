@@ -12,31 +12,27 @@
   tags:
     - local-setup
 
-- name: Local create directory /usr/local/share/ca-certificates/{{domain_name}}
-  file:
-    path: /usr/local/share/ca-certificates/{{domain_name}}
-    state: directory
-    mode: 0755
-  become: true
-  delegate_to: localhost
-  register: mkdir_ca_certs
-  tags:
-    - local-setup
+- block:
 
-- name: Local Install CA cert {{mkdir_ca_certs.path}}/{{domain_name}}_CA.crt
-  copy:
-    src: ../var/cacert.pem
-    dest: "{{mkdir_ca_certs.path}}/{{domain_name}}_CA.crt"
-  become: true
-  register: usr_local_share_ca_certificates
-  delegate_to: localhost
-  tags:
-    - local-setup
+    - name: Local create directory /usr/local/share/ca-certificates/{{domain_name}}
+      file:
+        path: /usr/local/share/ca-certificates/{{domain_name}}
+        state: directory
+        mode: 0755
+      register: mkdir_ca_certs
 
-- name: Local update CA certs
-  command: update-ca-certificates
-  become: true
+    - name: Local Install CA cert {{mkdir_ca_certs.path}}/{{domain_name}}_CA.crt
+      copy:
+        src: ../var/cacert.pem
+        dest: "{{mkdir_ca_certs.path}}/{{domain_name}}_CA.crt"
+      register: usr_local_share_ca_certificates
+
+    - name: Local update CA certs
+      command: update-ca-certificates
+      when: usr_local_share_ca_certificates.changed
+
   delegate_to: localhost
-  when: usr_local_share_ca_certificates.changed
+  become: true
+  run_once: true
   tags:
     - local-setup

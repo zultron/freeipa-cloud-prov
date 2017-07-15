@@ -2,23 +2,24 @@
 #################################
 # Update local /etc/hosts
 
-- name: Get DigitalOcean inventory
-  do_droplet_info:
-    names: "{{ groups.digitalocean|formatmaplist('{}.%s' % domain_name)}}"
-  register: droplet_info
+- block:
+
+    - name: Get DigitalOcean inventory
+      do_droplet_info:
+        names: "{{ groups.digitalocean|formatmaplist('{}.%s' % domain_name)}}"
+      register: droplet_info
+
+    - name: "Add/update host IP in /etc/hosts"
+      lineinfile:
+        dest: /etc/hosts
+        regexp: " {{item}}"
+        state: present
+        line: "{{droplet_info.d[item].ip_address}} {{item}} {{item|shortname}}"
+        unsafe_writes: yes
+      become: true
+      delegate_to: localhost
+      with_items: "{{droplet_info.d}}"
+
+  run_once: true
   tags:
     - local-setup
-
-- name: "Add/update host IP in /etc/hosts"
-  lineinfile:
-    dest: /etc/hosts
-    regexp: " {{item}}"
-    state: present
-    line: "{{droplet_info.d[item].ip_address}} {{item}} {{item|shortname}}"
-    unsafe_writes: yes
-  become: true
-  delegate_to: localhost
-  with_items: "{{droplet_info.d}}"
-  tags:
-    - local-setup
-
