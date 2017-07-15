@@ -4,10 +4,15 @@
 
 - block:
 
-    - name: Get DigitalOcean inventory
+    - name: "Get DigitalOcean inventory"
       do_droplet_info:
         names: "{{ groups.digitalocean|formatmaplist('{}.%s' % domain_name)}}"
       register: droplet_info
+
+    - name: "Print hosts and IPs"
+      debug:
+        msg: "{{item|shortname}} {{droplet_info.d[item].ip_address}}"
+      with_items: "{{droplet_info.d}}"
 
     - name: "Add/update host IP in /etc/hosts"
       lineinfile:
