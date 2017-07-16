@@ -87,6 +87,7 @@
   register: install_path_stat
   tags:
     - install
+    - docker-run-ipa
 
 - name: "Clean out any incomplete prior install--{{item}}"
   # The next step *always* restarts the container for whatever broken
@@ -144,6 +145,7 @@
   when: not install_path_stat.stat.exists
   tags:
     - install
+    - docker-run-ipa
 
 # - name: Debug Docker container
 #   debug:
