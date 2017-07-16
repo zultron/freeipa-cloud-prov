@@ -4,4 +4,4 @@
 
 - include: provision.yaml
 - include: freeipa-install.yaml
-- include: coreos-kubernetes.yaml
+- include: coreos-cluster.yaml

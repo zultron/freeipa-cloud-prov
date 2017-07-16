@@ -1,0 +1,95 @@
+---
+#
+# Create TLS certs with certmonger in ipaclient container
+#
+# The cert is actually created and maintained by certmonger running in
+# ipaclient.  The {{cert_dir}} directory must be bind-mounted in the
+# ipaclient container for this purpose.
+#
+# Usage, included in role/tasks/main.yaml:
+#
+# - set_fact:
+#     # A human-friendly nickname for `ipa-getcert -i`
+#     cert_nick:  "my_cert"
+#     # Service principal basename, without /{{fqdn}}@{{kerberos_realm}}
+#     service_principal: "{{my_service_basename}}"
+#     ca_name:  "{{my_ca}}"
+#     ca_subject_cn:  "{{my_ca_subject_cn}}"
+#     # Number of bits for key, default 2048
+#     key_bits:  "1024"
+#     # Paths for certificates
+#     cert_dir: "{{my_ssl_dir}}"
+#     cacert_path:  "{{my_ssl_cacert}}"
+#     cert_path:  "{{my_ssl_cert}}"
+#     key_path:  "{{my_ssl_key}}"
+#
+# - include: tasks/ipa_certmonger_certs.yaml
+
+- name: "Create cert directory {{cert_dir}}"
+  file:
+    path: "{{cert_dir}}"
+    state: directory
+    mode: 0755
+  become: true
+
+- name:  "Create {{service_principal}} principal,
+          managed by {{freeipa_client_fqdn}} host"
+  ipa_service:
+    name: "{{service_principal}}/{{fqdn}}@{{kerberos_realm}}"
+    managedby_host: "{{freeipa_client_fqdn}}"
+    state: present
+    ipa_host: "{{fqdn}}"
+    ipa_user: "{{ipa_user}}"
+    ipa_pass: "{{freeipa_admin_password}}"
+  delegate_to: localhost
+
+- name: "Read {{ca_name}} CA cert"
+  ipa_cert:
+    cacn: "ipa"
+    principal: "{{ca_subject_cn}}"
+    state: present
+    ipa_host: "{{fqdn}}"
+    ipa_user: "{{ipa_user}}"
+    ipa_pass: "{{freeipa_admin_password}}"
+  delegate_to: localhost
+  # Don't actually create, just read
+  check_mode: yes
+  changed_when: False
+  register: ca_cert
+
+- name: "Dump top-level and {{ca_name}} CA certs into {{cacert_path}}"
+  copy:
+    content: |
+      {{ca_cert.cert.certificate | ipa_cert_to_pem}}
+      {{ lookup('file', '../var/cacert.pem') }}
+    dest: "{{cacert_path}}"
+    force: yes
+  become: true
+  register: cacert_path_create
+
+- name:  "Check cert tracking status of {{cert_path}}"
+  shell: "{{ipaclient_exec}}
+             ipa-getcert status -f {{cert_path}} |
+             grep -q 'No request found' && echo no || echo yes"
+  register: cert_tracking
+  changed_when:  cert_tracking.stdout == "no"
+
+- name:  "Start tracking server cert in {{cert_path}}"
+  shell: "{{ipaclient_exec}}
+            ipa-getcert request -w
+              -I {{cert_nick}}
+              -f {{cert_path}}
+              -k {{key_path}}
+              -K {{service_principal}}/{{fqdn}}@{{kerberos_realm}}
+              -N {{fqdn}}
+              -g {{key_bits|default(2048)}}
+              -X {{ca_name}}"
+  when: cert_tracking.changed
+
+- name:  "Double-check cert tracking status of {{cert_path}}"
+  shell: "{{ipaclient_exec}} ipa-getcert list -i {{cert_nick}} |
+             awk '/^\tstatus: / {print $2}'"
+  register: cert_tracking
+  changed_when:  false
+  failed_when:  cert_tracking.stdout != "MONITORING"
+  when: cert_tracking.changed

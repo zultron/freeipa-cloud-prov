@@ -1,32 +1,178 @@
 ---
+#################################
+# Deploy kubernetes master
+#
+# Largely step-by-step from:
+#
+# https://coreos.com/kubernetes/docs/latest/deploy-master.html
 
+#
+# Basics
+#
 - block:
+
+    - name:  "Create K8S directory {{k8s_dir}}"
+      file:
+        path: "{{k8s_dir}}"
+        state: directory
 
     - name:  "Create /etc/kubernetes directory"
       file:
         path: "/etc/kubernetes"
         state: directory
 
-    - name:  "Create /etc/kubernetes/cni directory"
+    - name:  "Create /etc/kubernetes/manifests directory"
       file:
-        path: "/etc/kubernetes/cni"
+        path: "/etc/kubernetes/manifests"
         state: directory
-
-    - name:  "Create /etc/kubernetes/cni/net.d directory"
-      file:
-        path: "/etc/kubernetes/cni/net.d"
-        state: directory
-
-    - name:  "Create /etc/kubernetes/cni/net.d/10-flannel.conf"
-      copy:
-        path: "/etc/kubernetes/cni/net.d/10-flannel.conf"
-        content: |
-          {
-              "name": "podnet",
-              "type": "flannel",
-              "delegate": {
-                  "isDefaultGateway": true
-              }
-          }
 
   become: true
+  tags:
+    - k8s-basics
+
+#
+# TLS Assets
+#
+
+- block:
+
+    - name:  "Set facts for creating certs"
+      set_fact:
+          cert_nick:  "k8s_ssl_cert"
+          service_principal: "{{k8s_service_basename}}"
+          ca_name:  "{{k8s_ca}}"
+          ca_subject_cn:  "{{k8s_ca_subject_cn}}"
+          cert_dir: "{{k8s_ssl_dir}}"
+          cacert_path:  "{{k8s_ssl_cacert}}"
+          cert_path:  "{{k8s_ssl_cert}}"
+          key_path:  "{{k8s_ssl_key}}"
+      tags:
+        - k8s-sub-ca
+        - k8s-certs
+
+    # Create Kubernetes sub-CA
+    - include: tasks/ipa_sub_ca.yaml
+      tags: k8s-sub-ca
+
+    # Create Kubernetes service certs
+    - include: tasks/ipa_certmonger_certs.yaml
+      tags: k8s-certs
+
+  tags:
+    - k8s-tls
+
+
+# #
+# # Calico configuration
+# #
+#
+# - block:
+#
+#     - name:  "Create /etc/kubernetes/cni directory"
+#       file:
+#         path: "/etc/kubernetes/cni"
+#         state: directory
+#
+#     - name:  "Create /etc/kubernetes/cni/net.d directory"
+#       file:
+#         path: "/etc/kubernetes/cni/net.d"
+#         state: directory
+#
+#     - name:  "Create /etc/kubernetes/cni/net.d/10-flannel.conf"
+#       template:
+#         src: 10-flannel.conf.j2
+#         dest: "/etc/kubernetes/cni/net.d/10-flannel.conf"
+#
+#   become: true
+#   tags:
+#     - k8s-docker
+
+
+#
+# Set up pods
+#
+
+- block:
+
+    - name: "Create pod manifest directory"
+      file:
+        path: "{{k8s_manifest_dir}}"
+        state: directory
+
+    - name: "Create pod manifests"
+      template:
+        src: "{{item}}.yaml.j2"
+        dest: "{{k8s_manifest_dir}}/{{item}}.yaml"
+      become: true
+      tags:
+        - k8s-pod-manifests
+      with_items:
+        - kube-apiserver
+        - kube-proxy
+        - kube-controller-manager
+        - kube-scheduler
+        # - calico
+
+  become: true
+  tags:
+    - k8s-pod-manifests
+
+#
+# Install systemd kubelet.service unit
+#
+
+- block:
+
+    - name: "Template systemd kubelet.service unit file"
+      template:
+        src: kubelet.service.j2
+        dest: "/etc/systemd/system/kubelet.service"
+      register:  kubelet_unit_file
+
+    - name: "Template /etc/kubernetes/kubelet.env"
+      template:
+        src: kubelet.env.j2
+        dest: "/etc/kubernetes/kubelet.env"
+      register:  kubelet_unit_env_file
+
+    - name:  "Install and run systemd kubelet.service unit"
+      systemd:
+        name: kubelet.service
+        daemon_reload: yes
+        state: restarted
+        enabled: true
+      when:  kubelet_unit_file.changed or kubelet_unit_env_file.changed
+
+  become: true
+  tags:
+    - k8s-kubelet
+
+#
+# Basic Health Checks
+#
+
+- block:
+
+    - name:  "Check API availability"
+      uri:
+        url: "{{k8s_apiserver_url}}/version"
+      register:  k8s_api_check
+      failed_when:  k8s_api_check.json.major != '1'
+
+
+    - name:  "Check pod creation"
+      uri:
+        url: "http://127.0.0.1:10255/pods"
+      register:  k8s_pod_check
+      failed_when:
+        not k8s_pod_check.json['items'][0].metadata.name|match(
+            'kube-(scheduler|apiserver|controller-manager|proxy)') and
+        not k8s_pod_check.json['items'][1].metadata.name|match(
+            'kube-(scheduler|apiserver|controller-manager|proxy)') and
+        not k8s_pod_check.json['items'][2].metadata.name|match(
+            'kube-(scheduler|apiserver|controller-manager|proxy)') and
+        not k8s_pod_check.json['items'][3].metadata.name|match(
+            'kube-(scheduler|apiserver|controller-manager|proxy)')
+
+  tags:
+    - k8s-check
