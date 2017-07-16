@@ -55,7 +55,7 @@ freeipa_ports:
   - "464"
   - "464/udp"
   # Dogtag
-  - "8080"
+  # - "8080"
   # - "7839"
 
 # FreeIPA credentials
