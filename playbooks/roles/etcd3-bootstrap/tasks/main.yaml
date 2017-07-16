@@ -150,6 +150,8 @@
                  grep -q 'No request found' && echo no || echo yes"
       register: etcd_ssl_cert_tracking
       changed_when:  etcd_ssl_cert_tracking.stdout == "no"
+      tags:
+        - configure-etcd
 
     - name:  "Start tracking etcd server cert in {{etcd_ssl_cert}}"
       # The cert is actually created and maintained by certmonger running
@@ -179,6 +181,8 @@
         dest: "{{dropin_dir_pat % 'etcd-member.service'}}/10-cert-owner.conf"
       become: true
       register: cert_owner_dropin
+      tags:
+        - configure-etcd
 
   tags:
     - configure-etcd
@@ -196,6 +200,8 @@
       become: true
       when:  hostname == master_host
       register:  certs_dropin
+      tags:
+        - configure-etcd
 
     - name:  "Read etcd member list"
       # Setting field sep to `:`, $1 is member id, $3 is `//host` part
