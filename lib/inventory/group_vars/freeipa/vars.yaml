@@ -3,6 +3,7 @@
 
 # Docker images
 freeipa_docker_image: "adelton/freeipa-server:centos-7"
+# - FIXME this is only used for toolbox at this point
 freeipa_docker_client_image_base: "zultron/freeipa-cloud-prov"
 freeipa_docker_client_image_tag: "ipaclient"
 freeipa_docker_client_image:
@@ -24,19 +25,8 @@ freeipa_volume_systemd_unit: "{{freeipa_volume_path|systemd_escape}}.mount"
 
 # FreeIPA server/replica container
 freeipa_hostname: "ipa"
-freeipa_container_name: "{{freeipa_client_hostname}}.{{hostname}}"
 freeipa_dns_zone: "{{fqdn}}"
 freeipa_fqdn: "{{freeipa_hostname}}.{{freeipa_dns_zone}}"
-
-# FreeIPA client container
-# - Short hostname
-freeipa_client_hostname: "ipaclient"
-# - Ansible hostname, Docker container name
-freeipa_client_container_name: "{{freeipa_client_hostname}}.{{hostname}}"
-# - DNS zone
-freeipa_client_dns_zone: "{{fqdn}}"
-# - Container fqdn
-freeipa_client_fqdn: "{{freeipa_client_hostname}}.{{freeipa_client_dns_zone}}"
 
 # FreeIPA published ports
 freeipa_ports:
@@ -65,7 +55,6 @@ ipa_user: admin
 
 # Shortcut commands
 ipa_exec: "docker exec -i ipa"
-ipaclient_exec: "docker exec -i ipaclient"
 
 # LDAP values
 bind_dn: "cn=Directory Manager"

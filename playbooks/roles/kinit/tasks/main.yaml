@@ -2,15 +2,14 @@
 #################################
 # Init Kerberos credentials
 - name: Check for kerberos credentials
-  shell: "{{ipaclient_exec}} klist -s && echo 'yes' || echo 'no'"
+  shell: "{{ipa_exec}} klist -s && echo 'yes' || echo 'no'"
   register: kerb_creds
   changed_when: kerb_creds.stdout == 'no'
   tags:
     - setup
 
 - name: Obtain kerberos credentials
-  shell: "echo {{freeipa_admin_password}} |
-              {{ipaclient_exec}} kinit admin"
+  shell: "echo {{freeipa_admin_password}} | {{ipa_exec}} kinit admin"
   when: kerb_creds.changed
   tags:
     - setup

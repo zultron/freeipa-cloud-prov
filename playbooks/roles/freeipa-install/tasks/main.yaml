@@ -6,26 +6,25 @@
 - name: Pull FreeIPA docker image
   docker_image:
     name: "{{freeipa_docker_image}}"
-  register: freeipa_docker_image_pull
   tags:
     - setup
-
-# - name: Debug FreeIPA docker image pull
-#   debug:
-#     var: freeipa_docker_image_pull
-#   tags:
-#     - setup
 
 - name: Create FreeIPA container network
   docker_network:
     name: ipa
     driver_options:
-      com.docker.network.bridge.name: ipa
+      com.docker.network.bridge.name: "ipa"
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.default_bridge: "false"
+      com.docker.network.bridge.host_binding_ipv4: "0.0.0.0"
+      com.docker.network.driver.mtu: "1450"
     ipam_options:
       subnet: "{{freeipa_network_cidr}}"
       gateway: "{{freeipa_network_gateway}}"
   tags:
     - setup
+    - docker-ipa-network
 
 #################################
 # Set up IPA server configuration
@@ -85,13 +84,13 @@
     path: "{{freeipa_volume_path}}/etc/systemd/system/{{ ''
              }}container-ipa.target.wants/ipa-server-upgrade.service"
   register: install_path_stat
+  changed_when:  not install_path_stat.stat.exists
   tags:
     - install
     - docker-run-ipa
 
-- name: "Clean out any incomplete prior install--{{item}}"
-  # The next step *always* restarts the container for whatever broken
-  # reason, the FreeIPA install doesn't cleanly resume after
+- name: "Clean out any incomplete prior install"
+  # The FreeIPA install doesn't cleanly resume after
   # restarting; deal with it by restarting from scratch
   file:
     state: absent
@@ -104,7 +103,7 @@
     - "usr"
     - "var"
   become: true
-  when: not install_path_stat.stat.exists
+  when: install_path_stat.changed
   tags:
     - install
     - docker-run-ipa
@@ -114,7 +113,7 @@
   failed_when:  false
   register:  docker_rm_ipa
   changed_when:  docker_rm_ipa.rc == 0
-  when: not install_path_stat.stat.exists
+  when: install_path_stat.changed
   tags:
     - install
     - docker-run-ipa
@@ -132,40 +131,20 @@
 - name: "Start ipa.service"
   systemd:
     name: ipa.service
-    daemon_reload: yes
+    daemon_reload: "{{ ipa_unit_file.changed | ternary('yes','no') }}"
     enabled: true
-    state: "{{  (ipa_unit_file.changed) |
-                 ternary('restarted','started') }}"
+    state: "{{  (ipa_unit_file.changed or install_path_stat.changed)
+                  | ternary('restarted','started') }}"
+  register: ipa_service_start
   become: true
   tags:
     - install
     - docker-run-ipa
 
-# - name: Debug Docker container
-#   debug:
-#     var: docker_run
-#   when: not install_path_stat.stat.exists
-#   tags:
-#     - install
-#     - docker-run-ipa
-
-- name: Wait for FreeIPA install to complete
-  wait_for:
-    # This file is updated at the end of the install
-    path: "/media/freeipa/etc/openldap/ldap.conf"
-    state: present
-    search_regex: "^TLS_CACERT /etc/ipa/ca.crt"
-    # Install can take almost minutes to install on a 1GB droplet
-    timeout: 900
-  when: not install_path_stat.stat.exists
-  tags:
-    - install
-    - docker-run-ipa
-
-- name: Wait for FreeIPA service to start
-  command: "docker exec ipa systemctl start ipa.service"
-  changed_when: False
-  when: not install_path_stat.stat.exists
+#
+# Wait for install to complete and service to come online
+#
+- include:  tasks/freeipa-service-wait.yaml
   tags:
     - install
     - docker-run-ipa

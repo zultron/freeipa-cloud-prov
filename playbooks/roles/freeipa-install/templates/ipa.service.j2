@@ -1,16 +1,15 @@
 [Unit]
 Description=FreeIPA service
 
-# Requirements
+# Requirements and dependency ordering
 Wants=etcd-member.service
-Requires=docker.service
-
-# Dependency ordering
+Wants=docker.service
 After=etcd-member.service
 After=docker.service
 
 [Service]
-# Let processes take awhile to start up (for first run Docker containers)
+# Let processes take awhile to start up (for first run Docker
+# containers)
 TimeoutStartSec=0
 
 # Change killmode from "control-group" to "none" to let Docker remove
@@ -28,9 +27,10 @@ ExecStart=/usr/bin/docker run \
 			  --interactive \
 			  --restart=no \
 			  --hostname={{fqdn}} \
-			  --security-opt=seccomp:unconfined \
+			  --security-opt=seccomp=unconfined \
 			  --name=ipa \
-			  --volume=/media/freeipa:/data \
+			  --volume={{freeipa_volume_path}}:/data \
+			  --volume={{data_volume_path}}:{{data_volume_path}} \
 			  --volume=/sys/fs/cgroup:/sys/fs/cgroup:ro \
 			  --net=ipa \
 			  --ip={{freeipa_network_addr}} \
@@ -39,7 +39,7 @@ ExecStart=/usr/bin/docker run \
 			  --publish={{p}} \
 {% endfor %}
 			  adelton/freeipa-server:centos-7
-# Wait for DNS to come online; this takes a minute normally, or about
+# Wait for DNS to come online; this takes a minute normally, or over
 # 10 minutes when bootstrapping on a 1GB DigitalOcean host
 ExecStartPost=/usr/bin/dig +noall +norecurse +comments +time=1 +tries=1200 \
 			   @{{freeipa_network_addr}} {{domain_name}}
