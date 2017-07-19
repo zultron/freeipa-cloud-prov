@@ -23,5 +23,7 @@
     # FreeIPA artifacts
     - "cacert.pem"
     - "docker"
+    # Kubernetes artifacts
+    - "k8s"
   delegate_to: localhost
   run_once: true
