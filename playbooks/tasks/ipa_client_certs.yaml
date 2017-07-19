@@ -9,16 +9,13 @@
 #     principal:  "{{my_uid}}"
 #     # Email address, e.g. 'me@example.com'; must be an IPA email
 #     email_address:  "{{my_email}}"
-#    FIXME:  no?
-#     # # Subject alt name, e.g. 'email:me@example.com'; must be an IPA email
-#     # subject_alt_name:  "email:{{my_email}}"
 #     # Certificate authority IPA name, e.g. 'my_ca'
 #     ca_name:  "{{my_ca}}"
 #     # Local paths for certificates
-#     cert_dir: "{{my_ssl_dir}}"
-#     cacert_path:  "{{my_ssl_cacert}}"
-#     cert_path:  "{{my_ssl_cert}}"
-#     key_path:  "{{my_ssl_key}}"
+#     client_cert_dir: "{{my_ssl_dir}}"
+#     client_cacert_path:  "{{my_ssl_cacert}}"
+#     client_cert_path:  "{{my_ssl_cert}}"
+#     client_key_path:  "{{my_ssl_key}}"
 #     # Number of bits for key, default 2048
 #     key_bits:  "1024"
 #
@@ -31,23 +28,23 @@
 - block:
 
     - name: "Check if {{ca_name}} client cert already exists locally in
-      {{cert_path}}"
+      {{client_cert_path}}"
       stat:
-        path: "{{cert_path}}"
+        path: "{{client_cert_path}}"
       register: client_cert_stat
       changed_when: not client_cert_stat.stat.exists
 
     - name: "Check if {{ca_name}} client key already exists locally in
-      {{cert_path}}"
+      {{client_cert_path}}"
       stat:
-        path: "{{cert_path}}"
+        path: "{{client_cert_path}}"
       register: client_key_stat
       changed_when: not client_key_stat.stat.exists
 
     - name: "Check if {{ca_name}} CA cert already exists locally in
-      {{cacert_path}}"
+      {{client_cacert_path}}"
       stat:
-        path: "{{cacert_path}}"
+        path: "{{client_cacert_path}}"
       register: ca_cert_stat
       changed_when: not ca_cert_stat.stat.exists
 
@@ -62,7 +59,7 @@
 
     - name: "Verify {{ca_name}} client cert validity"
       shell: |
-        openssl verify -CAfile {{cacert_path}} {{cert_path}} 1>&2 \
+        openssl verify -CAfile {{client_cacert_path}} {{client_cert_path}} 1>&2 \
             && echo yes || echo no
       register: client_cert_verify
       changed_when: client_cert_verify.stdout == "no"
@@ -78,22 +75,22 @@
 
     # Generate key and CSR
 
-    - name: "Create local {{ca_name}} client cert directory {{cert_dir}}"
+    - name: "Create local {{ca_name}} client cert directory {{client_cert_dir}}"
       file:
-        path: "{{cert_dir}}"
+        path: "{{client_cert_dir}}"
         state: directory
         mode: 0700
 
-    - name: "Generate key in {{key_path}}"
+    - name: "Generate key in {{client_key_path}}"
       openssl_privatekey:
-        path: "{{key_path}}"
+        path: "{{client_key_path}}"
         size: "{{ key_bits | default(2048) }}"
       register:  gen_client_key
 
     - name:  "Create local client certificate request for {{principal}}"
       openssl_csr:
-        path: "{{cert_dir}}/csr.pem"
-        privatekey_path: "{{key_path}}"
+        path: "{{client_cert_dir}}/csr.pem"
+        privatekey_path: "{{client_key_path}}"
         commonName: "{{principal}}"
         subjectAltName: "email:{{email_address}}"
 
@@ -113,7 +110,7 @@
 
     - name: "Request IPA CA {{ca_name}} client certificate for {{principal}}"
       ipa_cert:
-        req: "{{ lookup('file', '%s/csr.pem' % cert_dir) }}"
+        req: "{{ lookup('file', '%s/csr.pem' % client_cert_dir) }}"
         principal: "{{principal}}"
         cacn: "{{ca_name}}"
         state: present
@@ -122,10 +119,10 @@
         ipa_pass: "{{freeipa_admin_password}}"
       register: client_cert_req
 
-    - name: "Dump {{ca_name}} client certificate into {{cert_path}}"
+    - name: "Dump {{ca_name}} client certificate into {{client_cert_path}}"
       copy:
         content: "{{client_cert_req.cert.certificate | ipa_cert_to_pem}}"
-        dest: "{{cert_path}}"
+        dest: "{{client_cert_path}}"
         force: yes
 
   when: |
@@ -179,14 +176,14 @@
       when:  "ca_name != 'ipa'"
       register: ca_cert
 
-    - name: "Dump {{ca_name}} CA cert chain into {{cacert_path}}"
+    - name: "Dump {{ca_name}} CA cert chain into {{client_cacert_path}}"
       copy:
         content: |
           {{ sub_ca_cert.cert.certificate | ipa_cert_to_pem }}
           {{ (ca_name != 'ipa')|ternary(
                  ca_cert.cert.certificate | ipa_cert_to_pem,
                  '') }}
-        dest: "{{cacert_path}}"
+        dest: "{{client_cacert_path}}"
         force: yes
 
   run_once: True
@@ -200,7 +197,7 @@
 
     - name: "Verify {{ca_name}} certificate chain"
       command: |
-        openssl verify -CAfile {{cacert_path}} {{cert_path}}
+        openssl verify -CAfile {{client_cacert_path}} {{client_cert_path}}
       changed_when: False
 
     - name: "Verify cert matches key"

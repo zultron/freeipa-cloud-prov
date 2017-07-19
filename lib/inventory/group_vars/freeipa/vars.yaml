@@ -3,11 +3,11 @@
 
 # Docker images
 freeipa_docker_image: "adelton/freeipa-server:centos-7"
-# - FIXME this is only used for toolbox at this point
-freeipa_docker_client_image_base: "zultron/freeipa-cloud-prov"
-freeipa_docker_client_image_tag: "ipaclient"
-freeipa_docker_client_image:
-  "{{freeipa_docker_client_image_base}}:{{freeipa_docker_client_image_tag}}"
+
+# Toolbox image; this one is customized for FreeIPA
+toolbox_image_base: "zultron/freeipa-cloud-prov"
+toolbox_image_tag: "ipaclient"
+toolbox_image: "{{toolbox_image_base}}:{{toolbox_image_tag}}"
 
 # FreeIPA container network
 freeipa_network_prefix: "{{network_prefix}}.128"
