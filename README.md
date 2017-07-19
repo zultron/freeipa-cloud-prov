@@ -159,6 +159,7 @@ plugins, some for specific purposes and some general.
   - [Local facts][ansible-local-facts]
     - `ansible.cfg`: `fact_path = /home/centos/ansible_facts.d`
     - [Providing cached facts from modules][ansible-module-facts]
+- This online [YAML parser][yaml-parser] is very helpful
 
 [ansible]: https://www.ansible.com/
 [ansible-glossary]: https://docs.ansible.com/ansible/playbooks_keywords.html
@@ -171,6 +172,7 @@ plugins, some for specific purposes and some general.
 [ansible-docker-conn]: http://docs.ansible.com/ansible/intro_inventory.html#non-ssh-connection-types
 [ansible-local-facts]: http://docs.ansible.com/ansible/playbooks_variables.html#local-facts-facts-d
 [ansible-module-facts]:  http://docs.ansible.com/ansible/dev_guide/developing_modules_general.html#module-provided-facts
+[yaml-parser]: http://yaml-online-parser.appspot.com/
 
 ### [DigitalOcean][digitalocean]
 
