@@ -108,6 +108,11 @@ etcdctl_command:
   --endpoints={{etcd_endpoints}}"
 
 #################################
+# Flanneld configuration
+
+flanneld_dir:  "{{ data_volume_path }}/flanneld"
+
+#################################
 # Kubernetes configuration
 
 # Master node
@@ -118,6 +123,9 @@ k8s_master: "{{master_host}}"
 #k8s_version: "1.7.0_coreos.0"
 k8s_version: "1.6.1_coreos.0"
 
+# Directory/file paths
+k8s_dir: "{{data_volume_path}}/k8s"
+
 # Networking
 k8s_pod_network:  10.2.0.0/16
 k8s_service_ip_range:  10.3.0.0/24
@@ -125,10 +133,13 @@ k8s_service_ip: 10.3.0.1
 k8s_dns_service_ip: 10.3.0.10
 k8s_apiserver_secure_port: 6443
 k8s_apiserver_insecure_port: 9080
-k8s_apiserver_url:  "http://127.0.0.1:{{k8s_apiserver_insecure_port}}"
-
-# Directory/file paths
-k8s_dir: "{{data_volume_path}}/k8s"
+k8s_apiserver_url_local:  "http://127.0.0.1:{{k8s_apiserver_insecure_port}}"
+k8s_apiserver_url_remote:
+  "https://{{master_fqdn}}:{{k8s_apiserver_secure_port}}"
+k8s_apiserver_url:
+  "{{ (hostname==master_host)|ternary(
+  k8s_apiserver_url_local, k8s_apiserver_url_remote) }}"
+k8s_use_calico:  no
 
 # TLS
 # - service principal basename
@@ -143,6 +154,26 @@ k8s_ssl_cacert: "{{k8s_ssl_dir}}/ca.pem"
 k8s_ssl_cert: "{{k8s_ssl_dir}}/cert.pem"
 k8s_ssl_key: "{{k8s_ssl_dir}}/key.pem"
 k8s_manifest_dir: "{{k8s_dir}}/manifests"
+# - local files
+k8s_client_ssl_dir: "var/k8s"
+k8s_client_ssl_cacert: "{{k8s_client_ssl_dir}}/ca.pem"
+k8s_client_ssl_cert: "{{k8s_client_ssl_dir}}/cert.pem"
+k8s_client_ssl_key: "{{k8s_client_ssl_dir}}/key.pem"
+
+# kubectl
+kubectl_version: "1.6.1"
+kubectl_path:  "../lib/bin/kubectl"
+
+# Calico CNI
+# - versions
+k8s_calico_node_version: "1.3.0"
+k8s_calico_cni_version: "1.9.1"
+k8s_calico_pol_cont_version: "1.9.1"
+# - paths
+k8s_cni_dir:  "{{k8s_dir}}/cni"
+k8s_cni_bin_dir:  "{{k8s_cni_dir}}/bin"
+k8s_cni_net_dir:  "{{k8s_cni_dir}}/net.d"
+k8s_cni_run_dir:  "{{k8s_cni_dir}}/run"
 
 
 #################################

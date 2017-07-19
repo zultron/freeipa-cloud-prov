@@ -1,6 +1,4 @@
-# 30-certs.conf.j2:  flanneld.service dropin
-#
-# Configure TLS on initial member
+# 30-overrides.conf:  flanneld.service dropin
 
 [Service]
 
@@ -10,13 +8,20 @@ Environment="RKT_RUN_ARGS=\
   --volume etcd-certs,kind=host,source={{etcd_cert_dir}},readOnly=true \
   --mount volume=etcd-certs,target={{etcd_cert_dir}}"
 
+# Set EnvironmentFile symlink
+# - etcd endpoints
+# - public interface
+ExecStartPre=/usr/bin/ln -sf {{flanneld_dir}}/options.env /run/flannel/options.env
+
+
 # Override settings in 20-clct-flannel.conf:
 # - The endpoints of etcd flanneld should use
 # - The tls files to use when communicating with etcd
 
 ExecStart=
 ExecStart=/usr/lib/coreos/flannel-wrapper $FLANNEL_OPTS \
-  --etcd-endpoints="https://{{fqdn}}:2379" \
   --etcd-cafile="{{etcd_ssl_cacert}}" \
   --etcd-certfile="{{etcd_ssl_cert}}" \
   --etcd-keyfile="{{etcd_ssl_key}}"
+
+

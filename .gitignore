@@ -1,14 +1,15 @@
 /config.yaml
 /state.yaml
 *.pyc
+
 # User's config files
 /hosts.yaml
 /.vault_pass
 /lib/inventory/group_vars/freeipa/vault.yaml
 /.docker-extra-args
+
 # Ansible-generated files
 /var/*
 !/var/retries/
-/var/retries/*
-!/var/retries/.exists
-*.retry
+/var/retries/*.retry
+/lib/bin/kubectl

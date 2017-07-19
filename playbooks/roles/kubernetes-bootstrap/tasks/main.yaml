@@ -1,34 +1,53 @@
 ---
 #################################
-# Deploy kubernetes master
-#
-# Largely step-by-step from:
-#
-# https://coreos.com/kubernetes/docs/latest/deploy-master.html
+# Setup kubernetes deployment
 
 #
-# Basics
+# Basics:  master and workers
 #
 - block:
 
-    - name:  "Create K8S directory {{k8s_dir}}"
+    - name:  "Create K8S directories"
       file:
-        path: "{{k8s_dir}}"
+        path: "{{item}}"
         state: directory
+      with_items:
+        - "{{k8s_dir}}"
+        - "{{k8s_ssl_dir}}"
+        - "{{k8s_manifest_dir}}"
+        - "{{k8s_cni_dir}}"
+        - "{{k8s_cni_dir}}/net.d"
+        - "{{k8s_cni_dir}}/bin"
 
-    - name:  "Create /etc/kubernetes directory"
-      file:
-        path: "/etc/kubernetes"
-        state: directory
+    - name:  "Set master node facts"
+      set_fact:
+        manifests:
+          - kube-apiserver
+          - kube-proxy
+          - kube-controller-manager
+          - kube-scheduler
+          # - calico
+      when:  hostname == master_host
 
-    - name:  "Create /etc/kubernetes/manifests directory"
-      file:
-        path: "/etc/kubernetes/manifests"
-        state: directory
+    - name:  "Set worker node facts"
+      set_fact:
+        manifests:
+          - kube-proxy
+          # - calico
+      when:  hostname != master_host
 
   become: true
   tags:
     - k8s-basics
+    - k8s-pod-manifests
+
+#################################
+# Deploy kubernetes master and worker
+#
+# Largely step-by-step from:
+#
+# https://coreos.com/kubernetes/docs/latest/deploy-master.html
+# https://coreos.com/kubernetes/docs/latest/deploy-workers.html
 
 #
 # TLS Assets
@@ -38,14 +57,14 @@
 
     - name:  "Set facts for creating certs"
       set_fact:
-          cert_nick:  "k8s_ssl_cert"
-          service_principal: "{{k8s_service_basename}}"
-          ca_name:  "{{k8s_ca}}"
-          ca_subject_cn:  "{{k8s_ca_subject_cn}}"
-          cert_dir: "{{k8s_ssl_dir}}"
-          cacert_path:  "{{k8s_ssl_cacert}}"
-          cert_path:  "{{k8s_ssl_cert}}"
-          key_path:  "{{k8s_ssl_key}}"
+        cert_nick:  "k8s_ssl_cert"
+        service_principal: "{{k8s_service_basename}}"
+        ca_name:  "{{k8s_ca}}"
+        ca_subject_cn:  "{{k8s_ca_subject_cn}}"
+        cert_dir: "{{k8s_ssl_dir}}"
+        cacert_path:  "{{k8s_ssl_cacert}}"
+        cert_path:  "{{k8s_ssl_cert}}"
+        key_path:  "{{k8s_ssl_key}}"
       tags:
         - k8s-sub-ca
         - k8s-certs
@@ -53,6 +72,7 @@
     # Create Kubernetes sub-CA
     - include: tasks/ipa_sub_ca.yaml
       tags: k8s-sub-ca
+      when:  hostname == master_host
 
     # Create Kubernetes service certs
     - include: tasks/ipa_certmonger_certs.yaml
@@ -62,30 +82,21 @@
     - k8s-tls
 
 
-# #
-# # Calico configuration
-# #
 #
-# - block:
+# Flannel configuration
 #
-#     - name:  "Create /etc/kubernetes/cni directory"
-#       file:
-#         path: "/etc/kubernetes/cni"
-#         state: directory
-#
-#     - name:  "Create /etc/kubernetes/cni/net.d directory"
-#       file:
-#         path: "/etc/kubernetes/cni/net.d"
-#         state: directory
-#
-#     - name:  "Create /etc/kubernetes/cni/net.d/10-flannel.conf"
-#       template:
-#         src: 10-flannel.conf.j2
-#         dest: "/etc/kubernetes/cni/net.d/10-flannel.conf"
-#
-#   become: true
-#   tags:
-#     - k8s-docker
+
+- block:
+
+    - name:  "Template {{k8s_cni_dir}}/net.d/10-flannel.conf"
+      template:
+        src: 10-flannel.conf.j2
+        dest: "{{k8s_cni_dir}}/net.d/10-flannel.conf"
+      when: not k8s_use_calico
+
+  become: true
+  tags:
+    - k8s-docker
 
 
 #
@@ -94,31 +105,20 @@
 
 - block:
 
-    - name: "Create pod manifest directory"
-      file:
-        path: "{{k8s_manifest_dir}}"
-        state: directory
-
-    - name: "Create pod manifests"
+    - name: "Template pod manifests in {{k8s_manifest_dir}}/*.yaml"
       template:
         src: "{{item}}.yaml.j2"
         dest: "{{k8s_manifest_dir}}/{{item}}.yaml"
       become: true
-      tags:
-        - k8s-pod-manifests
-      with_items:
-        - kube-apiserver
-        - kube-proxy
-        - kube-controller-manager
-        - kube-scheduler
-        # - calico
+      with_items:  "{{manifests}}"
 
   become: true
+  when:  hostname == master_host
   tags:
     - k8s-pod-manifests
 
 #
-# Install systemd kubelet.service unit
+# Install systemd kubelet.service unit:  master and workers
 #
 
 - block:
@@ -129,19 +129,31 @@
         dest: "/etc/systemd/system/kubelet.service"
       register:  kubelet_unit_file
 
-    - name: "Template /etc/kubernetes/kubelet.env"
+    - name: "Template {{k8s_dir}}/kubelet.env"
       template:
         src: kubelet.env.j2
-        dest: "/etc/kubernetes/kubelet.env"
+        dest: "{{k8s_dir}}/kubelet.env"
       register:  kubelet_unit_env_file
 
-    - name:  "Install and run systemd kubelet.service unit"
-      systemd:
-        name: kubelet.service
-        daemon_reload: yes
-        state: restarted
-        enabled: true
-      when:  kubelet_unit_file.changed or kubelet_unit_env_file.changed
+    - name: "Template {{k8s_dir}}/kubeconfig.yaml"
+      template:
+        src: kubeconfig.yaml.j2
+        dest: "{{k8s_dir}}/kubeconfig.yaml"
+      register: kubeconfig
+
+    # - name:  "Install and run systemd kubelet.service unit"
+    #   systemd:
+    #     name: kubelet.service
+    #     daemon_reload: yes
+    #     state: "{{  (kubelet_unit_file.changed or kubelet_unit_env_file.changed
+    #       or kubeconfig.changed) | ternary('restarted','started') }}"
+    #     enabled: true
+
+    - name:  "Wait for apiserver to come online on port 9080"
+      wait_for:
+        host:  localhost
+        port:  9080
+      # when:  hostname == master_host
 
   become: true
   tags:
@@ -159,20 +171,86 @@
       register:  k8s_api_check
       failed_when:  k8s_api_check.json.major != '1'
 
-
-    - name:  "Check pod creation"
+    - name:  "Check kube-* pod creation"
       uri:
         url: "http://127.0.0.1:10255/pods"
       register:  k8s_pod_check
       failed_when:
-        not k8s_pod_check.json['items'][0].metadata.name|match(
-            'kube-(scheduler|apiserver|controller-manager|proxy)') and
-        not k8s_pod_check.json['items'][1].metadata.name|match(
-            'kube-(scheduler|apiserver|controller-manager|proxy)') and
-        not k8s_pod_check.json['items'][2].metadata.name|match(
-            'kube-(scheduler|apiserver|controller-manager|proxy)') and
-        not k8s_pod_check.json['items'][3].metadata.name|match(
-            'kube-(scheduler|apiserver|controller-manager|proxy)')
+        not k8s_pod_check.json['items'][item].metadata.name|match(
+             'kube-(scheduler|apiserver|controller-manager|proxy)')
+      with_items:
+        - [ 0, 1, 2, 3 ]
 
+  when:  hostname == master_host
   tags:
     - k8s-check
+
+#################################
+# Set up kubectl
+#
+# https://coreos.com/kubernetes/docs/latest/configure-kubectl.html
+
+#
+# Create the local k8s client cert
+#
+- block:
+
+    - name:  "Set facts for creating the kubernetes client cert"
+      set_fact:
+        principal: "{{manager_id}}"
+        email_address:  "{{manager_id}}@{{domain_name}}"
+        ca_name:  "{{k8s_ca}}"
+        cert_dir: "../{{k8s_client_ssl_dir}}"
+        cacert_path: "../{{k8s_client_ssl_cacert}}"
+        cert_path: "../{{k8s_client_ssl_cert}}"
+        key_path: "../{{k8s_client_ssl_key}}"
+        key_bits: "2048"
+
+    - include: tasks/ipa_client_certs.yaml
+
+  run_once:  true
+  tags:
+    - k8s-client-cert
+
+#
+# Download and configure the local kubectl executable
+#
+- block:
+
+    - name: "Download the kubectl executable"
+      get_url:
+        url: >-
+          {{ 'https://storage.googleapis.com/kubernetes-release/release' +
+             '/v%s/bin/linux/amd64/kubectl' % kubectl_version }}
+        dest: "{{kubectl_path}}"
+        mode: 0755
+
+    - name: "Configure kubectl"
+      command: "{{kubectl_path}} config {{item}}"
+      with_items:
+        - >-
+          set-cluster default-cluster
+          --server={{k8s_apiserver_url_remote}}
+          --certificate-authority=../{{k8s_client_ssl_cacert}}
+        - >-
+          set-credentials default-admin
+          --certificate-authority=../{{k8s_client_ssl_cacert}}
+          --client-key=../{{k8s_client_ssl_key}}
+          --client-certificate=../{{k8s_client_ssl_cert}}
+        - >-
+          set-context default-system
+          --cluster=default-cluster
+          --user=default-admin
+        - >-
+          use-context default-system
+
+    - name: "Verify kubectl configuration and connection"
+      command:  "{{kubectl_path}} get nodes"
+      register:  kubectl_nodes
+      failed_when:  "'Ready' not in kubectl_nodes.stdout"
+
+
+  delegate_to: localhost
+  run_once:  true
+  tags:
+    - k8s-kubectl

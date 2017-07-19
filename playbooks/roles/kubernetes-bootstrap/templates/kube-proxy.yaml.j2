@@ -6,19 +6,20 @@ metadata:
 spec:
   hostNetwork: true
   containers:
-  - name: kube-proxy
-    image: quay.io/coreos/hyperkube:v{{k8s_version}}
-    command:
-      - /hyperkube
-      - proxy
-      - --master={{k8s_apiserver_url}}
-    securityContext:
-      privileged: true
-    volumeMounts:
-    - mountPath: /etc/ssl/certs
-      name: ssl-certs-host
-      readOnly: true
+    - name: kube-proxy
+      image: quay.io/coreos/hyperkube:v{{k8s_version}}
+      command:
+        - /hyperkube
+        - proxy
+        - --master={{k8s_apiserver_url}}
+        - --kubeconfig={{k8s_dir}}/kubeconfig.yaml
+      securityContext:
+        privileged: true
+      volumeMounts:
+        - mountPath: {{k8s_dir}}
+          name: k8s
+          readOnly: true
   volumes:
-  - hostPath:
-      path: /usr/share/ca-certificates
-    name: ssl-certs-host
+    - name: k8s
+      hostPath:
+        path: {{k8s_dir}}

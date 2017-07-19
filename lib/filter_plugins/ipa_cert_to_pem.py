@@ -1,5 +1,7 @@
 __metaclass__ = type
 
+import re
+
 class FilterModule(object):
     ''' Query filter '''
 
@@ -10,10 +12,19 @@ class FilterModule(object):
         while len(data) >= 64:
             cert += ('%s\n' % data[:64])
             data = data[64:]
-        cert += ('%s\n-----END CERTIFICATE-----\n' % data)
+        cert += ('%s-----END CERTIFICATE-----\n' %
+                 ('%s\n' % data if data else ''))
         return cert
+
+    cn_re = re.compile(r'CN=([^,]*),')
+    def cn_from_dn(self, data):
+        """Given a DN, extract and return the CN"""
+        m = self.cn_re.search(data)
+        if m is None:  return None
+        return m.group(1)
 
     def filters(self):
         return {
             'ipa_cert_to_pem': self.ipa_cert_to_pem,
+            'cn_from_dn': self.cn_from_dn,
         }

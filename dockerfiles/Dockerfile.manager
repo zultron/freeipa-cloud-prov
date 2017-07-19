@@ -17,7 +17,7 @@ RUN apt-get install -y \
         python-pkg-resources
 RUN pip install python-digitalocean
 RUN pip install --upgrade \
-        cffi
+        cffi pyOpenSSL
 RUN pip install paramiko
 RUN pip install Jinja2
 # https://pypi.python.org/pypi/ipcalc/
@@ -40,6 +40,8 @@ RUN apt-get -y install ed
 
 RUN apt-get -y install libldap2-dev libsasl2-dev
 RUN pip install python-ldap
+
+RUN apt-get -y install telnet
 
 RUN apt-get -y install dnsutils
 
@@ -73,6 +75,7 @@ RUN pip install nose mock
 
 RUN ansible-galaxy install defunctzombie.coreos-bootstrap
 
+ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/data/lib/bin
 ENV PYTHONPATH=/data/lib/python
 
 # Work around annoying python location on CoreOS

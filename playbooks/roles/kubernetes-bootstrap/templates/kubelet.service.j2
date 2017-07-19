@@ -1,20 +1,34 @@
+# https://kubernetes.io/docs/admin/kubelet/
+[Unit]
+Description=Kubernetes kubelet service
+
+# Requirements & dependency ordering
+Wants=ipa.service
+After=ipa.service
+
 [Service]
 Environment=KUBELET_IMAGE_TAG=v{{k8s_version}}
-EnvironmentFile=/etc/kubernetes/kubelet.env
-ExecStartPre=/usr/bin/mkdir -p {{k8s_manifest_dir}}
+EnvironmentFile={{k8s_dir}}/kubelet.env
 ExecStartPre=/usr/bin/mkdir -p /var/log/containers
 ExecStartPre=-/usr/bin/rkt rm --uuid-file=/var/run/kubelet-pod.uuid
+{% if k8s_use_calico %}
+ExecStartPre=/usr/bin/mkdir -p /opt/cni/bin
+{% endif %}
 ExecStart=/usr/lib/coreos/kubelet-wrapper \
   --api-servers={{k8s_apiserver_url}} \
-  --register-schedulable=false \
-  --cni-conf-dir=/etc/kubernetes/cni/net.d \
-  --network-plugin=${NETWORK_PLUGIN} \
+  --cni-conf-dir={{k8s_cni_dir}}/net.d \
+  --network-plugin={{ k8s_use_calico | ternary('cni','') }} \
   --container-runtime=docker \
+  --register-node=true \
   --allow-privileged=true \
   --pod-manifest-path={{k8s_manifest_dir}} \
   --hostname-override={{ip_addr}} \
   --cluster_dns={{k8s_dns_service_ip}} \
-  --cluster_domain={{etcd_cluster_token}}.{{domain_name}}
+  --cluster_domain=cluster.local \
+  --kubeconfig={{k8s_dir}}/kubeconfig.yaml \
+  --tls-cert-file={{k8s_ssl_cert}} \
+  --tls-private-key-file={{k8s_ssl_key}}
+
 ExecStop=-/usr/bin/rkt stop --uuid-file=/var/run/kubelet-pod.uuid
 Restart=always
 RestartSec=10

@@ -1,0 +1,221 @@
+---
+#
+# Create TLS client certs and copy locally
+#
+# Usage, included in role/tasks/main.yaml:
+#
+# - set_fact:
+#     # Principal, e.g. 'me'; must be an IPA user ID
+#     principal:  "{{my_uid}}"
+#     # Email address, e.g. 'me@example.com'; must be an IPA email
+#     email_address:  "{{my_email}}"
+#    FIXME:  no?
+#     # # Subject alt name, e.g. 'email:me@example.com'; must be an IPA email
+#     # subject_alt_name:  "email:{{my_email}}"
+#     # Certificate authority IPA name, e.g. 'my_ca'
+#     ca_name:  "{{my_ca}}"
+#     # Local paths for certificates
+#     cert_dir: "{{my_ssl_dir}}"
+#     cacert_path:  "{{my_ssl_cacert}}"
+#     cert_path:  "{{my_ssl_cert}}"
+#     key_path:  "{{my_ssl_key}}"
+#     # Number of bits for key, default 2048
+#     key_bits:  "1024"
+#
+# - include: tasks/ipa_client_certs.yaml
+
+#
+# Check if client cert already exists and is valid
+#
+# Saves a lot of work later, if so
+- block:
+
+    - name: "Check if {{ca_name}} client cert already exists locally in
+      {{cert_path}}"
+      stat:
+        path: "{{cert_path}}"
+      register: client_cert_stat
+      changed_when: not client_cert_stat.stat.exists
+
+    - name: "Check if {{ca_name}} client key already exists locally in
+      {{cert_path}}"
+      stat:
+        path: "{{cert_path}}"
+      register: client_key_stat
+      changed_when: not client_key_stat.stat.exists
+
+    - name: "Check if {{ca_name}} CA cert already exists locally in
+      {{cacert_path}}"
+      stat:
+        path: "{{cacert_path}}"
+      register: ca_cert_stat
+      changed_when: not ca_cert_stat.stat.exists
+
+    - name: "Verify cert matches key"
+      shell: >-
+        (openssl x509 -noout -modulus -in var/k8s/cert.pem | openssl md5;
+        openssl rsa -noout -modulus -in var/k8s/key.pem | openssl md5 ) |
+        uniq | wc -l
+      when: not client_cert_stat.changed and not client_key_stat.changed
+      register: cert_key_match
+      changed_when: "cert_key_match.stdout != '1'"
+
+    - name: "Verify {{ca_name}} client cert validity"
+      shell: |
+        openssl verify -CAfile {{cacert_path}} {{cert_path}} 1>&2 \
+            && echo yes || echo no
+      register: client_cert_verify
+      changed_when: client_cert_verify.stdout == "no"
+      when: not client_cert_stat.changed and not ca_cert_stat.changed
+
+  delegate_to: localhost
+  run_once: True
+
+#
+# Create client cert on FreeIPA server
+#
+- block:
+
+    # Generate key and CSR
+
+    - name: "Create local {{ca_name}} client cert directory {{cert_dir}}"
+      file:
+        path: "{{cert_dir}}"
+        state: directory
+        mode: 0700
+
+    - name: "Generate key in {{key_path}}"
+      openssl_privatekey:
+        path: "{{key_path}}"
+        size: "{{ key_bits | default(2048) }}"
+      register:  gen_client_key
+
+    - name:  "Create local client certificate request for {{principal}}"
+      openssl_csr:
+        path: "{{cert_dir}}/csr.pem"
+        privatekey_path: "{{key_path}}"
+        commonName: "{{principal}}"
+        subjectAltName: "email:{{email_address}}"
+
+    # Request cert from IPA and create cert file
+
+    - name: "Ensure no current cert exists for {{principal}}"
+      ipa_cert:
+        principal: "{{principal}}"
+        cacn: "{{ca_name}}"
+        # Revocation reason:  'superceded'
+        revocation_reason: "4"
+        state: absent
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      when:  gen_client_key.changed or cert_key_match.changed
+
+    - name: "Request IPA CA {{ca_name}} client certificate for {{principal}}"
+      ipa_cert:
+        req: "{{ lookup('file', '%s/csr.pem' % cert_dir) }}"
+        principal: "{{principal}}"
+        cacn: "{{ca_name}}"
+        state: present
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      register: client_cert_req
+
+    - name: "Dump {{ca_name}} client certificate into {{cert_path}}"
+      copy:
+        content: "{{client_cert_req.cert.certificate | ipa_cert_to_pem}}"
+        dest: "{{cert_path}}"
+        force: yes
+
+  when: |
+    client_cert_stat.changed or client_key_stat.changed or
+    cert_key_match.changed
+  run_once: True
+  delegate_to: localhost
+
+
+#
+# Download CA cert chain
+#
+- block:
+
+    - name: "Read {{ca_name}} CA info"
+      ipa_ca:
+        name: "{{ca_name}}"
+        state: present
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      # Don't actually create, just read
+      check_mode: yes
+      changed_when: False
+      register: ca_info
+
+    - name: "Read {{ca_name}} CA cert"
+      ipa_cert:
+        cacn: ipa
+        principal: "{{ca_info.ca.ipacasubjectdn[0]|cn_from_dn()}}"
+        state: present
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      # Don't actually create, just read
+      check_mode: yes
+      changed_when: False
+      register: sub_ca_cert
+
+    - name: "Read ipa CA cert"
+      ipa_cert:
+        cacn: ipa
+        principal: "Certificate Authority"
+        state: present
+        ipa_host: "{{fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      # Don't actually create, just read
+      check_mode: yes
+      changed_when: False
+      when:  "ca_name != 'ipa'"
+      register: ca_cert
+
+    - name: "Dump {{ca_name}} CA cert chain into {{cacert_path}}"
+      copy:
+        content: |
+          {{ sub_ca_cert.cert.certificate | ipa_cert_to_pem }}
+          {{ (ca_name != 'ipa')|ternary(
+                 ca_cert.cert.certificate | ipa_cert_to_pem,
+                 '') }}
+        dest: "{{cacert_path}}"
+        force: yes
+
+  run_once: True
+  when: ca_cert_stat.changed or client_cert_verify.changed
+  delegate_to: localhost
+
+#
+# Final certificate chain verification
+#
+- block:
+
+    - name: "Verify {{ca_name}} certificate chain"
+      command: |
+        openssl verify -CAfile {{cacert_path}} {{cert_path}}
+      changed_when: False
+
+    - name: "Verify cert matches key"
+      shell: >-
+        (openssl x509 -noout -modulus -in var/k8s/cert.pem | openssl md5;
+        openssl rsa -noout -modulus -in var/k8s/key.pem | openssl md5 ) |
+        uniq | wc -l
+      when: not client_cert_stat.changed and not client_key_stat.changed
+      register: cert_key_match
+      changed_when: False
+      failed_when: "cert_key_match.stdout != '1'"
+
+  run_once: True
+  when: |
+    client_cert_stat.changed or client_key_stat.changed or
+    cert_key_match.changed or
+    ca_cert_stat.changed or client_cert_verify.changed
+  delegate_to: localhost
