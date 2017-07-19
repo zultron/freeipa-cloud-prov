@@ -6,12 +6,6 @@ hostname: "{{inventory_hostname}}"
 # FQDN
 fqdn: "{{hostname}}.{{domain_name}}"
 
-# Volume names
-data_volume_name: "{{block_storage_name_pat % 'data'}}"
-
-# Volume mount points
-data_volume_path: "/media/data"
-
 # Main IP address:  shortcut
 ip_addr: "{{ansible_default_ipv4.address}}"
 

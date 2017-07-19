@@ -64,6 +64,7 @@ docker_client_extra_args: "--config=../{{docker_client_ssl_dir}} --tlsverify"
 
 # Data volume block device
 data_volume_block_device:  "{{ block_device_path_pat % 'data' }}"
+data_volume_name: "{{block_storage_name_pat % 'data'}}"
 # - Size in GB
 data_volume_size: 4
 
