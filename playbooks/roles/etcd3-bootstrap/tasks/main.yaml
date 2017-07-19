@@ -110,10 +110,10 @@
       become: true
 
     - name:  "Create {{etcd_service_principal}} service principal and
-                  add managed by {{freeipa_client_fqdn}} host"
+                  add managed by {{freeipa_fqdn}} host"
       ipa_service:
         name: "{{etcd_service_principal}}"
-        managedby_host: "{{freeipa_client_fqdn}}"
+        managedby_host: "{{freeipa_fqdn}}"
         state: present
         ipa_host: "{{fqdn}}"
         ipa_user: "{{ipa_user}}"
@@ -145,7 +145,7 @@
       register: etcd_ssl_cacert_create
 
     - name:  "Check cert tracking status of {{etcd_ssl_cert}}"
-      shell: "{{ipaclient_exec}}
+      shell: "{{ipa_exec}}
                  ipa-getcert status -f {{etcd_ssl_cert}} |
                  grep -q 'No request found' && echo no || echo yes"
       register: etcd_ssl_cert_tracking
@@ -155,11 +155,9 @@
 
     - name:  "Start tracking etcd server cert in {{etcd_ssl_cert}}"
       # The cert is actually created and maintained by certmonger running
-      # in ipaclient.  The {{etcd_ssl_dir}} has been bind-mounted in the
+      # in ipa.  The {{etcd_ssl_dir}} has been bind-mounted in the
       # container for this purpose.
-      #
-      # FIXME The -X arg doesn't actually work yet
-      shell: "{{ipaclient_exec}} ipa-getcert request -w
+      shell: "{{ipa_exec}} ipa-getcert request -w
                   -I etcd_ssl_cert
                   -f {{etcd_ssl_cert}} -k {{etcd_ssl_key}}
                   -K {{etcd_service_principal}} -N '{{fqdn}}' -g 2048
