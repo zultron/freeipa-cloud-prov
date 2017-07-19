@@ -4,8 +4,15 @@
 ############################################
 - name: Install CoreOS cluster
   hosts: coreos
+  # FIXME WTF?  Suddenly needed why?
+  environment:
+    PYTHONPATH: "../lib/python"
 
   roles:
+
+    # Configure CoreOS Docker TLS
+    - role: docker-tls
+      tags: docker-tls
 
     # Set up etcd
     - role: etcd3-bootstrap
@@ -18,5 +25,3 @@
     # Set up kubernetes
     - role: kubernetes-bootstrap
       tags: kubernetes
-
-    # Add ipa and ipaclient containers to kubernetes

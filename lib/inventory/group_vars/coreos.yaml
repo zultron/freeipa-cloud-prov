@@ -33,9 +33,9 @@ freeipa_client_network_addr: "{{container_network_prefix}}.2"
 # TLS
 # - FreeIPA sub-CA
 docker_ca: "docker"
-docker_ca_subject: "CN=Docker Certificate Authority,O={{kerberos_realm}}"
+docker_ca_subject_cn: "Docker Certificate Authority"
 # - FreeIPA service principal
-docker_service_principal: "docker/{{fqdn}}@{{kerberos_realm}}"
+docker_service_principal: "docker"
 # - Server-side cert locations
 docker_ssl_dir: "{{data_volume_path}}/docker"
 docker_ssl_cacert: "{{docker_ssl_dir}}/ca.pem"
