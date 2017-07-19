@@ -334,6 +334,15 @@ web services on a single IP.
 
 
 
+## Other links
+
+- [port.direct Harbor][pd-harbor] integrates K8s and FreeIPA (and others)
+- A [paper][tremolo-k8s-idm] from Tremolo Security about a K8s and
+  FreeIPA integration
+
+[pd-harbor]: https://github.com/portdirect/harbor
+[tremolo-k8s-idm]: https://www.tremolosecurity.com/kubernetes-idm-part-i/
+
 ## TODO
 
 ### Adjust etcd endpoints after cluster complete
