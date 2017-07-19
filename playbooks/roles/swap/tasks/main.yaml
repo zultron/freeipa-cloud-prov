@@ -50,14 +50,12 @@
     #   debug:
     #     var:  mkswap_cmd
 
-    - name:  "Swap on swap partition {{ swap_device_canon }}"
-      command:  "swapon {{ swap_device_canon }}"
+    - name:  "Start {{swap_device_systemd_unit}}"
+      systemd:
+        name: "{{swap_device_systemd_unit}}"
+        enabled: true
+        state: "started"
       become: true
-      register:  swapon_cmd
-
-    # - name:  Debug swapon_cmd
-    #   debug:
-    #     var:  swapon_cmd
 
     - name:  "Verify swapon status of device {{ swap_device_canon }}"
       shell:  "swapon -s | grep -q '{{ swap_device_canon|quote }}'
@@ -70,4 +68,4 @@
     #   debug:
     #     var: verify_swap_status_cmd
 
-  when:  not is_swapping
+  when:  "not is_swapping|default(False)"
