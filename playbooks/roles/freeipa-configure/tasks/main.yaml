@@ -74,60 +74,26 @@
 # RewriteCond %{REQUEST_URI}  !^/ipa/[^\?]+(\.js|\.css|\.png|[...])$
 # RewriteRule ^/ipa/(.*)      https://host1.example.com/ipa/$1 [L,R=301,NC]
 
-- name: Disable IPA web UI redirect to https 1
+- name: Disable IPA web UI redirect to https
   lineinfile:
-    dest: /media/freeipa/etc/httpd/conf.d/ipa-rewrite.conf
-    regexp: "^(RewriteCond.*SERVER_PORT.*)$"
+    dest: "/media/freeipa/etc/httpd/conf.d/ipa-rewrite.conf"
+    regexp: "{{item}}"
     state: present
     line: '#\1'
     backrefs: yes
+  with_items:
+    - "^(RewriteCond.*SERVER_PORT.*)$"
+    - "^(RewriteCond.*REQUEST_URI.*errors.*)$"
+    - "^(RewriteCond.*REQUEST_URI.*css.*)$"
+    - "(RewriteRule.*ipa.*https://{{fqdn}}.*)$"
   become: true
-  register:  ipa_redirect_1
-  tags:
-    - configure
-
-- name: Disable IPA web UI redirect to https 2
-  lineinfile:
-    dest: /media/freeipa/etc/httpd/conf.d/ipa-rewrite.conf
-    regexp: "^(RewriteCond.*REQUEST_URI.*errors.*)$"
-    state: present
-    line: '#\1'
-    backrefs: yes
-  become: true
-  register:  ipa_redirect_2
-  tags:
-    - configure
-
-- name: Disable IPA web UI redirect to https 3
-  lineinfile:
-    dest: /media/freeipa/etc/httpd/conf.d/ipa-rewrite.conf
-    regexp: "^(RewriteCond.*REQUEST_URI.*css.*)$"
-    state: present
-    line: '#\1'
-    backrefs: yes
-  become: true
-  register:  ipa_redirect_3
-  tags:
-    - configure
-
-- name: Disable IPA web UI redirect to https 4
-  lineinfile:
-    dest: /media/freeipa/etc/httpd/conf.d/ipa-rewrite.conf
-    regexp: "(RewriteRule.*ipa.*https://{{fqdn}}.*)$"
-    state: present
-    line: '#\1'
-    backrefs: yes
-  become: true
-  register:  ipa_redirect_4
+  register:  ipa_redirect
   tags:
     - configure
 
 - name: Restart httpd
   command: "{{ipa_exec}} systemctl restart httpd.service"
-  when: ipa_redirect_1.changed
-     or ipa_redirect_2.changed
-     or ipa_redirect_3.changed
-     or ipa_redirect_4.changed
+  when: ipa_redirect.changed
   tags:
     - configure
 
