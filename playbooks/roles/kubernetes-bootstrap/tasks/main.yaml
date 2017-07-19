@@ -141,13 +141,13 @@
         dest: "{{k8s_dir}}/kubeconfig.yaml"
       register: kubeconfig
 
-    # - name:  "Install and run systemd kubelet.service unit"
-    #   systemd:
-    #     name: kubelet.service
-    #     daemon_reload: yes
-    #     state: "{{  (kubelet_unit_file.changed or kubelet_unit_env_file.changed
-    #       or kubeconfig.changed) | ternary('restarted','started') }}"
-    #     enabled: true
+    - name:  "Install and run systemd kubelet.service unit"
+      systemd:
+        name: kubelet.service
+        daemon_reload: yes
+        state: "{{  (kubelet_unit_file.changed or kubelet_unit_env_file.changed
+          or kubeconfig.changed) | ternary('restarted','started') }}"
+        enabled: true
 
     - name:  "Wait for apiserver to come online on port 9080"
       wait_for:
@@ -200,10 +200,10 @@
         principal: "{{manager_id}}"
         email_address:  "{{manager_id}}@{{domain_name}}"
         ca_name:  "{{k8s_ca}}"
-        cert_dir: "../{{k8s_client_ssl_dir}}"
-        cacert_path: "../{{k8s_client_ssl_cacert}}"
-        cert_path: "../{{k8s_client_ssl_cert}}"
-        key_path: "../{{k8s_client_ssl_key}}"
+        client_cert_dir: "../{{k8s_client_ssl_dir}}"
+        client_cacert_path: "../{{k8s_client_ssl_cacert}}"
+        client_cert_path: "../{{k8s_client_ssl_cert}}"
+        client_key_path: "../{{k8s_client_ssl_key}}"
         key_bits: "2048"
 
     - include: tasks/ipa_client_certs.yaml
