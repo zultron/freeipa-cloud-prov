@@ -105,6 +105,9 @@
     - "var"
   become: true
   when: not install_path_stat.stat.exists
+  tags:
+    - install
+    - docker-run-ipa
 
 - name: "Remove any stale ipa container"
   command:  "docker rm ipa"
@@ -112,37 +115,28 @@
   register:  docker_rm_ipa
   changed_when:  docker_rm_ipa.rc == 0
   when: not install_path_stat.stat.exists
+  tags:
+    - install
+    - docker-run-ipa
 
-- name: Run FreeIPA install in Docker container
-  docker_container:
-    name: ipa
-    hostname: "{{fqdn}}"
-    image: "{{freeipa_docker_image}}"
-    volumes:
-      - "{{freeipa_volume_path}}:/data"
-      - "/sys/fs/cgroup:/sys/fs/cgroup:ro"
-    env:
-      IPA_SERVER_IP: "{{ip_addr}}"
-    detach: yes
-    cleanup: yes
-    interactive: yes
-    tty: yes
-    security_opts:
-      - seccomp:unconfined
-    state: started
-    recreate: no
-    restart: no
-    restart_policy: on-failure
-    networks:
-      - name: ipa
-        ipv4_address: "{{freeipa_network_addr}}"
-    purge_networks: yes
-    published_ports: "{{freeipa_ports|docker_port_list}}"
-  register: docker_run
-  # In Ansible 2.2.2.0 (at least), this docker container always gets
-  # restarted, despite `recreate` and `restart` params turned off; use
-  # other criteria for when this task is run
-  when: not install_path_stat.stat.exists
+- name: "Template ipa.service"
+  template:
+    src: ipa.service.j2
+    dest: "/etc/systemd/system/ipa.service"
+  become: true
+  register:  ipa_unit_file
+  tags:
+    - install
+    - docker-run-ipa
+
+- name: "Start ipa.service"
+  systemd:
+    name: ipa.service
+    daemon_reload: yes
+    enabled: true
+    state: "{{  (ipa_unit_file.changed) |
+                 ternary('restarted','started') }}"
+  become: true
   tags:
     - install
     - docker-run-ipa
@@ -153,6 +147,7 @@
 #   when: not install_path_stat.stat.exists
 #   tags:
 #     - install
+#     - docker-run-ipa
 
 - name: Wait for FreeIPA install to complete
   wait_for:
@@ -165,6 +160,7 @@
   when: not install_path_stat.stat.exists
   tags:
     - install
+    - docker-run-ipa
 
 - name: Wait for FreeIPA service to start
   command: "docker exec ipa systemctl start ipa.service"
@@ -172,3 +168,4 @@
   when: not install_path_stat.stat.exists
   tags:
     - install
+    - docker-run-ipa
