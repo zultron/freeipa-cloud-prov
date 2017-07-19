@@ -83,7 +83,10 @@ this work in any critical scenario.**
             -e ansible_ssh_user=core
 
         # Destroy host1
-        ansible-playbook playbooks/destroy.yaml -e confirm=yes -l host1
+        ansible-playbook playbooks/destroy.yaml -e confirm=host -l host1
+
+        # Destroy whole cluster
+        ansible-playbook playbooks/destroy.yaml -e confirm=all
 
         # List all variables for a host
         ansible host1 -m debug -a "var=hostvars[inventory_hostname]"

@@ -1,0 +1,27 @@
+---
+# Destroy the whole cluster
+#
+# Assumes that droplets have already been destroyed
+
+- name: "Refuse to destroy cluster if 'confirm' is not set to 'all'"
+  fail: msg="Please set '-e confirm=all' to destroy cluster"
+  when: confirm|default('no') != 'all'
+
+- name:  "Destroy cached files in var/"
+  file:
+    path: "../var/{{item}}"
+    state: absent
+  with_items:
+    # Ansible artifacts
+    - "ansible.log"
+    - "retries"
+    - "cache"
+    - "tmp"
+    # SSH keys
+    - "ssh_id_rsa"
+    - "ssh_id_rsa.pub"
+    # FreeIPA artifacts
+    - "cacert.pem"
+    - "docker"
+  delegate_to: localhost
+  run_once: true

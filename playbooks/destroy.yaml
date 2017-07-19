@@ -1,7 +1,5 @@
 ---
-# Destroy DigitalOcean hosts
-
-- name: Destroy DigitalOcean hosts
+- name: "Destroy DigitalOcean hosts or cluster"
   hosts: coreos
   # This all runs on localhost regardless of whether hosts exist;
   # don't run setup
@@ -10,8 +8,13 @@
 
   vars_prompt:
   - name: confirm
-    prompt: "Really destroy droplet(s)? Enter `yes` to confirm"
+    prompt: |
+      Really destroy droplet(s) or cluster?
+      Enter `host` to confirm droplet(s); enter `all` to confirm cluster
 
   roles:
     - role: digitalocean-droplet-destroy
-      when: confirm == 'yes'
+      when: confirm == 'host' or confirm == 'all'
+
+    - role: destroy-all
+      when: confirm == 'all'

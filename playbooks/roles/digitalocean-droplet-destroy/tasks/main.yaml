@@ -2,9 +2,9 @@
 # DigitalOcean:  droplet destruction tasks
 
 
-- name: "Refuse to destroy droplet if 'confirm' is not set to 'yes'"
-  fail: msg="Please set '-e confirm=yes' to destroy droplet"
-  when: confirm|default('no') != 'yes'
+- name: "Refuse to destroy droplet if 'confirm' is not set to 'host' or 'all'"
+  fail: msg="Please set '-e confirm=host' to destroy droplet"
+  when: confirm|default('no') != 'host' and confirm|default('no') != 'all'
 
 - name:  Destroy droplet
   digital_ocean:
@@ -14,16 +14,16 @@
     unique_name: yes
     api_token:  "{{ do_token }}"
 
-- name:  "Destroy ansible cached data in var/cache/{{hostname}}"
+- name:  "Destroy cached files in var/"
   file:
-    path: "../var/cache/{{hostname}}"
+    path: "../var/{{item}}"
     state: absent
-  delegate_to: localhost
-
-- name:  "Destroy docker certs in {{docker_client_ssl_dir}}"
-  file:
-    path: "../{{docker_client_ssl_dir}}"
-    state: absent
+  with_items:
+    # Ansible cache
+    - "cache/{{hostname}}"
+    # Ignition config
+    - "container_linux_config-{{hostname}}.yaml"
+    - "ignition_config-{{hostname}}.json"
   delegate_to: localhost
 
 - name:  "Destroy data volume {{data_volume_name}}"
