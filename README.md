@@ -214,6 +214,8 @@ Next step is to install and configure FreeIPA in a Docker container.
   - [NSS `certutil`][nss-certutil]
   - [FreeIPA behind SSL proxy][freeipa-ssl-proxy]
 
+- [Configure SSSD on CoreOS][coreos-sssd]
+
 [freeipa]: http://www.freeipa.org/page/Main_Page
 [freeipa-docker]: https://github.com/adelton/docker-freeipa
 [freeipa-docker-client]: https://github.com/zultron/docker-freeipa/tree/centos-7-client
@@ -228,6 +230,8 @@ Next step is to install and configure FreeIPA in a Docker container.
 [rhel6-ipa-rep-docs]: https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/6/html/Identity_Management_Guide/ipa-replica-manage.html
 [nss-certutil]: https://developer.mozilla.org/en-US/docs/Mozilla/Projects/NSS/tools/NSS_Tools_certutil
 [freeipa-ssl-proxy]: https://www.adelton.com/freeipa/freeipa-behind-ssl-proxy
+
+[coreos-sssd]: https://coreos.com/os/docs/latest/sssd.html
 
 ### [CoreOS][coreos]
 
