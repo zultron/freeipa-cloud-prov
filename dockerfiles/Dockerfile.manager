@@ -75,7 +75,7 @@ RUN pip install nose mock
 
 RUN ansible-galaxy install defunctzombie.coreos-bootstrap
 
-ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/data/lib/bin
+ENV PATH=/data/lib/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ENV PYTHONPATH=/data/lib/python
 
 # Work around annoying python location on CoreOS
