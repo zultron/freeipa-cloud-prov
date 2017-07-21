@@ -59,20 +59,23 @@
 ##############################
 # Create partitions
 
-- name: (Init partition_map facts)
-  # Used in include: partition.yaml below
-  set_fact:
-    partition_map: {}
-  tags:
-    - setup
-
-- include: partition.yaml partition="{{item}}"
+- name: "Device {{device}}, create partition"
+  parted:
+    align: "{{ align|default('optimal') }}"
+    device: "{{ device }}"
+    number: "{{ item.number }}"
+    state: present
+    part_type: "{{ item.part_type|default('primary') }}"
+    fs_type: "{{ item.fs_type|default('ext4') }}"
+    part_start: "{{ item.part_start|default('0%') }}"
+    part_end: "{{ item.part_end|default('100%') }}"
+    unit: GiB
+  become: true
+  register: create_partition
   with_items:  "{{ partitions }}"
   tags:
     - setup
 
-# - name: debug partition map
+# - name: debug create partition
 #   debug:
-#     var: partition_map
-#   tags:
-#     - setup
+#     var: create_partition
