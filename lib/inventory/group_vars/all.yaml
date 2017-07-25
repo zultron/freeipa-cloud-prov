@@ -1,17 +1,17 @@
 ---
 
-# Short hostname
+# This host name and IP
 hostname: "{{inventory_hostname}}"
-
-# FQDN
 fqdn: "{{hostname}}.{{domain_name}}"
-
-# Main IP address:  shortcut
 ip_addr: "{{ansible_default_ipv4.address}}"
 
-# Master host
+# Master host name and IP
 master_host: "{{groups.coreos_master[0]}}"
 master_fqdn: "{{groups.coreos_master[0]}}.{{domain_name}}"
+master_ip_addr: "{{hostvars[master_host].ansible_default_ipv4.address}}"
 
 # Manager user ID
 manager_id: "manager"
+
+# Replica host list
+replica_hosts: "{{ groups.coreos | difference(groups.coreos_master) }}"

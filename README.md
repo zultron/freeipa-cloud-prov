@@ -54,24 +54,26 @@ this work in any critical scenario.**
         # and directory passwords
         ansible-playbook playbooks/init-site.yaml
 
-- Install hosts (master first, then others):
+- Install whole cluster in one command:
 
-        # Provision master droplet on DigitalOcean and configure storage
-        ansible-playbook playbooks/provision.yaml -l host1
+        ansible-playbook playbooks/site.yaml
 
-        # Install FreeIPA server+client containers
-        ansible-playbook playbooks/freeipa-install.yaml -l host1
+- Install cluster with progressive steps:
 
-        # Install and configure etcd3 and Kubernetes on master
-        ansible-playbook playbooks/coreos-cluster.yaml -l host1
+        # Provision droplets on DigitalOcean and configure storage
+        ansible-playbook playbooks/provision.yaml
 
-        # Install other cluster nodes
-        ansible-playbook playbooks/provision.yaml -l host2,host3
-        ansible-playbook playbooks/freeipa-install.yaml -l host2,host3
-        ansible-playbook playbooks/coreos-kubernetes.yaml -l host2,host3
+        # Install FreeIPA server/replica containers
+        ansible-playbook playbooks/freeipa.yaml
 
-        # Install services on all hosts:  email, PBX, web, etc.
-        ansible-playbook playbooks/services-install.yaml
+        # Install and configure docker TLS, etcd3 and flanneld
+        ansible-playbook playbooks/coreos-cluster.yaml
+
+        # Install and configure kubernetes
+        ansible-playbook playbooks/kubernetes.yaml
+
+        # Install services in k8s:  email, PBX, web, etc.
+        ansible-playbook playbooks/services.yaml
 
 ## Other commands
 

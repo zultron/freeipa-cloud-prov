@@ -1,7 +1,23 @@
 ---
-# Install everything
+# Install everything in the right order
 
 
+# 1.  Provision CoreOS host on DigitalOcean
 - include: provision.yaml
-- include: freeipa-install.yaml
+  tags:  provision
+
+# 2.  Install FreeIPA in Docker
+- include: freeipa.yaml
+  tags:  freeipa
+
+# 3.  Install docker TLS, etcd, flanneld
 - include: coreos-cluster.yaml
+  tags:  coreos-cluster
+
+# 4.  Install kubernetes
+- include: kubernetes.yaml
+  tags:  kubernetes
+
+# # 5.  Install services
+# - include: services.yaml
+#   tags:  services

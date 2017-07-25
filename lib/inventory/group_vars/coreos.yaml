@@ -25,16 +25,15 @@ swap_size:  2
 container_network_prefix: "{{network_prefix}}.32"
 container_network_cidr: "{{container_network_prefix}}.0/24"
 container_network_gateway: "{{container_network_prefix}}.1"
-freeipa_client_network_addr: "{{container_network_prefix}}.2"
 
 ##################################
 # Docker
 
 # TLS
-# - FreeIPA sub-CA
+# - Docker sub-CA
 docker_ca: "docker"
 docker_ca_subject_cn: "Docker Certificate Authority"
-# - FreeIPA service principal
+# - Docker service principal
 docker_service_principal: "docker"
 # - Server-side cert locations
 docker_ssl_dir: "{{data_volume_path}}/docker"
@@ -84,11 +83,11 @@ data_volume_systemd_unit: "{{data_volume_path|systemd_escape}}.mount"
 # etcd configuration
 
 # TLS
-# - FreeIPA sub-CA
+# - Etcd sub-CA
 etcd_ca: "etcd"
 etcd_ca_subject_short: "Etcd Certificate Authority"
 etcd_ca_subject: "CN={{etcd_ca_subject_short}},O={{kerberos_realm}}"
-# - FreeIPA service principal
+# - Etcd service principal
 etcd_service_principal: "etcd/{{fqdn}}@{{kerberos_realm}}"
 # - Cert locations; accessible from mount in etcd-member-wrapper
 etcd_cert_dir: "{{ data_volume_path }}/etcd"

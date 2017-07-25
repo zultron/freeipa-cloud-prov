@@ -2,18 +2,44 @@
 # Provision FreeIPA Docker container
 
 #################################
-# Set up Docker
+# Set up DNS for replicas
+- block:
+
+    - name: "Template /etc/systemd/resolved.conf with only master"
+      template:
+        src: resolved.conf.j2
+        dest: /etc/systemd/resolved.conf
+      register:  resolved_conf
+      vars:
+        dns_servers:
+          - "{{ master_host }}"
+
+    - name:  "Reload systemd and restart systemd-resolved.service"
+      systemd:
+        name: systemd-resolved
+        daemon_reload: yes
+        state: restarted
+      when:  resolved_conf.changed
+
+  become: true
+  tags:
+    - setup
+    - resolved-conf
+
+
+#################################
+# Prepare Docker for IPA
 - name: Pull FreeIPA docker image
   docker_image:
     name: "{{freeipa_docker_image}}"
   tags:
-    - setup
+    - docker-ipa-config
 
 - name: Create FreeIPA container network
   docker_network:
     name: ipa
     driver_options:
-      com.docker.network.bridge.name: "ipa"
+      com.docker.network.bridge.name: "{{freeipa_network_bridge}}"
       com.docker.network.bridge.enable_ip_masquerade: "true"
       com.docker.network.bridge.enable_icc: "true"
       com.docker.network.bridge.default_bridge: "false"
@@ -23,128 +49,219 @@
       subnet: "{{freeipa_network_cidr}}"
       gateway: "{{freeipa_network_gateway}}"
   tags:
-    - setup
-    - docker-ipa-network
-
-#################################
-# Set up IPA server configuration
-- name: Install FreeIPA server config
-  template:
-    src: ipa-server-install-options.j2
-    dest: "{{freeipa_volume_path}}/ipa-server-install-options"
-  register: ipa_install_options
-  become: true
-  when: hostname == master_host
-  tags:
-    - configure
-
-#################################
-# Set up IPA replica configuration
-- name: Install FreeIPA replica config
-  template:
-    src: ipa-replica-install-options.j2
-    dest: "{{freeipa_volume_path}}/ipa-replica-install-options"
-  register: ipa_install_options
-  become: true
-  when: hostname != master_host
-  tags:
-    - configure
-
-- name: Create FreeIPA replica info file on master
-  command: "docker exec -i ipa ipa-replica-prepare {{fqdn}}
-                 --ip-address {{ip_addr}} --no-reverse"
-  delegate_to: "{{master_host}}"
-  when: hostname != master_host
-  tags:
-    - configure
-
-- name: Fetch FreeIPA replica info from master
-  fetch:
-    src: "{{freeipa_volume_path}}/var/lib/ipa/replica-info-{{fqdn}}.gpg"
-    dest: "cache/replica-info-{{fqdn}}.gpg"
-  become: true
-  delegate_to: "{{master_host}}"
-  when: hostname != master_host
-  tags:
-    - configure
-
-- name: Copy FreeIPA replica info to replica
-  copy:
-    src: "cache/replica-info-{{fqdn}}.gpg"
-    dest: "{{freeipa_volume_path}}/var/lib/ipa/replica-info-{{fqdn}}.gpg"
-  become: true
-  when: hostname != master_host
-  tags:
-    - configure
+    - docker-ipa-config
 
 #################################
 # Install IPA server/replica
-- name:  Check if install is already complete
-  stat:
-    path: "{{freeipa_volume_path}}/etc/systemd/system/{{ ''
-             }}container-ipa.target.wants/ipa-server-upgrade.service"
-  register: install_path_stat
-  changed_when:  not install_path_stat.stat.exists
-  tags:
-    - install
-    - docker-run-ipa
 
-- name: "Clean out any incomplete prior install"
-  # The FreeIPA install doesn't cleanly resume after
-  # restarting; deal with it by restarting from scratch
-  file:
-    state: absent
-    path: "{{freeipa_volume_path}}/{{item}}"
-  with_items:
-    - "build-id"
-    - "etc"
-    - "hostname"
-    - "root"
-    - "usr"
-    - "var"
-  become: true
-  when: install_path_stat.changed
-  tags:
-    - install
-    - docker-run-ipa
-
-- name: "Remove any stale ipa container"
-  command:  "docker rm ipa"
-  failed_when:  false
-  register:  docker_rm_ipa
-  changed_when:  docker_rm_ipa.rc == 0
-  when: install_path_stat.changed
-  tags:
-    - install
-    - docker-run-ipa
-
-- name: "Template ipa.service"
-  template:
-    src: ipa.service.j2
-    dest: "/etc/systemd/system/ipa.service"
-  become: true
-  register:  ipa_unit_file
-  tags:
-    - install
-    - docker-run-ipa
-
-- name: "Start ipa.service"
-  systemd:
-    name: ipa.service
-    daemon_reload: "{{ ipa_unit_file.changed | ternary('yes','no') }}"
-    enabled: true
-    state: "{{  (ipa_unit_file.changed or install_path_stat.changed)
-                  | ternary('restarted','started') }}"
-  register: ipa_service_start
-  become: true
-  tags:
-    - install
-    - docker-run-ipa
 
 #
-# Wait for install to complete and service to come online
+# Set up files
 #
-- include:  tasks/freeipa-service-wait.yaml
+- block:
+
+    - name:  Check if install is already complete
+      stat:
+        path: "{{freeipa_volume_path}}/etc/systemd/system/{{ ''
+                 }}container-ipa.target.wants/ipa-server-upgrade.service"
+      register: install_path_stat
+      changed_when:  not install_path_stat.stat.exists
+
+    - name: "Clean out any incomplete prior install"
+      # The FreeIPA install doesn't cleanly resume after
+      # restarting; deal with it by restarting from scratch
+      file:
+        state: absent
+        path: "{{freeipa_volume_path}}/{{item}}"
+      with_items:
+        - "build-id"
+        - "etc"
+        - "hostname"
+        - "root"
+        - "usr"
+        - "var"
+      become: true
+      when: install_path_stat.changed
+
+    - name: "Remove any stale ipa container"
+      command:  "docker rm ipa"
+      failed_when:  false
+      register:  docker_rm_ipa
+      changed_when:  docker_rm_ipa.rc == 0
+      when: install_path_stat.changed
+
+    - name: "Template ipa.service"
+      template:
+        src: ipa.service.j2
+        dest: "/etc/systemd/system/ipa.service"
+      become: true
+      register:  ipa_unit_file
+
   tags:
-    - install
-    - docker-run-ipa
+    - docker-ipa-run
+
+#
+# Run server
+#
+- block:
+
+    - name: Install FreeIPA server config
+      template:
+        src: ipa-server-install-options.j2
+        dest: "{{freeipa_volume_path}}/ipa-server-install-options"
+      register: ipa_install_options
+      become: true
+
+    - name: "Start ipa.service on IPA server"
+      systemd:
+        name: ipa.service
+        daemon_reload: "{{ ipa_unit_file.changed | ternary('yes','no') }}"
+        enabled: true
+        state: "{{  (ipa_unit_file.changed or install_path_stat.changed)
+                      | ternary('restarted','started') }}"
+      register: ipa_service_start
+      become: true
+
+    # Wait for install to complete and service to come online
+    - include:  tasks/freeipa-service-wait.yaml
+
+  when: hostname == master_host
+  tags:
+    - docker-ipa-run
+
+#
+# Run replica
+#
+# FIXME
+#
+# Best way to do this is to add host to IPA first (need Ansible
+# ipa_host module), generate one-time password, and put it into
+# replica config.
+#
+# https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/7/html/Linux_Domain_Identity_Authentication_and_Policy_Guide/creating-the-replica.html#replica-install-otp
+
+- block:
+
+    # FIXME The next two tasks shouldn't be needed, since the
+    # freeipa-container init scripts are supposed to do this when
+    # $IPA_SERVER_IP is set in the environment
+
+    # Copy CA cert to container
+    - include: tasks/local-ca-cert.yaml
+
+    - name: "Ensure replica has correct A-record in DNS"
+      ipa_dnsrecord:
+        name: "{{item.host}}"
+        zone: "{{domain_name}}"
+        arecord: "{{item.a_rec}}"
+        state: exact
+        ipa_host: "{{master_fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      delegate_to: localhost
+      with_items:
+        - host: "{{hostname}}"
+          a_rec: "{{ip_addr}}"
+
+    - name: Install FreeIPA replica config
+      template:
+        src: ipa-replica-install-options.j2
+        dest: "{{freeipa_volume_path}}/ipa-replica-install-options"
+      register: ipa_install_options
+      become: true
+
+    - name: "Ensure {{hostname}} not enrolled in IPA"
+      # FIXME this should be done with an ipa_host module
+      shell: |
+        echo {{freeipa_admin_password}} | {{ipa_exec}} kinit admin;
+        {{ipa_exec}} ipa host-del {{hostname}} || true
+      delegate_to:  "{{master_host}}"
+
+    - name: "Start ipa.service on IPA replicas"
+      systemd:
+        name: ipa.service
+        daemon_reload: "{{ ipa_unit_file.changed | ternary('yes','no') }}"
+        enabled: true
+        state: "{{  (ipa_unit_file.changed or install_path_stat.changed
+                     or ipa_install_options.changed)
+                      | ternary('restarted','started') }}"
+      register: ipa_service_start
+      become: true
+
+    # Wait for install to complete and service to come online
+    - include:  tasks/freeipa-service-wait.yaml
+
+  when: hostname != master_host
+  tags:
+    - docker-ipa-run
+
+#################################
+# Harden DNS server config files
+- block:
+
+    - name: Restrict DNS recursion in named.conf
+      lineinfile:
+        dest: "/media/freeipa/etc/named.conf"
+        regexp: "allow-recursion"
+        state: present
+        line: "        allow-recursion { 127.0.0.1; 10.0.0.0/8; };"
+      become: true
+      register:  dns_recursion
+
+    - name: Restrict DNS zone transfers globally in named.conf
+      lineinfile:
+        dest: "/media/freeipa/etc/named.conf"
+        regexp: "allow-transfer"
+        insertafter: "allow-recursion"
+        state: present
+        line: "        allow-transfer { none; };"
+      become: true
+      register:  dns_transfers
+
+    - name: Restart named
+      command: "{{ipa_exec}} systemctl restart named-pkcs11.service"
+      when: dns_recursion.changed or dns_transfers.changed
+
+  tags:
+    - freeipa-config-external
+
+#################################
+# Configure httpd files
+#
+# IPA will be behind haproxy later on, so disable http redirect to
+# https by disabling these lines in
+# /etc/httpd/conf.d/ipa-rewrite.conf:
+#
+# RewriteCond %{SERVER_PORT}  !^443$
+# RewriteCond %{REQUEST_URI}  !^/ipa/(errors|config|crl)
+# RewriteCond %{REQUEST_URI}  !^/ipa/[^\?]+(\.js|\.css|\.png|[...])$
+# RewriteRule ^/ipa/(.*)      https://host1.example.com/ipa/$1 [L,R=301,NC]
+
+- block:
+
+    - name: Disable IPA web UI redirect to https
+      lineinfile:
+        dest: "/media/freeipa/etc/httpd/conf.d/ipa-rewrite.conf"
+        regexp: "{{item}}"
+        state: present
+        line: '#\1'
+        backrefs: yes
+      with_items:
+        - "^(RewriteCond.*SERVER_PORT.*)$"
+        - "^(RewriteCond.*REQUEST_URI.*errors.*)$"
+        - "^(RewriteCond.*REQUEST_URI.*css.*)$"
+        - "(RewriteRule.*ipa.*https://{{fqdn}}.*)$"
+      become: true
+      register:  ipa_redirect
+
+    - name: Restart httpd
+      command: "{{ipa_exec}} systemctl restart httpd.service"
+      when: ipa_redirect.changed
+
+    - name: Wait for httpd service
+      wait_for:
+        port:  443
+        delay: 10
+
+  tags:
+    - freeipa-config-external

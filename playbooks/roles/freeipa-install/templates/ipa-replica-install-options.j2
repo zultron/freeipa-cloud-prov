@@ -1,8 +1,200 @@
+{# ---------------------------------------------------------------------#}
+{# Options to `ipa-replica-install`; place in {{freeipa_volume_path}}   #}
+{# ---------------------------------------------------------------------#}
+
+--unattended
+{# Use --principal and --admin-password; alternative is to configure
+   host password before enrolling and use --password #}
+--principal=admin
 --admin-password={{freeipa_admin_password}}
---password={{freeipa_ds_password}}
+{# Enroll with this server; must be in /etc/hosts #}
+--server={{master_fqdn}}
+{# Config basic facts #}
+--hostname={{fqdn}}
+--realm={{kerberos_realm}}
+--domain={{domain_name}}
+{# Other options #}
 --setup-ca
 --setup-dns
 --no-forwarders
---no-reverse
+--auto-reverse
 --no-host-dns
---unattended
+--skip-conncheck
+--no-ntp  {# done on host #}
+--no-ui-redirect
+{# Without this option, install will fail if domain already resolvable #}
+--allow-zone-overlap
+
+{#
+Usage: ipa-replica-install [options] [REPLICA_FILE]
+
+Options:
+  --version             show program's version number and exit
+  -h, --help            show this help message and exit
+  -U, --unattended      unattended (un)installation never prompts the user
+
+  basic options:
+    --setup-ca          configure a dogtag CA
+    --setup-kra         configure a dogtag KRA
+    --setup-dns         configure bind with our zone
+    --ip-address=IP_ADDRESS
+                        Replica server IP Address. This option can be used
+                        multiple times
+    -p PASSWORD, --password=PASSWORD
+                        Password to join the IPA realm. Assumes bulk password
+                        unless principal is also set. (domain level 1+)
+                        Directory Manager (existing master) password. (domain
+                        level 0)
+    -w ADMIN_PASSWORD, --admin-password=ADMIN_PASSWORD
+                        Kerberos password for the specified admin principal
+    --server=SERVER     fully qualified name of IPA server to enroll to
+    --mkhomedir         create home directories for users on their first login
+    --no-host-dns       Do not use DNS for hostname lookup during installation
+    -N, --no-ntp        do not configure ntp
+    --no-ui-redirect    Do not automatically redirect to the Web UI
+    --ssh-trust-dns     configure OpenSSH client to trust DNS SSHFP records
+    --no-ssh            do not configure OpenSSH client
+    --no-sshd           do not configure OpenSSH server
+    --no-dns-sshfp      Do not automatically create DNS SSHFP records
+    --skip-conncheck    skip connection check to remote master
+    -P PRINCIPAL, --principal=PRINCIPAL
+                        User Principal allowed to promote replicas and join
+                        IPA realm
+    -k KEYTAB, --keytab=KEYTAB
+                        path to backed up keytab from previous enrollment
+    -r REALM_NAME, --realm=REALM_NAME
+                        realm name
+    -n DOMAIN_NAME, --domain=DOMAIN_NAME
+                        domain name
+    --hostname=HOST_NAME
+                        fully qualified name of this host
+    --dirsrv-config-file=FILE
+                        The path to LDIF file that will be used to modify
+                        configuration of dse.ldif during installation of the
+                        directory server instance
+
+  certificate system options:
+    --dirsrv-cert-file=FILE
+                        File containing the Directory Server SSL certificate
+                        and private key
+    --http-cert-file=FILE
+                        File containing the Apache Server SSL certificate and
+                        private key
+    --dirsrv-pin=PIN    The password to unlock the Directory Server private
+                        key
+    --http-pin=PIN      The password to unlock the Apache Server private key
+    --dirsrv-cert-name=NAME
+                        Name of the Directory Server SSL certificate to
+                        install
+    --http-cert-name=NAME
+                        Name of the Apache Server SSL certificate to install
+    --skip-schema-check
+                        skip check for updated CA DS schema on the remote
+                        master
+
+  DNS options:
+    --forwarder=FORWARDERS
+                        Add a DNS forwarder. This option can be used multiple
+                        times
+    --forward-policy=FORWARD_POLICY
+                        DNS forwarding policy for global forwarders
+    --auto-forwarders   Use DNS forwarders configured in /etc/resolv.conf
+    --no-forwarders     Do not add any DNS forwarders, use root servers
+                        instead
+    --allow-zone-overlap
+                        Create DNS zone even if it already exists
+    --reverse-zone=REVERSE_ZONE
+                        The reverse DNS zone to use. This option can be used
+                        multiple times
+    --no-reverse        Do not create new reverse DNS zone
+    --auto-reverse      Create necessary reverse zones
+    --no-dnssec-validation
+                        Disable DNSSEC validation
+
+  Logging and output options:
+    -v, --verbose       print debugging information
+    -d, --debug         alias for --verbose (deprecated)
+    -q, --quiet         output only errors
+    --log-file=FILE     log to the given file
+#}
+
+{#
+Usage: ipa-client-install [options]
+
+Options:
+  --version             show program's version number and exit
+  -h, --help            show this help message and exit
+
+  basic options:
+    --domain=DOMAIN     domain name
+    --server=SERVER     IPA server
+    --realm=REALM_NAME  realm name
+    --fixed-primary     Configure sssd to use fixed server as primary IPA
+                        server
+    -p PRINCIPAL, --principal=PRINCIPAL
+                        principal to use to join the IPA realm
+    -w PASSWORD, --password=PASSWORD
+                        password to join the IPA realm (assumes bulk password
+                        unless principal is also set)
+    -k KEYTAB, --keytab=KEYTAB
+                        path to backed up keytab from previous enrollment
+    -W                  Prompt for a password to join the IPA realm
+    --mkhomedir         create home directories for users on their first login
+    --hostname=HOSTNAME
+                        The hostname of this machine (FQDN). If specified, the
+                        hostname will be set and the system configuration will
+                        be updated to persist over reboot. By default a
+                        nodename result from uname(2) is used.
+    --force-join        Force client enrollment even if already enrolled
+    --ntp-server=NTP_SERVERS
+                        ntp server to use. This option can be used multiple
+                        times
+    -N, --no-ntp        do not configure ntp
+    --force-ntpd        Stop and disable any time&date synchronization
+                        services besides ntpd
+    --nisdomain=NISDOMAIN
+                        NIS domain name
+    --no-nisdomain      do not configure NIS domain name
+    --ssh-trust-dns     configure OpenSSH client to trust DNS SSHFP records
+    --no-ssh            do not configure OpenSSH client
+    --no-sshd           do not configure OpenSSH server
+    --no-sudo           do not configure SSSD as data source for sudo
+    --no-dns-sshfp      do not automatically create DNS SSHFP records
+    --noac              do not modify the nsswitch.conf and PAM configuration
+    -f, --force         force setting of LDAP/Kerberos conf
+    --kinit-attempts=KINIT_ATTEMPTS
+                        number of attempts to obtain host TGT (defaults to 5).
+    -d, --debug         print debugging information
+    -U, --unattended    unattended (un)installation never prompts the user
+    --ca-cert-file=CA_CERT_FILE
+                        load the CA certificate from this file
+    --request-cert      request certificate for the machine
+    --automount-location=LOCATION
+                        Automount location
+    --configure-firefox
+                        configure Firefox to use IPA domain credentials
+    --firefox-dir=FIREFOX_DIR
+                        specify directory where Firefox is installed (for
+                        example: '/usr/lib/firefox')
+    --ip-address=IP_ADDRESSES
+                        Specify IP address that should be added to DNS. This
+                        option can be used multiple times
+    --all-ip-addresses  All routable IP addresses configured on any inteface
+                        will be added to DNS
+
+  SSSD options:
+    --permit            disable access rules by default, permit all access.
+    --enable-dns-updates
+                        Configures the machine to attempt dns updates when the
+                        ip address changes.
+    --no-krb5-offline-passwords
+                        Configure SSSD not to store user password when the
+                        server is offline
+    -S, --no-sssd       Do not configure the client to use SSSD for
+                        authentication
+    --preserve-sssd     Preserve old SSSD configuration if possible
+
+  uninstall options:
+    --uninstall         uninstall an existing installation. The uninstall can
+                        be run with --unattended option
+#}

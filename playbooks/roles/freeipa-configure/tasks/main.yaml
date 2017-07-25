@@ -2,120 +2,57 @@
 # Configure FreeIPA
 
 #################################
-# Harden DNS
-- name: Restrict DNS recursion in named.conf
-  lineinfile:
-    dest: "/media/freeipa/etc/named.conf"
-    regexp: "allow-recursion"
-    state: present
-    line: "        allow-recursion { 127.0.0.1; 10.0.0.0/8; };"
-  become: true
-  register:  dns_recursion
-  tags:
-    - configure
+# Harden DNS server IPA settings
 
-- name: Restrict DNS zone transfers globally in named.conf
-  lineinfile:
-    dest: "/media/freeipa/etc/named.conf"
-    regexp: "allow-transfer"
-    insertafter: "allow-recursion"
-    state: present
-    line: "        allow-transfer { none; };"
-  become: true
-  register:  dns_transfers
-  tags:
-    - configure
-
-- name: Restart named
-  command: "{{ipa_exec}} systemctl restart named-pkcs11.service"
-  when: dns_recursion.changed or dns_transfers.changed
-  tags:
-    - configure
-
-- name: "Restrict DNS zone transfers for {{domain_name}} in IPA"
+- name: "Restrict zone transfers for {{domain_name}} in IPA"
   ipa_dnszone:
     idnsname: "{{domain_name}}"
     state: present
     idnsallowtransfer: "none;"
-    ipa_host: "{{fqdn}}"
+    ipa_host: "{{master_fqdn}}"
     ipa_user: "{{ipa_user}}"
     ipa_pass: "{{freeipa_admin_password}}"
   delegate_to: localhost
   register: create_fqdn_dnszone
+  when:  hostname == master_host
+  run_once: true
   tags:
     - configure
     - dns
 
 #################################
-# Harden LDAP
+# Harden LDAP settings
 
-- name: Restrict LDAP anonymous binds
+- name: "Restrict LDAP anonymous binds in IPA"
   ldap_attr:
     bind_dn: "cn=Directory Manager"
     bind_pw: "{{freeipa_ds_password}}"
     dn: cn=config
     name: nsslapd-allow-anonymous-access
-    server_uri: "ldaps://{{fqdn}}"
+    server_uri: "ldaps://{{master_fqdn}}"
     state: exact
     values: rootdse
   delegate_to: localhost
+  when:  hostname == master_host
+  run_once: true
   tags:
     - configure
-
-#################################
-# Configure httpd
-#
-# IPA will be behind haproxy later on, so disable http redirect to
-# https by disabling these lines in
-# /etc/httpd/conf.d/ipa-rewrite.conf:
-#
-# RewriteCond %{SERVER_PORT}  !^443$
-# RewriteCond %{REQUEST_URI}  !^/ipa/(errors|config|crl)
-# RewriteCond %{REQUEST_URI}  !^/ipa/[^\?]+(\.js|\.css|\.png|[...])$
-# RewriteRule ^/ipa/(.*)      https://host1.example.com/ipa/$1 [L,R=301,NC]
-
-- name: Disable IPA web UI redirect to https
-  lineinfile:
-    dest: "/media/freeipa/etc/httpd/conf.d/ipa-rewrite.conf"
-    regexp: "{{item}}"
-    state: present
-    line: '#\1'
-    backrefs: yes
-  with_items:
-    - "^(RewriteCond.*SERVER_PORT.*)$"
-    - "^(RewriteCond.*REQUEST_URI.*errors.*)$"
-    - "^(RewriteCond.*REQUEST_URI.*css.*)$"
-    - "(RewriteRule.*ipa.*https://{{fqdn}}.*)$"
-  become: true
-  register:  ipa_redirect
-  tags:
-    - configure
-
-- name: Restart httpd
-  command: "{{ipa_exec}} systemctl restart httpd.service"
-  when: ipa_redirect.changed
-  tags:
-    - configure
-
-- name: Wait for httpd service
-  wait_for:
-    port:  443
-    delay: 10
 
 #################################
 # Misc
 
-- name: IPA set default login shell to /bin/bash
+- name: "Set default login shell to /bin/bash in IPA"
   ldap_attr:
     bind_dn: "{{bind_dn}}"
     bind_pw: "{{freeipa_ds_password}}"
-    server_uri: "ldaps://{{fqdn}}"
+    server_uri: "ldaps://{{master_fqdn}}"
     dn: "cn=ipaConfig,cn=etc,{{domain_dn}}"
     name: ipaDefaultLoginShell
     values: /bin/bash
     state: exact
   delegate_to: localhost
   when:  hostname == master_host
+  run_once: true
   tags:
     - configure
 
@@ -124,30 +61,32 @@
 # 
 # ipa-server-install erroneously puts container IP into A record
 
-- name: "Remove container IP {{freeipa_network_addr}} from {{domain_name}} zone
-            ipa-ca entry"
-  ipa_dnsrecord:
-    name: ipa-ca
-    zone: "{{domain_name}}"
-    arecord: "{{freeipa_network_addr}}"
-    state: absent
-    ipa_host: "{{fqdn}}"
-    ipa_user: "{{ipa_user}}"
-    ipa_pass: "{{freeipa_admin_password}}"
-  delegate_to: localhost
-  tags:
-    - configure
-    - dns
+- block:
 
-- name: "Add host IP {{ip_addr}} to {{domain_name}} zone ipa-ca entry"
-  ipa_dnsrecord:
-    name: ipa-ca
-    zone: "{{domain_name}}"
-    arecord: "{{ip_addr}}"
-    state: present
-    ipa_host: "{{fqdn}}"
-    ipa_user: "{{ipa_user}}"
-    ipa_pass: "{{freeipa_admin_password}}"
+    - name: "Remove container IP from ipa-ca A record"
+      ipa_dnsrecord:
+        name: ipa-ca
+        zone: "{{domain_name}}"
+        arecord: "{{item}}"
+        state: absent
+        ipa_host: "{{master_fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      with_items:
+        - "{{freeipa_network_addr}}"
+
+    - name: "Add host IP to ipa-ca A record"
+      ipa_dnsrecord:
+        name: ipa-ca
+        zone: "{{domain_name}}"
+        arecord: "{{item}}"
+        state: present
+        ipa_host: "{{master_fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      with_items:
+        - "{{ip_addr}}"
+
   delegate_to: localhost
   tags:
     - configure
@@ -156,56 +95,56 @@
 #################################
 # Add host DNS zone and transfer A record
 
-- name: "Add {{fqdn}} zone"
-  ipa_dnszone:
-    idnsname: "{{fqdn}}"
-    state: present
-    ipa_host: "{{fqdn}}"
-    ipa_user: "{{ipa_user}}"
-    ipa_pass: "{{freeipa_admin_password}}"
-  delegate_to: localhost
-  register: create_fqdn_dnszone
-  tags:
-    - configure
-    - dns
+- block:
 
-- name: "Remove host {{hostname}} from {{domain_name}} zone"
-  ipa_dnsrecord:
-    name: "{{hostname}}"
-    zone: "{{domain_name}}"
-    state: absent
-    ipa_host: "{{fqdn}}"
-    ipa_user: "{{ipa_user}}"
-    ipa_pass: "{{freeipa_admin_password}}"
-  delegate_to: localhost
-  tags:
-    - configure
-    - dns
+    - name: "Add DNS zone for fqdn"
+      ipa_dnszone:
+        idnsname: "{{item}}"
+        state: present
+        ipa_host: "{{master_fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      with_items:
+        - "{{fqdn}}"
+      register: create_fqdn_dnszone
 
-- name: "Add host IP {{ip_addr}} to {{fqdn}} zone @ entry"
-  ipa_dnsrecord:
-    name: "@"
-    zone: "{{fqdn}}"
-    arecord: "{{ip_addr}}"
-    state: present
-    ipa_host: "{{fqdn}}"
-    ipa_user: "{{ipa_user}}"
-    ipa_pass: "{{freeipa_admin_password}}"
-  delegate_to: localhost
-  tags:
-    - configure
-    - dns
+    - name: "Remove hostname from {{domain_name}}. zone"
+      ipa_dnsrecord:
+        name: "{{item}}"
+        zone: "{{domain_name}}"
+        state: absent
+        ipa_host: "{{master_fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      with_items:
+        - "{{hostname}}"
 
-- name: "Add IPA container IP {{freeipa_network_addr}}
-            to {{fqdn}} zone ipa entry"
-  ipa_dnsrecord:
-    name: ipa
-    zone: "{{fqdn}}"
-    arecord: "{{freeipa_network_addr}}"
-    state: present
-    ipa_host: "{{fqdn}}"
-    ipa_user: "{{ipa_user}}"
-    ipa_pass: "{{freeipa_admin_password}}"
+    - name: "Add host IP to [fqdn]. zone A record"
+      ipa_dnsrecord:
+        name: "@"
+        zone: "{{item.zone}}"
+        arecord: "{{item.ip_addr}}"
+        state: present
+        ipa_host: "{{master_fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      with_items:
+        - zone: "{{fqdn}}"
+          ip_addr: "{{ip_addr}}"
+
+    - name: "Add IPA container IP to ipa.[fqdn]. zone A record"
+      ipa_dnsrecord:
+        name: ipa
+        zone: "{{item.zone}}"
+        arecord: "{{item.ip_addr}}"
+        state: present
+        ipa_host: "{{master_fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      with_items:
+        - ip_addr: "{{freeipa_network_addr}}"
+          zone: "{{fqdn}}"
+
   delegate_to: localhost
   tags:
     - configure
@@ -214,28 +153,32 @@
 #################################
 # Add host DNS freeipa network reverse zone
 
-- name: "Add {{freeipa_network_prefix|reverse_zone}} zone"
-  ipa_dnszone:
-    idnsname: "{{freeipa_network_prefix|reverse_zone}}"
-    state: present
-    ipa_host: "{{fqdn}}"
-    ipa_user: "{{ipa_user}}"
-    ipa_pass: "{{freeipa_admin_password}}"
-  register: create_rev_dnszone
-  delegate_to: localhost
-  tags:
-    - configure
-    - dns
+- block:
 
-- name: "Add IPA container PTR to {{fqdn}} zone"
-  ipa_dnsrecord:
-    name: "{{freeipa_network_addr|last_octet}}"
-    zone: "{{freeipa_network_prefix|reverse_zone}}"
-    ptrrecord: "ipa.{{fqdn}}"
-    state: present
-    ipa_host: "{{fqdn}}"
-    ipa_user: "{{ipa_user}}"
-    ipa_pass: "{{freeipa_admin_password}}"
+    - name: "Add FreeIPA network reverse zone"
+      ipa_dnszone:
+        idnsname: "{{item}}"
+        state: present
+        ipa_host: "{{master_fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      with_items:
+        - "{{freeipa_network_prefix|reverse_zone}}"
+
+    - name: "Add IPA container PTR to IPA network reverse zone"
+      ipa_dnsrecord:
+        name: "{{item.last_octet}}"
+        zone: "{{item.zone}}"
+        ptrrecord: "{{item.ptr}}"
+        state: present
+        ipa_host: "{{master_fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      with_items:
+        - last_octet: "{{freeipa_network_addr|last_octet}}"
+          zone: "{{freeipa_network_prefix|reverse_zone}}"
+          ptr: "ipa.{{fqdn}}"
+
   delegate_to: localhost
   tags:
     - configure
@@ -246,16 +189,17 @@
 
 - block:
 
-    - name: "Create CA ACL {{user_cert_acl}}
-                  with cert profile {{user_cert_profile}}"
+    - name: "Create user CA ACL with user cert profile"
       ipa_caacl:
-        name: "{{user_cert_acl}}"
-        certprofile: "{{user_cert_profile}}"
+        name: "{{item.ca_acl}}"
+        certprofile: "{{item.certprofile}}"
         state: enabled
-        ipa_host: "{{fqdn}}"
+        ipa_host: "{{master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
-      tags: ca-acl
+      with_items:
+        - ca_acl: "{{user_cert_acl}}"
+          certprofile: "{{user_cert_profile}}"
 
     - name: "Create manager user"
       # The admin user can't do some things, like create user certs,
@@ -266,21 +210,25 @@
         givenname: Manager
         sn: User
         # password: "{{freeipa_admin_password}}"
-        ipa_host: "{{fqdn}}"
-        ipa_user: "{{ipa_user}}"
-        ipa_pass: "{{freeipa_admin_password}}"
-
-    - name: "Add docker user to CA ACL {{user_cert_acl}}"
-      ipa_caacl:
-        name: "{{user_cert_acl}}"
-        user: "{{manager_id}}"
-        state: present
-        ipa_host: "{{fqdn}}"
+        ipa_host: "{{master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       tags: manager-user
 
+    - name: "Add manager user to user CA ACL {{user_cert_acl}}"
+      ipa_caacl:
+        name: "{{item}}"
+        user: "{{manager_id}}"
+        state: present
+        ipa_host: "{{master_fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      with_items:
+        - "{{user_cert_acl}}"
+      tags: manager-user
+
   delegate_to: localhost
+  when:  hostname == master_host
   run_once: True
   tags:
     - ca-acl

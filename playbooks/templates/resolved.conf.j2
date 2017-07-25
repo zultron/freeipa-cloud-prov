@@ -1,8 +1,7 @@
 # https://www.freedesktop.org/software/systemd/man/resolved.conf.html
 
 [Resolve]
-# FIXME this must be updated later with all cluster DNS server IPs
-DNS={{freeipa_network_addr}}
+DNS={{ dns_servers | ip_addr_list(hostvars) | join(' ') }}
 Domains={{domain_name}}
 Cache=no
 #FallbackDNS=

@@ -53,6 +53,7 @@
   # Don't actually create, just read
   check_mode: yes
   changed_when: False
+  run_once: true
   delegate_to: localhost
   register: ca_info
 
@@ -67,6 +68,7 @@
   delegate_to: localhost
   # Don't actually create, just read
   check_mode: yes
+  run_once: true
   changed_when: False
   register: ca_cert
 

@@ -2,7 +2,7 @@
 # Vars for FreeIPA
 
 # Docker images
-freeipa_docker_image: "adelton/freeipa-server:centos-7"
+freeipa_docker_image: "freeipa/freeipa-server:centos-7"
 
 # Toolbox image; this one is customized for FreeIPA
 toolbox_image_base: "zultron/freeipa-cloud-prov"
@@ -10,6 +10,7 @@ toolbox_image_tag: "ipaclient"
 toolbox_image: "{{toolbox_image_base}}:{{toolbox_image_tag}}"
 
 # FreeIPA container network
+freeipa_network_bridge: "br-ipa"
 freeipa_network_prefix: "{{network_prefix}}.128"
 freeipa_network_cidr: "{{freeipa_network_prefix}}.0/24"
 freeipa_network_gateway: "{{freeipa_network_prefix}}.1"

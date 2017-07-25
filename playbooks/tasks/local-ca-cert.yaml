@@ -1,0 +1,38 @@
+---
+#################################
+# Install CA cert in local container
+
+- name: "Copy CA certificate to local container var/cacert.pem"
+  fetch:
+    src: "{{freeipa_volume_path}}/etc/ipa/ca.crt"
+    dest: "../var/cacert.pem"
+    flat: yes
+  run_once: true
+  register: fetch_ca_cert
+  tags:
+    - local-setup
+
+- block:
+
+    - name: Local create directory /usr/local/share/ca-certificates/{{domain_name}}
+      file:
+        path: /usr/local/share/ca-certificates/{{domain_name}}
+        state: directory
+        mode: 0755
+      register: mkdir_ca_certs
+
+    - name: Local Install CA cert {{mkdir_ca_certs.path}}/{{domain_name}}_CA.crt
+      copy:
+        src: ../var/cacert.pem
+        dest: "{{mkdir_ca_certs.path}}/{{domain_name}}_CA.crt"
+      register: usr_local_share_ca_certificates
+
+    - name: Local update CA certs
+      command: update-ca-certificates
+      when: usr_local_share_ca_certificates.changed
+
+  delegate_to: localhost
+  become: true
+  run_once: true
+  tags:
+    - local-setup

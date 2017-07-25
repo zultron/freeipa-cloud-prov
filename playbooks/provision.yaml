@@ -72,3 +72,11 @@
       device: "{{data_volume_device}}"
       mount_path: "{{data_volume_path}}"
       tags: data-volume
+
+############################################
+- name: Configure etc files
+  hosts: coreos
+
+  roles:
+    - role: etc-hosts
+      tags: etc-hosts

@@ -30,12 +30,11 @@
       mount_path: "{{freeipa_volume_path}}"
       tags: freeipa-volume
 
-    # Install FreeIPA in Docker container
+    # Install FreeIPA server in Docker container
+    # - Initial IPA server is installed before IPA configuration
     - role: freeipa-install
       tags: freeipa-install
 
-    # Configure FreeIPA:  hardening, http, DNS, CA
+    # IPA settings for http, DNS, CA, LDAP
     - role: freeipa-configure
-      tags:
-        - freeipa-install
-        - freeipa-configure
+      tags: freeipa-configure

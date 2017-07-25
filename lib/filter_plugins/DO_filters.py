@@ -43,10 +43,17 @@ class FilterModule(object):
         """
         return ','.join(map('dc={}'.format, data.split('.')))
 
+    def ip_addr_list(self, host_list, hostvars):
+        """Given a list of hosts and hostvars, return a list of IP
+        addresses"""
+        return [ hostvars[h]['ansible_default_ipv4']['address']
+                 for h in host_list ]
+
     def filters(self):
         return {
             'formatmapstr': self.formatmapstr,
             'formatmaplist': self.formatmaplist,
             'systemd_escape': self.systemd_escape,
             'domain_to_dn': self.domain_to_dn,
+            'ip_addr_list': self.ip_addr_list,
         }

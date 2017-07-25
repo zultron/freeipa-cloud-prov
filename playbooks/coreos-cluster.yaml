@@ -21,7 +21,3 @@
     # Set up flannel
     - role: flannel-bootstrap
       tags: flannel
-
-    # Set up kubernetes
-    - role: kubernetes-bootstrap
-      tags: kubernetes

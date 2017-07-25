@@ -159,6 +159,11 @@ systemd:
               --uuid-file-save=/var/lib/coreos/flannel-wrapper.uuid \
               --volume etcd-certs,kind=host,source={{etcd_cert_dir}},readOnly=true \
               --mount volume=etcd-certs,target={{etcd_cert_dir}}"
+    # Disable these on replicas so that Docker can run immediately
+    - name: flanneld.service
+      mask: true
+    - name: flannel-docker-opts.service
+      mask: true
 {% endif %}
 
     # Restore iptables configuration

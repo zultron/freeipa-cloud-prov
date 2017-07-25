@@ -17,7 +17,7 @@ TimeoutStartSec=0
 KillMode=none
 
 # Debug opts
-#Environment="DEBUGOPTS=--security-opt=seccomp:unconfined"
+#Environment="DEBUGOPTS=KRB5_TRACE=/data/var/log/kinit.log"
 
 # Pre-start and Start
 ExecStartPre=-/usr/bin/docker kill ipa
@@ -35,10 +35,16 @@ ExecStart=/usr/bin/docker run \
 			  --net=ipa \
 			  --ip={{freeipa_network_addr}} \
 			  --env=IPA_SERVER_IP={{ip_addr}} \
+			  --env=DEBUGOPTS \
+			  --add-host={{master_fqdn}}:{{master_ip_addr}} \
 {% for p in freeipa_ports|docker_port_list %}
 			  --publish={{p}} \
 {% endfor %}
-			  adelton/freeipa-server:centos-7
+			  {{freeipa_docker_image}}
+{%- if hostname != master_host %} \
+                          ipa-replica-install
+{% endif %}
+
 # Wait for DNS to come online; this takes a minute normally, or over
 # 10 minutes when bootstrapping on a 1GB DigitalOcean host
 ExecStartPost=/usr/bin/dig +noall +norecurse +comments +time=1 +tries=1200 \
