@@ -130,21 +130,12 @@
     - docker-ipa-run
 
 #
-# Run replica
+# Set up certs in local container
 #
-# FIXME
-#
-# Best way to do this is to add host to IPA first (need Ansible
-# ipa_host module), generate one-time password, and put it into
-# replica config.
-#
-# https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/7/html/Linux_Domain_Identity_Authentication_and_Policy_Guide/creating-the-replica.html#replica-install-otp
-
+# FIXME The next two tasks shouldn't be needed, since the
+# freeipa-container init scripts are supposed to do this when
+# $IPA_SERVER_IP is set in the environment
 - block:
-
-    # FIXME The next two tasks shouldn't be needed, since the
-    # freeipa-container init scripts are supposed to do this when
-    # $IPA_SERVER_IP is set in the environment
 
     # Copy CA cert to container
     - include: tasks/local-ca-cert.yaml
@@ -158,10 +149,27 @@
         ipa_host: "{{master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
-      delegate_to: localhost
       with_items:
         - host: "{{hostname}}"
           a_rec: "{{ip_addr}}"
+      delegate_to: localhost
+      when:  hostname != master_host
+
+  tags:
+    - docker-ipa-run
+
+#
+# Run replica
+#
+# FIXME
+#
+# Best way to do this is to add host to IPA first (need Ansible
+# ipa_host module), generate one-time password, and put it into
+# replica config.
+#
+# https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/7/html/Linux_Domain_Identity_Authentication_and_Policy_Guide/creating-the-replica.html#replica-install-otp
+
+- block:
 
     - name: Install FreeIPA replica config
       template:
