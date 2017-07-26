@@ -100,39 +100,63 @@ update:
 systemd:
   units:
     #######################################
-    # base daemons
+    # cluster daemons
     #
     # Disable these on replicas so that Docker can run immediately
     - name: etcd-member.service
       mask: true
       dropins:
         - name: 10-etcd-certs.conf
-          contents: >-
+          contents: |
             [Service]
-            \#
-            \# Mount a non-standard directory containing SSL certs
-            Environment=\"RKT_RUN_ARGS=\
+            #
+            # Mount a non-standard directory containing SSL certs
+            Environment="RKT_RUN_ARGS=\
               --uuid-file-save=/var/lib/coreos/etcd-member-wrapper.uuid \
               --volume etcd-certs,kind=host,source={{etcd_cert_dir}},readOnly=true \
-              --mount volume=etcd-certs,target={{etcd_cert_dir}}\"
-            \# Ensure SSL cert is readable by etcd
+              --mount volume=etcd-certs,target={{etcd_cert_dir}}"
+            #
+            # Ensure SSL cert is readable by etcd
             ExecStartPre=/usr/bin/chown etcd {{etcd_ssl_cert}} {{etcd_ssl_key}}
 
     - name: flanneld.service
       mask: true
       dropins:
-        - name: 10-etcd-cert-dir.conf
+        - name: 10-flanneld-certs.conf
           contents: |
+            [Unit]
+            Requires=coreos-metadata.service
+            After=coreos-metadata.service
+
             [Service]
+            EnvironmentFile=/run/metadata/coreos
             #
             # Mount a non-standard directory containing SSL certs
             Environment="RKT_RUN_ARGS=\
               --uuid-file-save=/var/lib/coreos/flannel-wrapper.uuid \
               --volume etcd-certs,kind=host,source={{etcd_cert_dir}},readOnly=true \
               --mount volume=etcd-certs,target={{etcd_cert_dir}}"
+            #
+            # Flannel service public interface
+            Environment="FLANNELD_IFACE=${COREOS_DIGITALOCEAN_IPV4_PUBLIC_0}"
+            #
+            # Etcd cluster
+            Environment="FLANNELD_ETCD_ENDPOINTS={{etcd_endpoints}}"
+
 
     - name: flannel-docker-opts.service
       mask: true
+      dropins:
+        - name: 30-env-file-link.conf
+          contents: |
+            [Service]
+            #
+            # Set EnvironmentFile symlink
+            # - Docker CNI options
+            ExecStartPre=/usr/bin/ln -sf \
+                /etc/flannel_docker_opts.env \
+                /run/flannel/flannel_docker_opts.env
+
 
     #######################################
     # disk
@@ -177,6 +201,14 @@ storage:
       mode:       0644
       contents:
         inline: {{fqdn}}
+
+    - filesystem: "root"
+      path:       /etc/flannel_docker_opts.env
+      mode:       0644
+      contents:
+        inline: |
+          DOCKER_OPT_BIP=""
+          DOCKER_OPT_IPMASQ=""
 
     - filesystem: "root"
       path: /home/core/.toolboxrc

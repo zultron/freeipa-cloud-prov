@@ -3,100 +3,31 @@
 # Setup flanneld deployment
 
 #
-# Create directory
-#
-
-- name:  "Create flanneld config directories"
-  file:
-    path: "{{item}}"
-    state: directory
-  with_items:
-    - "{{flanneld_dir}}"
-    - "{{dropin_dir_pat % 'flannel-docker-opts.service'}}"
-  when:  hostname == master_host
-  become: true
-  tags:
-    - flannel-config
-
-#
 # Configure flanneld service
 #
 - block:
 
-
-    - name:  "Template flanneld.service EnvironmentFile {{flanneld_dir}}/options.env"
-      template:
-        src: options.env.j2
-        dest: "{{flanneld_dir}}/options.env"
-      register:  flanneld_options_env
-
-    - name:  "Template flanneld.service dropin 30-overrides.conf"
-      template:
-        src: flanneld.service-30-overrides.conf.j2
-        dest: "{{dropin_dir_pat % 'flanneld.service'}}/30-overrides.conf"
-      register:  flanneld_dropin
-
-    - name:  "Remove junk flanneld.service dropins"
-      file:
-        path: "{{dropin_dir_pat % 'flanneld.service'}}/{{item}}.conf"
-        state: absent
-      with_items:
-        - "20-clct-flannel"
-        - "50-network-config"
-
-    - name:  "Check whether flanneld.service should be restarted"
-      set_fact:
-        flanneld_restart:
-          "{{ (flanneld_options_env.changed or flanneld_dropin.changed) |
-          ternary('restarted','started') }}"
-
-    - name:  "Reload systemd and {{flanneld_restart}} flanneld.service"
+    - name:  "Start flanneld.service"
       systemd:
         name: flanneld.service
-        daemon_reload: yes
-        state: "{{flanneld_restart}}"
+        enabled: true
+        masked: false
+        state: started
+      register: flanneld_service
 
-  when:  hostname == master_host
-  become: true
-  tags:
-    - flannel-config
-
-#
-# Configure docker CNI options
-#
-- block:
-
-    - name:  "Template {{flanneld_dir}}/flannel_docker_opts.env"
-      template:
-        src: flannel_docker_opts.env.j2
-        dest: "{{flanneld_dir}}/flannel_docker_opts.env"
-      register:  flannel_docker_opts_env
-
-    - name:  "Template flannel-docker-opts.service dropin 30-overrides.conf"
-      template:
-        src: flannel-docker-opts.service-30-overrides.conf.j2
-        dest: "{{dropin_dir_pat % 'flannel-docker-opts.service'}}/30-overrides.conf"
-      register:  flannel_docker_opts_dropin
-
-    - name:  "Check whether flannel-docker-opts.service should be restarted"
-      set_fact:
-        flanneld_docker_opts_restart:
-          "{{ (flannel_docker_opts_env.changed
-          or   flannel_docker_opts_dropin.changed) |
-          ternary('restarted','started') }}"
-
-    - name:  "Reload systemd and
-      {{flanneld_docker_opts_restart}} flannel-docker-opts.service"
+    - name:  "Start flannel-docker-opts.service"
       systemd:
+        enabled: true
+        masked: false
         name: flannel-docker-opts.service
-        daemon_reload: yes
-        state: "{{flanneld_restart}}"
+        state: started
+      register: flannel_docker_opts_service
 
     - name:  "Restart docker.service"
       systemd:
         name: docker.service
         state: "restart"
-      when:  flanneld_restart == 'restart'
+      when:  flannel_docker_opts_service.changed or flanneld_service.changed
 
   when:  hostname == master_host
   become: true

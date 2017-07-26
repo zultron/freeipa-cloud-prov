@@ -1,9 +1,0 @@
-# 30-overrides.conf:  flannel-docker-opts.service dropin
-
-[Service]
-
-# Set EnvironmentFile symlink
-# - Docker CNI options
-ExecStartPre=/usr/bin/ln -sf \
-			 {{flanneld_dir}}/flannel_docker_opts.env \
-			 /run/flannel/flannel_docker_opts.env
