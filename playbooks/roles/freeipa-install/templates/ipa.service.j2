@@ -41,9 +41,6 @@ ExecStart=/usr/bin/docker run \
 			  --publish={{p}} \
 {% endfor %}
 			  {{freeipa_docker_image}}
-{%- if hostname != master_host %} \
-                          ipa-replica-install
-{% endif %}
 
 # Wait for DNS to come online; this takes a minute normally, or over
 # 10 minutes when bootstrapping on a 1GB DigitalOcean host
