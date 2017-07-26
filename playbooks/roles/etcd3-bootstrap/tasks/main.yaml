@@ -161,85 +161,54 @@
                   -X {{etcd_ca}}"
       when: etcd_ssl_cert_tracking.changed
 
-    # Install dropin to chown certs to etcd; the `ipa-getcert request
-    # -C` arg didn't seem to work, so do it this way instead
-    - name:  "Install etcd-member dropin directory"
-      file:
-        path: "{{dropin_dir_pat % 'etcd-member.service'}}"
-        state: directory
-        mode: 0755
-      become: true
-
-    - name:  "Install etcd-member dropin to make certs readable by etcd user"
-      template:
-        src: 10-cert-owner.conf.j2
-        dest: "{{dropin_dir_pat % 'etcd-member.service'}}/10-cert-owner.conf"
-      become: true
-      register: cert_owner_dropin
-
   tags:
     - etcd-server-cert
     - etcd-start
 
 #
-# Enable TLS on initial member
+# Start etcd-member service on initial member
 #
-- block:
-
-    - name:  "Install etcd-member dropin to configure TLS on initial member"
-      template:
-        src: 30-certs.conf.j2
-        dest: "{{dropin_dir_pat % 'etcd-member.service'}}/30-certs.conf"
-      become: true
-      when:  hostname == master_host
-      register:  certs_dropin
-
-    - name:  "Read etcd member list"
-      # Setting field sep to `:`, $1 is member id, $3 is `//host` part
-      # of URL
-      shell: "etcdctl member list | awk -F : '{print $1; print $3}'"
-      changed_when: false
-      register:  etcd_member_list
-
-    - name:  "Set initial member facts"
-      set_fact:
-        initial_member_id:  "{{etcd_member_list.stdout_lines[0]|default('')}}"
-        # Cut off initial slashes
-        initial_member_host:
-          "{{etcd_member_list.stdout_lines[1]|default('//'[2:])}}"
-
-    - name:  "Fix etcd peer URL on initial member"
-      command:
-        "etcdctl member update {{initial_member_id}} https://{{fqdn}}:2380"
-      when:  "initial_member_host != fqdn and
-          initial_member_id and initial_member_host"
-
-  when:  hostname == master_host
-  tags:
-    - etcd-initial-member
-    - etcd-start
-
-#
-# Add later members to cluster and clear any old config
-#
-- block:
-
-  - name:  "Ensure "
-
-#
-# Reload etcd-member service
-#
-- name:  "Reload systemd and restart etcd-member.service"
+- name:  "Start etcd-member.service on initial member"
   systemd:
     name: etcd-member
+    enabled: true
+    masked: false
     daemon_reload: yes
     state: restarted
   become: true
-  when:  "etcd_ssl_cert_tracking.changed
-       or cert_owner_dropin.changed
-       or certs_dropin.changed
-       or initial_member_host|default('bogus') != fqdn"
+  when:  "hostname == master_host and etcd_ssl_cert_tracking.changed"
 
+  tags:
+    - etcd-start
+
+#
+# Start etcd-member service on remaining members
+#
+- block:
+
+  - name:  "Check if host is member of existing etcd cluster"
+    shell:  "{{etcdctl_command}} member list | grep -q ' name={{hostname}} '
+                 && echo yes || echo no"
+    register:  is_etcd_member
+    changed_when:  is_etcd_member.stdout == 'no'
+    delegate_to:  "{{master_host}}"
+
+  - name:  "Add host to existing etcd cluster"
+    shell:  "{{etcdctl_command}} member add {{hostname}} https://{{fqdn}}:2380"
+    when: is_etcd_member.changed
+    delegate_to:  "{{master_host}}"
+
+  - name:  "Start etcd-member.service on new member"
+    systemd:
+      name: etcd-member
+      enabled: true
+      masked: false
+      daemon_reload: yes
+      state: restarted
+    when: "hostname != master_host and
+               (etcd_ssl_cert_tracking.changed or is_etcd_member.changed)"
+
+  become: true
   tags:
     - etcd-start
 

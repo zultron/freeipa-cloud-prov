@@ -1,3 +1,0 @@
-[Service]
-# Ensure SSL cert is readable by etcd
-ExecStartPre=/usr/bin/chown etcd {{etcd_ssl_cert}} {{etcd_ssl_key}}

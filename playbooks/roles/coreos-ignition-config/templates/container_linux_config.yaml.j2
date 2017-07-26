@@ -14,54 +14,35 @@ etcd:
   # Member name
   name: {{hostname}}
   # URLs to listen on for peer and client traffic
-{% if hostname == master_host %}
-  # Master will start without SSL, and migrate later
-  listen_client_urls: http://{PUBLIC_IPV4}:2379,http://127.0.0.1:2379
-  listen_peer_urls: http://{PUBLIC_IPV4}:2380
-{% else %}
-  # Slaves will use SSL on external interfaces
+  # Use SSL on external interfaces
   listen_client_urls: https://{PUBLIC_IPV4}:2379
   listen_peer_urls: https://{PUBLIC_IPV4}:2380
-{% endif %}
   #
   # List of member client URLs to advertise to the rest of the
   # cluster
-{% if hostname == master_host %}
-  advertise_client_urls: http://{PUBLIC_IPV4}:2379
-{% else %}
   advertise_client_urls: https://{{fqdn}}:2379
-{% endif %}
   #
   # Initial flags for bootstrapping new member (not used in
   # restarts)
-{% if hostname == master_host %}
-  # Master is statically configured for new cluster
-  initial_cluster: {{hostname}}=http://{PUBLIC_IPV4}:2380
-  initial_cluster_state: new
-  initial_advertise_peer_urls: http://{PUBLIC_IPV4}:2380
-{% else %}
   # Slaves use DNS srv records to join existing cluster
   discovery_srv: {{domain_name}}
-  initial_cluster_state: existing
+  initial_cluster_state: {{ (hostname==master_host)|ternary('new','existing') }}
   initial_advertise_peer_urls: https://{{fqdn}}:2380
-{% endif %}
   initial_cluster_token: cluster_{{etcd_cluster_token}}
   #
   # Exit (do not proxy) when discovery fails
   discovery_fallback: exit
   #
-{% if hostname != master_host %}
   # SSL cert file locations for client and peer servers; enable
   # cert-based authentication for slaves; master is converted later
   cert_file: {{etcd_ssl_cert}}
   key_file: {{etcd_ssl_key}}
-  client_cert_auth: true
   trusted_ca_file: {{etcd_ssl_cacert}}
+  client_cert_auth: true
   peer_cert_file: {{etcd_ssl_cert}}
   peer_key_file: {{etcd_ssl_key}}
-  peer_client_cert_auth: true
   peer_trusted_ca_file: {{etcd_ssl_cacert}}
-{% endif %}
+  peer_client_cert_auth: true
   #
   # Reject reconfiguration requests that would cause quorum loss
   strict_reconfig_check: true
@@ -78,10 +59,6 @@ etcd:
   #log_package_levels: etcdserver=WARNING,security=DEBUG
 
 flannel:
-{% if hostname == master_host %}
-  # The endpoints of etcd flanneld should use
-  etcd_endpoints: "http://{PUBLIC_IPV4}:2379"
-{% else %}
   # The version of flannel to be run
   #version: 0.7.1
   # The endpoints of etcd flanneld should use
@@ -90,7 +67,6 @@ flannel:
   etcd_cafile:    {{etcd_ssl_cacert}}
   etcd_certfile:  {{etcd_ssl_cert}}
   etcd_keyfile:   {{etcd_ssl_key}}
-{% endif %}
 
 docker:
   # Additional flags to pass to the docker daemon when it is started
@@ -125,30 +101,25 @@ systemd:
   units:
     #######################################
     # base daemons
-{% if hostname == master_host %}
-    - name: flanneld.service
-      dropins:
-        - name: 50-network-config.conf
-          contents: |
-            [Service]
-            ExecStartPre=/usr/bin/etcdctl \
-                set /coreos.com/network/config \
-                '{ "Network": "{{k8s_pod_network}}", \
-                    "Backend": {"Type": "vxlan"}}'
-{% else %}
+    #
+    # Disable these on replicas so that Docker can run immediately
     - name: etcd-member.service
+      mask: true
       dropins:
-        - name: 10-etcd-cert-dir.conf
-          contents: |
+        - name: 10-etcd-certs.conf
+          contents: >-
             [Service]
-            #
-            # Mount a non-standard directory containing SSL certs
-            Environment="RKT_RUN_ARGS=\
+            \#
+            \# Mount a non-standard directory containing SSL certs
+            Environment=\"RKT_RUN_ARGS=\
               --uuid-file-save=/var/lib/coreos/etcd-member-wrapper.uuid \
               --volume etcd-certs,kind=host,source={{etcd_cert_dir}},readOnly=true \
-              --mount volume=etcd-certs,target={{etcd_cert_dir}}"
+              --mount volume=etcd-certs,target={{etcd_cert_dir}}\"
+            \# Ensure SSL cert is readable by etcd
+            ExecStartPre=/usr/bin/chown etcd {{etcd_ssl_cert}} {{etcd_ssl_key}}
 
     - name: flanneld.service
+      mask: true
       dropins:
         - name: 10-etcd-cert-dir.conf
           contents: |
@@ -159,27 +130,10 @@ systemd:
               --uuid-file-save=/var/lib/coreos/flannel-wrapper.uuid \
               --volume etcd-certs,kind=host,source={{etcd_cert_dir}},readOnly=true \
               --mount volume=etcd-certs,target={{etcd_cert_dir}}"
-    # Disable these on replicas so that Docker can run immediately
-    - name: flanneld.service
-      mask: true
+
     - name: flannel-docker-opts.service
       mask: true
-{% endif %}
 
-    # Restore iptables configuration
-    - name: iptables-restore.service
-      enable: true
-      dropins:
-        - name: 40-iptables-restore-source.conf
-          contents: |
-            [Unit]
-            Requires={{data_volume_systemd_unit}}
-            After={{data_volume_systemd_unit}}
-            [Service]
-            ExecStartPre=/usr/bin/ln -sf \
-                {{data_volume_path}}/iptables/rules-save \
-                /var/lib/iptables/rules-save
- 
     #######################################
     # disk
     #
