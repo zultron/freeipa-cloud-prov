@@ -32,15 +32,17 @@
     mode: 0755
   become: true
 
-- name:  "Create {{service_principal}} principal,
-          managed by {{freeipa_fqdn}} host"
+- name:  "Create service principal managed by host"
   ipa_service:
-    name: "{{service_principal}}/{{fqdn}}@{{kerberos_realm}}"
-    managedby_host: "{{freeipa_fqdn}}"
+    name: "{{item.princ}}/{{fqdn}}@{{kerberos_realm}}"
+    managedby_host: "{{item.managedby}}"
     state: present
     ipa_host: "{{fqdn}}"
     ipa_user: "{{ipa_user}}"
     ipa_pass: "{{freeipa_admin_password}}"
+  with_items:
+    - princ: "{{service_principal}}"
+      managedby: "{{freeipa_fqdn}}"
   delegate_to: localhost
 
 - name: "Read {{ca_name}} CA info"
@@ -75,7 +77,7 @@
 # FIXME The top-level CA cert should be grabbed just like the sub-CA
 # cert
 
-- name: "Dump top-level and {{ca_name}} CA certs into {{cacert_path}}"
+- name: "Dump  CA cert chain into {{cacert_path}}"
   copy:
     content: |
       {{ca_cert.cert.certificate | ipa_cert_to_pem}}
@@ -108,7 +110,7 @@
               -X {{ca_name}}"
   when: cert_tracking.changed
 
-- name:  "Double-check cert tracking status of {{cert_path}}"
+- name:  "Double-check tracking of {{cert_path}}"
   shell: "{{ipa_exec}} ipa-getcert list -i {{cert_nick}} |
              awk '/^\tstatus: / {print $2}'"
   register: cert_tracking

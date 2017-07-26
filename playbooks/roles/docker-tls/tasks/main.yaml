@@ -49,6 +49,7 @@
 # Create docker sub-CA for Docker authentication
 #
 - include: tasks/ipa_sub_ca.yaml
+  when:  hostname == master_host
   tags: docker-ca
 
 

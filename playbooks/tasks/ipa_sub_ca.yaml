@@ -20,7 +20,7 @@
         ipacasubjectdn: "CN={{ca_subject_cn}},O={{kerberos_realm}}"
         description: "{{ca_subject_cn}}"
         state: present
-        ipa_host: "{{fqdn}}"
+        ipa_host: "{{master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
 
@@ -29,7 +29,7 @@
         name: "{{user_cert_acl}}"
         ca: "{{ca_name}}"
         state: present
-        ipa_host: "{{fqdn}}"
+        ipa_host: "{{master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
 
@@ -38,9 +38,10 @@
         name: "hosts_services_caIPAserviceCert"
         ca: "{{ca_name}}"
         state: present
-        ipa_host: "{{fqdn}}"
+        ipa_host: "{{master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
 
   delegate_to: localhost
+  when:  hostname == master_host
   run_once: True
