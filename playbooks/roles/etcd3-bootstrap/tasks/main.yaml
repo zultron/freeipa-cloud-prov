@@ -28,7 +28,6 @@
 
   delegate_to: localhost
   tags:
-    - configure-etcd
     - etcd-dns-srv
 
 #
@@ -37,11 +36,13 @@
 - block:
     # Point CoreOS resolver at FreeIPA to read etcd SRV records and
     # resolve member names
-    - name:  "Set CoreOS DNS resolvers with systemd resolved.conf"
+    - name: "Template /etc/systemd/resolved.conf with all FreeIPA servers"
       template:
         src: resolved.conf.j2
         dest: /etc/systemd/resolved.conf
       register:  resolved_conf
+      vars:
+        dns_servers: "{{ groups.coreos }}"
 
     - name:  "Reload systemd and restart systemd-resolved.service"
       systemd:
@@ -52,8 +53,7 @@
 
   become: true
   tags:
-    - configure-etcd
-    - etcd-member-service
+    - etcd-resolv-conf
 
 #
 # Create etcd sub-CA and etcd user
@@ -91,7 +91,6 @@
   delegate_to: localhost
   run_once: True
   tags:
-    - configure-etcd
     - etcd-ca
 
 
@@ -150,8 +149,6 @@
                  grep -q 'No request found' && echo no || echo yes"
       register: etcd_ssl_cert_tracking
       changed_when:  etcd_ssl_cert_tracking.stdout == "no"
-      tags:
-        - configure-etcd
 
     - name:  "Start tracking etcd server cert in {{etcd_ssl_cert}}"
       # The cert is actually created and maintained by certmonger running
@@ -179,12 +176,10 @@
         dest: "{{dropin_dir_pat % 'etcd-member.service'}}/10-cert-owner.conf"
       become: true
       register: cert_owner_dropin
-      tags:
-        - configure-etcd
 
   tags:
-    - configure-etcd
     - etcd-server-cert
+    - etcd-start
 
 #
 # Enable TLS on initial member
@@ -198,8 +193,6 @@
       become: true
       when:  hostname == master_host
       register:  certs_dropin
-      tags:
-        - configure-etcd
 
     - name:  "Read etcd member list"
       # Setting field sep to `:`, $1 is member id, $3 is `//host` part
@@ -223,8 +216,15 @@
 
   when:  hostname == master_host
   tags:
-    - configure-etcd
     - etcd-initial-member
+    - etcd-start
+
+#
+# Add later members to cluster and clear any old config
+#
+- block:
+
+  - name:  "Ensure "
 
 #
 # Reload etcd-member service
@@ -236,12 +236,12 @@
     state: restarted
   become: true
   when:  "etcd_ssl_cert_tracking.changed
-       or cert_owner_dropin.changed|default(True)
-       or certs_dropin.changed|default(True)
-       or initial_member_host != fqdn"
+       or cert_owner_dropin.changed
+       or certs_dropin.changed
+       or initial_member_host|default('bogus') != fqdn"
 
   tags:
-    - configure-etcd
+    - etcd-start
 
 #
 # Add etcdctl command alias
@@ -271,5 +271,4 @@
         line: "alias etcdctl='sudo {{etcdctl_command}}'"
 
   tags:
-    - configure-etcd
     - etcdctl-alias
