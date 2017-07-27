@@ -12,7 +12,7 @@
         zone: "{{domain_name}}"
         srvrecord: "0 100 2380 {{fqdn}}."
         state: present
-        ipa_host: "{{fqdn}}"
+        ipa_host: "{{master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
 
@@ -22,7 +22,7 @@
         zone: "{{domain_name}}"
         srvrecord: "0 100 2379 {{fqdn}}."
         state: present
-        ipa_host: "{{fqdn}}"
+        ipa_host: "{{master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
 
@@ -66,7 +66,7 @@
         ipacasubjectdn: "{{etcd_ca_subject}}"
         description: "Etcd Cluster CA"
         state: present
-        ipa_host: "{{fqdn}}"
+        ipa_host: "{{master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
 
@@ -75,7 +75,7 @@
         name: "{{user_cert_acl}}"
         ca: "{{etcd_ca}}"
         state: present
-        ipa_host: "{{fqdn}}"
+        ipa_host: "{{master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
 
@@ -84,7 +84,7 @@
         name: "hosts_services_caIPAserviceCert"
         ca: "{{etcd_ca}}"
         state: present
-        ipa_host: "{{fqdn}}"
+        ipa_host: "{{master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
 
@@ -114,7 +114,7 @@
         name: "{{etcd_service_principal}}"
         managedby_host: "{{freeipa_fqdn}}"
         state: present
-        ipa_host: "{{fqdn}}"
+        ipa_host: "{{master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       delegate_to: localhost
@@ -124,7 +124,7 @@
         cacn: ipa
         principal: "{{etcd_ca_subject_short}}"
         state: present
-        ipa_host: "{{fqdn}}"
+        ipa_host: "{{master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       delegate_to: localhost

@@ -103,7 +103,7 @@
         # Revocation reason:  'superceded'
         revocation_reason: "4"
         state: absent
-        ipa_host: "{{fqdn}}"
+        ipa_host: "{{master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       when:  gen_client_key.changed or cert_key_match.changed
@@ -114,7 +114,7 @@
         principal: "{{principal}}"
         cacn: "{{ca_name}}"
         state: present
-        ipa_host: "{{fqdn}}"
+        ipa_host: "{{master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       register: client_cert_req
@@ -141,7 +141,7 @@
       ipa_ca:
         name: "{{ca_name}}"
         state: present
-        ipa_host: "{{fqdn}}"
+        ipa_host: "{{master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       # Don't actually create, just read
@@ -154,7 +154,7 @@
         cacn: ipa
         principal: "{{ca_info.ca.ipacasubjectdn[0]|cn_from_dn()}}"
         state: present
-        ipa_host: "{{fqdn}}"
+        ipa_host: "{{master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       # Don't actually create, just read
@@ -167,7 +167,7 @@
         cacn: ipa
         principal: "Certificate Authority"
         state: present
-        ipa_host: "{{fqdn}}"
+        ipa_host: "{{master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       # Don't actually create, just read

@@ -37,7 +37,7 @@
     name: "{{item.princ}}/{{fqdn}}@{{kerberos_realm}}"
     managedby_host: "{{item.managedby}}"
     state: present
-    ipa_host: "{{fqdn}}"
+    ipa_host: "{{master_fqdn}}"
     ipa_user: "{{ipa_user}}"
     ipa_pass: "{{freeipa_admin_password}}"
   with_items:
@@ -49,7 +49,7 @@
   ipa_ca:
     name: "{{ca_name}}"
     state: present
-    ipa_host: "{{fqdn}}"
+    ipa_host: "{{master_fqdn}}"
     ipa_user: "{{ipa_user}}"
     ipa_pass: "{{freeipa_admin_password}}"
   # Don't actually create, just read
@@ -64,7 +64,7 @@
     cacn: "ipa"
     principal: "{{ca_info.ca.ipacasubjectdn[0]|cn_from_dn()}}"
     state: present
-    ipa_host: "{{fqdn}}"
+    ipa_host: "{{master_fqdn}}"
     ipa_user: "{{ipa_user}}"
     ipa_pass: "{{freeipa_admin_password}}"
   delegate_to: localhost
