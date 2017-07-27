@@ -14,9 +14,9 @@
 - include: coreos-cluster.yaml
   tags:  coreos-cluster
 
-# # 4.  Install kubernetes
-# - include: kubernetes.yaml
-#   tags:  kubernetes
+# 4.  Install kubernetes
+- include: kubernetes.yaml
+  tags:  kubernetes
 
 # # 5.  Install services
 # - include: services.yaml
