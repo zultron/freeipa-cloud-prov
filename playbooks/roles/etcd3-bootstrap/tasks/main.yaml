@@ -121,7 +121,10 @@
         ipa_pass: "{{freeipa_admin_password}}"
 
   delegate_to: localhost
+  # once...
   run_once: True
+  # ...ever
+  when:  hostname == master_host
   tags:
     - etcd-ca
 
@@ -200,16 +203,28 @@
 #
 # Start etcd-member service on initial member
 #
-- name:  "Start etcd-member.service on initial member"
-  systemd:
-    name: etcd-member
-    enabled: true
-    masked: false
-    daemon_reload: yes
-    state: restarted
-  become: true
-  when:  "hostname == master_host and etcd_ssl_cert_tracking.changed"
+- block:
 
+    - name:  "Unmask etcd-member.service on initial member"
+      systemd:
+        name: etcd-member
+        masked: false
+        enabled: true
+        daemon_reload: yes
+      register:  etcd_initial_mask
+
+    - name:  "Start etcd-member.service on initial member"
+      systemd:
+        name: etcd-member
+        enabled: true
+        masked: false
+        daemon_reload: yes
+        state: restarted
+      when:  "etcd_ssl_cert_tracking.changed or etcd_initial_mask.changed"
+      
+
+  become: true
+  when:  "hostname == master_host"
   tags:
     - etcd-start
 
@@ -218,28 +233,36 @@
 #
 - block:
 
-  - name:  "Check if host is member of existing etcd cluster"
-    shell:  "{{etcdctl_command}} member list | grep -q ' name={{hostname}} '
-                 && echo yes || echo no"
-    register:  is_etcd_member
-    changed_when:  is_etcd_member.stdout == 'no'
-    delegate_to:  "{{master_host}}"
+    - name:  "Check if host is member of existing etcd cluster"
+      shell:  "{{etcdctl_command}} member list | grep -q ' name={{hostname}} '
+                   && echo yes || echo no"
+      register:  is_etcd_member
+      changed_when:  is_etcd_member.stdout == 'no'
+      delegate_to:  "{{master_host}}"
 
-  - name:  "Add host to existing etcd cluster"
-    shell:  "{{etcdctl_command}} member add {{hostname}} https://{{fqdn}}:2380"
-    when: is_etcd_member.changed
-    delegate_to:  "{{master_host}}"
+    - name:  "Add host to existing etcd cluster"
+      shell:  "{{etcdctl_command}} member add {{hostname}} https://{{fqdn}}:2380"
+      when: is_etcd_member.changed
+      delegate_to:  "{{master_host}}"
 
-  - name:  "Start etcd-member.service on new member"
-    systemd:
-      name: etcd-member
-      enabled: true
-      masked: false
-      daemon_reload: yes
-      state: restarted
-    when: "hostname != master_host and
-               (etcd_ssl_cert_tracking.changed or is_etcd_member.changed)"
+    - name:  "Unmask etcd-member.service on new members"
+      systemd:
+        name: etcd-member
+        masked: false
+        daemon_reload: yes
+      register:  etcd_initial_mask
+
+    - name:  "Start etcd-member.service on new members"
+      systemd:
+        name: etcd-member
+        enabled: true
+        masked: false
+        daemon_reload: yes
+        state: restarted
+      when: "etcd_ssl_cert_tracking.changed or is_etcd_member.changed
+             or etcd_initial_mask.changed"
 
   become: true
+  when:  "hostname != master_host"
   tags:
     - etcd-start
