@@ -43,5 +43,7 @@
         ipa_pass: "{{freeipa_admin_password}}"
 
   delegate_to: localhost
-  when:  hostname == master_host
+  # Run once...
   run_once: True
+  # ...ever
+  when:  hostname == master_host
