@@ -101,7 +101,7 @@ etcd_endpoints:
 
 # etcdctl
 etcdctl_command:
-  "etcdctl
+  "/usr/bin/etcdctl
   --ca-file {{etcd_ssl_cacert}}
   --cert-file {{etcd_ssl_cert}}
   --key-file {{etcd_ssl_key}}
@@ -127,7 +127,7 @@ k8s_version: "1.6.1_coreos.0"
 k8s_dir: "{{data_volume_path}}/k8s"
 
 # Networking
-k8s_pod_network:  10.2.0.0/16
+k8s_pod_network:  10.2.0.1/16
 k8s_service_ip_range:  10.3.0.0/24
 k8s_service_ip: 10.3.0.1
 k8s_dns_service_ip: 10.3.0.10

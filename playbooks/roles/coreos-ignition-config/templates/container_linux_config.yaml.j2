@@ -61,17 +61,18 @@ etcd:
 flannel:
   # The version of flannel to be run
   #version: 0.7.1
-  # The endpoints of etcd flanneld should use
-  etcd_endpoints: "{{etcd_endpoints}}"
   # The tls files to use when communicating with etcd
   etcd_cafile:    {{etcd_ssl_cacert}}
   etcd_certfile:  {{etcd_ssl_cert}}
   etcd_keyfile:   {{etcd_ssl_key}}
+  # The interface to use
+  iface:          {PUBLIC_IPV4}
 
 docker:
   # Additional flags to pass to the docker daemon when it is started
   flags:
     - "--live-restore"
+    - "--bip={{k8s_pod_network}}"
 
 locksmith:
   # The reboot strategy for locksmithd to follow.  Must be one of:
@@ -124,25 +125,13 @@ systemd:
       dropins:
         - name: 10-flanneld-certs.conf
           contents: |
-            [Unit]
-            Requires=coreos-metadata.service
-            After=coreos-metadata.service
-
             [Service]
-            EnvironmentFile=/run/metadata/coreos
             #
             # Mount a non-standard directory containing SSL certs
             Environment="RKT_RUN_ARGS=\
               --uuid-file-save=/var/lib/coreos/flannel-wrapper.uuid \
               --volume etcd-certs,kind=host,source={{etcd_cert_dir}},readOnly=true \
               --mount volume=etcd-certs,target={{etcd_cert_dir}}"
-            #
-            # Flannel service public interface
-            Environment="FLANNELD_IFACE=${COREOS_DIGITALOCEAN_IPV4_PUBLIC_0}"
-            #
-            # Etcd cluster
-            Environment="FLANNELD_ETCD_ENDPOINTS={{etcd_endpoints}}"
-
 
     - name: flannel-docker-opts.service
       mask: true

@@ -7,18 +7,43 @@
 #
 - block:
 
+    - name:  "Create flanneld config directories"
+      file:
+        path: "{{item}}"
+        state: directory
+      with_items:
+        - "{{dropin_dir_pat % 'flanneld.service'}}"
+        - "{{dropin_dir_pat % 'flannel-docker-opts.service'}}"
+
+    - name:  "Template flanneld.service dropin"
+      template:
+        src: "{{item}}.j2"
+        dest: "{{dropin_dir_pat % 'flanneld.service'}}/{{item}}"
+      with_items:
+        - 50-flanneld-endpoints.conf
+      register:  flanneld_dropin
+
+    - name:  "Unmask flannel services"
+      systemd:
+        masked: false
+        name: "{{item}}"
+        daemon_reload: yes
+      with_items:
+        - flanneld.service
+        - flannel-docker-opts.service
+
     - name:  "Start flanneld.service"
       systemd:
         name: flanneld.service
         enabled: true
-        masked: false
-        state: started
+        daemon_reload: yes
+        state: "{{flanneld_dropin.changed|ternary('restarted','started')}}"
       register: flanneld_service
 
     - name:  "Start flannel-docker-opts.service"
       systemd:
         enabled: true
-        masked: false
+        daemon_reload: yes
         name: flannel-docker-opts.service
         state: started
       register: flannel_docker_opts_service
@@ -26,10 +51,9 @@
     - name:  "Restart docker.service"
       systemd:
         name: docker.service
-        state: "restart"
+        state: "restarted"
       when:  flannel_docker_opts_service.changed or flanneld_service.changed
 
-  when:  hostname == master_host
   become: true
   tags:
     - flannel-config
