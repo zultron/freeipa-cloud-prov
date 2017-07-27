@@ -52,7 +52,7 @@
           role: "server"
           srvrec: "{{ groups.freeipa |
                       formatmaplist('0 100 2380 {}.%s.' % domain_name) }}"
-        - 
+        -
           role: "client"
           srvrec: "{{ groups.freeipa |
                    formatmaplist('0 100 2379 {}.%s.' % domain_name) }}"
