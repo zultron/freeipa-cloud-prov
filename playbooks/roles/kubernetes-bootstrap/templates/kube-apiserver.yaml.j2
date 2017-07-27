@@ -48,7 +48,7 @@ spec:
         - mountPath: {{k8s_dir}}
           name: k8s
           readOnly: true
-        - mountPath: {{etcd_cert_dir}}
+        - mountPath: {{etcd_ssl_dir}}
           name: etcd-cert
           readOnly: true
   volumes:
@@ -56,5 +56,5 @@ spec:
         path: {{k8s_dir}}
       name: k8s
     - hostPath:
-        path: {{etcd_cert_dir}}
+        path: {{etcd_ssl_dir}}
       name: etcd-cert

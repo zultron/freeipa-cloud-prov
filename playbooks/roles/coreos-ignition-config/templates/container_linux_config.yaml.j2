@@ -114,8 +114,8 @@ systemd:
             # Mount a non-standard directory containing SSL certs
             Environment="RKT_RUN_ARGS=\
               --uuid-file-save=/var/lib/coreos/etcd-member-wrapper.uuid \
-              --volume etcd-certs,kind=host,source={{etcd_cert_dir}},readOnly=true \
-              --mount volume=etcd-certs,target={{etcd_cert_dir}}"
+              --volume etcd-certs,kind=host,source={{etcd_ssl_dir}},readOnly=true \
+              --mount volume=etcd-certs,target={{etcd_ssl_dir}}"
             #
             # Ensure SSL cert is readable by etcd
             ExecStartPre=/usr/bin/chown etcd {{etcd_ssl_cert}} {{etcd_ssl_key}}
@@ -130,8 +130,8 @@ systemd:
             # Mount a non-standard directory containing SSL certs
             Environment="RKT_RUN_ARGS=\
               --uuid-file-save=/var/lib/coreos/flannel-wrapper.uuid \
-              --volume etcd-certs,kind=host,source={{etcd_cert_dir}},readOnly=true \
-              --mount volume=etcd-certs,target={{etcd_cert_dir}}"
+              --volume etcd-certs,kind=host,source={{etcd_ssl_dir}},readOnly=true \
+              --mount volume=etcd-certs,target={{etcd_ssl_dir}}"
 
     - name: flannel-docker-opts.service
       mask: true

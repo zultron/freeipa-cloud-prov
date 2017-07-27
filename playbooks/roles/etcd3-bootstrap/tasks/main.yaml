@@ -88,124 +88,52 @@
     - etcd-resolv-conf
 
 #
-# Create etcd sub-CA and etcd user
+# Create etcd sub-CA and service certs
 #
-- block:
-
-    - name: "Create Etcd CA"
-      ipa_ca:
-        name: "{{etcd_ca}}"
-        ipacasubjectdn: "{{etcd_ca_subject}}"
-        description: "Etcd Cluster CA"
-        state: present
-        ipa_host: "{{master_fqdn}}"
-        ipa_user: "{{ipa_user}}"
-        ipa_pass: "{{freeipa_admin_password}}"
-
-    - name: "Add Etcd CA to CA ACL '{{user_cert_acl}}'"
-      ipa_caacl:
-        name: "{{user_cert_acl}}"
-        ca: "{{etcd_ca}}"
-        state: present
-        ipa_host: "{{master_fqdn}}"
-        ipa_user: "{{ipa_user}}"
-        ipa_pass: "{{freeipa_admin_password}}"
-
-    - name: "Add Etcd CA to CA ACL 'hosts_services_caIPAserviceCert'"
-      ipa_caacl:
-        name: "hosts_services_caIPAserviceCert"
-        ca: "{{etcd_ca}}"
-        state: present
-        ipa_host: "{{master_fqdn}}"
-        ipa_user: "{{ipa_user}}"
-        ipa_pass: "{{freeipa_admin_password}}"
-
-  delegate_to: localhost
-  # once...
-  run_once: True
-  # ...ever
-  when:  hostname == master_host
+- name:  "Set facts for creating etcd SSL certs"
+  set_fact:
+    # Create CA
+    ca_name:  "{{etcd_ca}}"
+    ca_subject_cn: "{{etcd_ca_subject_cn}}"
+    # Create Etcd service cert
+    cert_nick:  "etcd_ssl_cert"
+    service_principal: "{{etcd_service_principal}}"
+    key_bits:  "2048"
+    cert_dir: "{{etcd_ssl_dir}}"
+    cacert_path:  "{{etcd_ssl_cacert}}"
+    cert_path:  "{{etcd_ssl_cert}}"
+    key_path:  "{{etcd_ssl_key}}"
+    # Create Etcd client cert
+    principal:  "{{manager_id}}"
+    email_address:  "{{manager_id}}@{{domain_name}}"
+    client_cert_dir: "../{{etcd_client_ssl_dir}}"
+    client_cacert_path: "../{{etcd_client_ssl_cacert}}"
+    client_cert_path: "../{{etcd_client_ssl_cert}}"
+    client_key_path: "../{{etcd_client_ssl_key}}"
   tags:
     - etcd-ca
+    - etcd-server-cert
+    - etcd-client-cert
+    - etcd-start
 
+# Create etcd sub-CA
+- include: tasks/ipa_sub_ca.yaml
+  tags:
+    - etcd-ca
+    - etcd-start
 
-#
 # Etcd service certs
-#
-# Configure service in FreeIPA and use certmonger to generate certs
-#
-- block:
-
-    - name: "Create etcd cert directory {{etcd_cert_dir}}"
-      file:
-        path: "{{etcd_cert_dir}}"
-        state: directory
-        mode: 0755
-      become: true
-
-    - name:  "Create {{etcd_service_principal}} service principal and
-                  add managed by {{freeipa_fqdn}} host"
-      ipa_service:
-        name: "{{etcd_service_principal}}"
-        managedby_host: "{{freeipa_fqdn}}"
-        state: present
-        ipa_host: "{{master_fqdn}}"
-        ipa_user: "{{ipa_user}}"
-        ipa_pass: "{{freeipa_admin_password}}"
-      delegate_to: localhost
-
-    - name: "Read Etcd CA cert"
-      ipa_cert:
-        cacn: ipa
-        principal: "{{etcd_ca_subject_short}}"
-        state: present
-        ipa_host: "{{master_fqdn}}"
-        ipa_user: "{{ipa_user}}"
-        ipa_pass: "{{freeipa_admin_password}}"
-      delegate_to: localhost
-      # Don't actually create, just read
-      check_mode: yes
-      changed_when: False
-      register: etcd_ca_cert
-
-    - name: "Dump etcd CA cert into {{etcd_ssl_cacert}}"
-      copy:
-        content: |
-          {{etcd_ca_cert.cert.certificate | ipa_cert_to_pem}}
-          {{ lookup('file', '../var/cacert.pem') }}
-        dest: "{{etcd_ssl_cacert}}"
-        force: yes
-      become: true
-      register: etcd_ssl_cacert_create
-
-    - name:  "Check cert tracking status of {{etcd_ssl_cert}}"
-      shell: "{{ipa_exec}}
-                 ipa-getcert status -f {{etcd_ssl_cert}} |
-                 grep -q 'No request found' && echo no || echo yes"
-      register: etcd_ssl_cert_tracking
-      changed_when:  etcd_ssl_cert_tracking.stdout == "no"
-
-    - name:  "Start tracking etcd server cert in {{etcd_ssl_cert}}"
-      # The cert is actually created and maintained by certmonger running
-      # in ipa.  The {{etcd_ssl_dir}} has been bind-mounted in the
-      # container for this purpose.
-      shell: "{{ipa_exec}} ipa-getcert request -w
-                  -I etcd_ssl_cert
-                  -f {{etcd_ssl_cert}} -k {{etcd_ssl_key}}
-                  -K {{etcd_service_principal}} -N '{{fqdn}}' -g 2048
-                  -X {{etcd_ca}}"
-      when: etcd_ssl_cert_tracking.changed
-
+- include: tasks/ipa_certmonger_certs.yaml
   tags:
     - etcd-server-cert
     - etcd-start
 
 #
-# Start etcd-member service on initial member
+# Start etcd-member service
 #
 - block:
 
-    - name:  "Unmask etcd-member.service on initial member"
+    - name:  "Unmask etcd-member.service"
       systemd:
         name: etcd-member
         masked: false
@@ -213,56 +141,15 @@
         daemon_reload: yes
       register:  etcd_initial_mask
 
-    - name:  "Start etcd-member.service on initial member"
+    - name:  "Start etcd-member.service"
       systemd:
         name: etcd-member
         enabled: true
         masked: false
         daemon_reload: yes
         state: restarted
-      when:  "etcd_ssl_cert_tracking.changed or etcd_initial_mask.changed"
+      when:  "cert_tracking.changed or etcd_initial_mask.changed"
       
-
   become: true
-  when:  "hostname == master_host"
-  tags:
-    - etcd-start
-
-#
-# Start etcd-member service on remaining members
-#
-- block:
-
-    - name:  "Check if host is member of existing etcd cluster"
-      shell:  "{{etcdctl_command}} member list | grep -q ' name={{hostname}} '
-                   && echo yes || echo no"
-      register:  is_etcd_member
-      changed_when:  is_etcd_member.stdout == 'no'
-      delegate_to:  "{{master_host}}"
-
-    - name:  "Add host to existing etcd cluster"
-      shell:  "{{etcdctl_command}} member add {{hostname}} https://{{fqdn}}:2380"
-      when: is_etcd_member.changed
-      delegate_to:  "{{master_host}}"
-
-    - name:  "Unmask etcd-member.service on new members"
-      systemd:
-        name: etcd-member
-        masked: false
-        daemon_reload: yes
-      register:  etcd_initial_mask
-
-    - name:  "Start etcd-member.service on new members"
-      systemd:
-        name: etcd-member
-        enabled: true
-        masked: false
-        daemon_reload: yes
-        state: restarted
-      when: "etcd_ssl_cert_tracking.changed or is_etcd_member.changed
-             or etcd_initial_mask.changed"
-
-  become: true
-  when:  "hostname != master_host"
   tags:
     - etcd-start

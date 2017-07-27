@@ -85,15 +85,20 @@ data_volume_systemd_unit: "{{data_volume_path|systemd_escape}}.mount"
 # TLS
 # - Etcd sub-CA
 etcd_ca: "etcd"
-etcd_ca_subject_short: "Etcd Certificate Authority"
-etcd_ca_subject: "CN={{etcd_ca_subject_short}},O={{kerberos_realm}}"
+etcd_ca_subject_cn: "Etcd Certificate Authority"
+etcd_ca_subject: "CN={{etcd_ca_subject_cn}},O={{kerberos_realm}}"
 # - Etcd service principal
-etcd_service_principal: "etcd/{{fqdn}}@{{kerberos_realm}}"
+etcd_service_principal: "etcd"
 # - Cert locations; accessible from mount in etcd-member-wrapper
-etcd_cert_dir: "{{ data_volume_path }}/etcd"
-etcd_ssl_cert: "{{ etcd_cert_dir }}/cert.pem"
-etcd_ssl_key: "{{ etcd_cert_dir }}/key.pem"
-etcd_ssl_cacert: "{{ etcd_cert_dir }}/ca.pem"
+etcd_ssl_dir: "{{ data_volume_path }}/etcd"
+etcd_ssl_cacert: "{{ etcd_ssl_dir }}/ca.pem"
+etcd_ssl_cert: "{{ etcd_ssl_dir }}/cert.pem"
+etcd_ssl_key: "{{ etcd_ssl_dir }}/key.pem"
+# - Client-side cert locations
+etcd_client_ssl_dir: "var/etcd"
+etcd_client_ssl_cacert: "{{etcd_client_ssl_dir}}/ca.pem"
+etcd_client_ssl_cert: "{{etcd_client_ssl_dir}}/cert.pem"
+etcd_client_ssl_key: "{{etcd_client_ssl_dir}}/key.pem"
 
 # Endpoints
 etcd_endpoints:
