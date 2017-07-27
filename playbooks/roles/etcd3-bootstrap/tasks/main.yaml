@@ -3,8 +3,40 @@
 # Configure etcd on CoreOS
 #
 
+#
+# Add etcdctl command alias
+#
 - block:
-    # Create SRV records for etcd service discovery
+
+    - name:  "Check if ~core/.bashrc is a symlink"
+      stat:
+        path: "/home/core/.bashrc"
+      register:  bashrc_stat
+
+    - name:  "Delete ~core/.bashrc symlink"
+      file:
+        path: "/home/core/.bashrc"
+        state: absent
+      when:  bashrc_stat.stat.islnk
+
+    - name:  "Copy /usr/share/skel/.bashrc to ~core/.bashrc"
+      command: "cp /usr/share/skel/.bashrc /home/core/.bashrc"
+      when:  bashrc_stat.stat.islnk
+
+    - name:  Add etcdctl command as alias
+      lineinfile:
+        dest: "/home/core/.bashrc"
+        state: present
+        insertafter: EOF
+        line: "alias etcdctl='sudo {{etcdctl_command}}'"
+
+  tags:
+    - etcdctl-alias
+
+#
+# Create SRV records for etcd service discovery
+#
+- block:
 
     - name:  Create SRV records for etcd servers
       ipa_dnsrecord:
@@ -211,33 +243,3 @@
   become: true
   tags:
     - etcd-start
-
-#
-# Add etcdctl command alias
-#
-- block:
-
-    - name:  "Check if ~core/.bashrc is a symlink"
-      stat:
-        path: "/home/core/.bashrc"
-      register:  bashrc_stat
-
-    - name:  "Delete ~core/.bashrc symlink"
-      file:
-        path: "/home/core/.bashrc"
-        state: absent
-      when:  bashrc_stat.stat.islnk
-
-    - name:  "Copy /usr/share/skel/.bashrc to ~core/.bashrc"
-      command: "cp /usr/share/skel/.bashrc /home/core/.bashrc"
-      when:  bashrc_stat.stat.islnk
-
-    - name:  Add etcdctl command as alias
-      lineinfile:
-        dest: "/home/core/.bashrc"
-        state: present
-        insertafter: EOF
-        line: "alias etcdctl='sudo {{etcdctl_command}}'"
-
-  tags:
-    - etcdctl-alias
