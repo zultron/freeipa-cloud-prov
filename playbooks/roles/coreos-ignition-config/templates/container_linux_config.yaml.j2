@@ -26,7 +26,7 @@ etcd:
   # restarts)
   # Slaves use DNS srv records to join existing cluster
   discovery_srv: {{domain_name}}
-  initial_cluster_state: {{ (hostname==master_host)|ternary('new','existing') }}
+  initial_cluster_state: new
   initial_advertise_peer_urls: https://{{fqdn}}:2380
   initial_cluster_token: cluster_{{etcd_cluster_token}}
   #
