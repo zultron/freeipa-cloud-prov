@@ -66,11 +66,8 @@ this work in any critical scenario.**
         # Install FreeIPA server/replica containers
         ansible-playbook playbooks/freeipa.yaml
 
-        # Install and configure docker TLS, etcd3 and flanneld
-        ansible-playbook playbooks/coreos-cluster.yaml
-
-        # Install and configure kubernetes
-        ansible-playbook playbooks/kubernetes.yaml
+        # Install and configure docker TLS, etcd3, flanneld, k8s
+        ansible-playbook playbooks/cluster.yaml
 
         # Install services in k8s:  email, PBX, web, etc.
         ansible-playbook playbooks/services.yaml

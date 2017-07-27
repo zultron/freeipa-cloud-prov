@@ -10,9 +10,9 @@
 - include: freeipa.yaml
   tags:  freeipa
 
-# 3.  Install docker TLS, etcd, flanneld
-- include: coreos-cluster.yaml
-  tags:  coreos-cluster
+# 3.  Install docker TLS, etcd, flanneld, kubernetes
+- include: cluster.yaml
+  tags:  cluster
 
 # 4.  Install services
 - include: services.yaml
