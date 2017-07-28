@@ -151,6 +151,7 @@
       wait_for:
         host:  localhost
         port:  9080
+      when:  hostname == master_host
 
   become: true
   tags:
