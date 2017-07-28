@@ -23,7 +23,6 @@ KillMode=none
 ExecStartPre=-/usr/bin/docker kill ipa
 ExecStartPre=-/usr/bin/docker rm ipa
 ExecStart=/usr/bin/docker run \
-			  --rm \
 			  --interactive \
 			  --restart=no \
 			  --hostname={{fqdn}} \
