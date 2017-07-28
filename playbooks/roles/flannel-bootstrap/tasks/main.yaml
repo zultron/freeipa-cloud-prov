@@ -48,12 +48,6 @@
         state: started
       register: flannel_docker_opts_service
 
-    - name:  "Restart docker.service"
-      systemd:
-        name: docker.service
-        state: "restarted"
-      when:  flannel_docker_opts_service.changed or flanneld_service.changed
-
   become: true
   tags:
     - flannel-config
