@@ -125,6 +125,9 @@ class CertIPAClient(IPAClient):
 
     param_keys = set(['serial_number','req'])
 
+    # Creating a cert can exceed the default 10s timeout
+    fetch_url_timeout=60
+
     kw_args = dict(
         # common params
         principal =         dict(type='str', required=True),
