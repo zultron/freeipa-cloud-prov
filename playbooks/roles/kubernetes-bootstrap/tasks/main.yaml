@@ -303,6 +303,53 @@
   tags:
     - k8s-dns
 
+#
+# Deploy the kube dashboard add-on
+#
+- block:
+
+    - name: "Template the k8s kube dashboard add-on definition"
+      template:
+        src: "{{item}}.yaml.j2"
+        dest: "../var/k8s/{{item}}.yaml"
+      with_items:
+        - kube-dashboard
+
+    - name: "Template the k8s kube dashboard add-on definition locally"
+      template:
+        src: "{{item}}.yaml.j2"
+        dest: "../{{k8s_local_manifest_dir}}/{{item}}.yaml"
+      with_items:
+        - kube-dashboard
+      delegate_to: localhost
+
+    - name: "Check the k8s kube dashboard add-on"
+      shell: "{{kubectl_path}} get pods --namespace=kube-system |
+                  grep -q kubernetes-dashboard && echo yes || echo no"
+      register: k8s_dashboard_addon
+      changed_when: "k8s_dashboard_addon.stdout == 'no'"
+
+    - name: "Start the k8s kube dashboard add-on"
+      # FIXME use the Ansible kubernetes module
+      command: "{{kubectl_path}} create -f
+                     ../var/k8s/kube-dashboard.yaml"
+      when:  k8s_dashboard_addon.changed
+
+    - name: "Re-check the k8s kube dashboard add-on"
+      shell: "{{kubectl_path}} get pods --namespace=kube-system |
+                  grep kubernetes-dashboard"
+      changed_when: false
+      when:  k8s_dashboard_addon.changed
+
+    # - name: "Get k8s dashboard pod name"
+    #   shell: "kubectl get pods --namespace=kube-system |
+    #               awk '/kubernetes-dashboard/ { print $1 }'"
+    #   register: k8s_dashboard_pod
+
+    # - name: "Port forward k8s dashboard"
+    #   shell: "kubectl port-forward {{k8s_dashboard_pod.stdout}}
+    #               9090 --namespace=kube-system"
+
   delegate_to: localhost
   run_once:  true
   tags:

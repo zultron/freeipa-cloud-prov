@@ -131,6 +131,8 @@ k8s_version: "1.6.1_coreos.0"
 k8s_kubedns_version: "1.8"
 k8s_kube_dnsmasq_version: "1.4"
 k8s_exechealthz_version: "1.2"
+# - kube dashboard add-on
+k8s_dashboard_version: "1.6.0"
 
 # Directory/file paths
 k8s_dir: "{{data_volume_path}}/k8s"
