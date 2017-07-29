@@ -111,6 +111,13 @@
       become: true
       with_items:  "{{manifests}}"
 
+    - name: "Template pod manifests locally in {{k8s_local_manifest_dir}}"
+      template:
+        src: "{{item}}.yaml.j2"
+        dest: "../{{k8s_local_manifest_dir}}/{{item}}.yaml"
+      with_items:  "{{manifests}}"
+      delegate_to: localhost
+
   become: true
   tags:
     - k8s-pod-manifests
@@ -252,3 +259,51 @@
   run_once:  true
   tags:
     - k8s-kubectl
+
+#
+# Deploy the DNS add-on
+#
+- block:
+
+    - name: "Template the k8s DNS add-on definition"
+      template:
+        src: "{{item}}.yaml.j2"
+        dest: "../var/k8s/{{item}}.yaml"
+      register:  k8s_dns_manifest
+      with_items:
+        - dns-addon
+
+    - name: "Template the k8s DNS add-on definition locally"
+      template:
+        src: "{{item}}.yaml.j2"
+        dest: "../{{k8s_local_manifest_dir}}/{{item}}.yaml"
+      with_items:
+        - dns-addon
+      delegate_to: localhost
+
+    - name: "Check the k8s DNS add-on"
+      shell: "{{kubectl_path}} get pods --namespace=kube-system |
+                  grep -q kube-dns-v20 && echo yes || echo no"
+      register: k8s_dns_addon
+      changed_when: "k8s_dns_addon.stdout == 'no'"
+
+    - name: "Start the k8s DNS add-on"
+      # FIXME use the Ansible kubernetes module
+      command: "{{kubectl_path}} create -f ../var/k8s/dns-addon.yaml"
+      when:  k8s_dns_addon.changed or k8s_dns_manifest.changed
+
+    - name: "Re-check the k8s DNS add-on"
+      shell: "{{kubectl_path}} get pods --namespace=kube-system |
+                  grep kube-dns-v20"
+      changed_when: false
+      when:  k8s_dns_addon.changed or k8s_dns_manifest.changed
+
+  delegate_to: localhost
+  run_once:  true
+  tags:
+    - k8s-dns
+
+  delegate_to: localhost
+  run_once:  true
+  tags:
+    - k8s-dashboard

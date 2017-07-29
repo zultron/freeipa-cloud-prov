@@ -127,6 +127,10 @@ k8s_master: "{{master_host}}"
 # https://quay.io/repository/coreos/hyperkube?tag=latest&tab=tags
 #k8s_version: "1.7.0_coreos.0"
 k8s_version: "1.6.1_coreos.0"
+# - DNS add-on
+k8s_kubedns_version: "1.8"
+k8s_kube_dnsmasq_version: "1.4"
+k8s_exechealthz_version: "1.2"
 
 # Directory/file paths
 k8s_dir: "{{data_volume_path}}/k8s"
@@ -159,11 +163,13 @@ k8s_ssl_cacert: "{{k8s_ssl_dir}}/ca.pem"
 k8s_ssl_cert: "{{k8s_ssl_dir}}/cert.pem"
 k8s_ssl_key: "{{k8s_ssl_dir}}/key.pem"
 k8s_manifest_dir: "{{k8s_dir}}/manifests"
-# - local files
+# - local certs
 k8s_client_ssl_dir: "var/k8s"
 k8s_client_ssl_cacert: "{{k8s_client_ssl_dir}}/ca.pem"
 k8s_client_ssl_cert: "{{k8s_client_ssl_dir}}/cert.pem"
 k8s_client_ssl_key: "{{k8s_client_ssl_dir}}/key.pem"
+# - local manifests
+k8s_local_manifest_dir: "var/k8s"
 
 # kubectl
 kubectl_version: "1.6.1"
