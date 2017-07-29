@@ -133,6 +133,18 @@ Run shell in `ipaclient` container, ready to run emacs
 
         docker exec -it --detach-keys ctrl-^ ipaclient env TERM=screen bash
 
+Misc. kubernetes commands
+
+    kubectl config *
+    kubectl cluster-info
+    kubectl --all-namespaces get pods
+    kubectl --namespace=kube-system get pods
+    kubectl --namespace=kube-system describe pods kube-dns-v20-d7crm
+    kubectl --namespace=kube-system logs kube-dns-v20-d7crm kubedns
+    kubectl --namespace=kube-system replace --force -f var/k8s/dns-addon.yaml
+    kubectl --namespace=kube-system delete pods kube-dns-v20-d7crm
+    kubectl --namespace=kube-system port-forward kubernetes-dashboard-v1.6.0-xcgh7 9090
+
 ## Documentation used to develop this system
 
 ### [Ansible][ansible]
@@ -309,7 +321,7 @@ Install Kubernetes after the Container Linux cluster is configured.
     - [FreeIPA won't issue IP SANs][freeipa-no-ip-sans]
     - Kubernetes-users list [query][kubernetes-no-ip-sans-email]
 - [Kubernetes module][ansible-kubernetes-module] in Ansible
-
+- [Kubectl cheat sheet][kubectl-cheat]
 
 [coreos-kubernetes]:  https://coreos.com/kubernetes/docs/latest/
 [kub-ansible]: https://github.com/kubernetes/contrib/tree/master/ansible/roles
@@ -320,6 +332,7 @@ Install Kubernetes after the Container Linux cluster is configured.
 [freeipa-no-ip-sans]:  https://www.redhat.com/archives/freeipa-users/2016-October/msg00053.html
 [kubernetes-no-ip-sans-email]:  https://groups.google.com/forum/#!topic/kubernetes-users/azpLUFHu_2I
 [ansible-kubernetes-module]:  http://docs.ansible.com/ansible/kubernetes_module.html
+[kubectl-cheat]: https://kubernetes.io/docs/user-guide/kubectl-cheatsheet/
 
 ### [HAProxy][haproxy]
 
