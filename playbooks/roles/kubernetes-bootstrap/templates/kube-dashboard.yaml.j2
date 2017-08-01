@@ -10,8 +10,8 @@ spec:
   selector:
     k8s-app: kubernetes-dashboard
   ports:
-  - port: 80
-    targetPort: 9090
+    - port: 80
+      targetPort: 9090
 
 ---
 
@@ -39,30 +39,30 @@ spec:
         scheduler.alpha.kubernetes.io/tolerations: '[{"key":"CriticalAddonsOnly", "operator":"Exists"}]'
     spec:
       containers:
-      - name: kubernetes-dashboard
-        image: gcr.io/google_containers/kubernetes-dashboard-amd64:v{{k8s_dashboard_version}}
-        resources:
-          limits:
-            cpu: 100m
-            memory: 50Mi
-          requests:
-            cpu: 100m
-            memory: 50Mi
-        args:
-        - --kubeconfig={{k8s_dir}}/kubeconfig.yaml
-        - --apiserver-host={{k8s_apiserver_url_remote}}
-        ports:
-        - containerPort: 9090
-        livenessProbe:
-          httpGet:
-            path: /
-            port: 9090
-          initialDelaySeconds: 30
-          timeoutSeconds: 30
-        volumeMounts:
-          - mountPath: {{k8s_dir}}
-            name: k8s
-            readOnly: true
+        - name: kubernetes-dashboard
+          image: gcr.io/google_containers/kubernetes-dashboard-amd64:v{{k8s_dashboard_version}}
+          resources:
+            limits:
+              cpu: 100m
+              memory: 50Mi
+            requests:
+              cpu: 100m
+              memory: 50Mi
+          args:
+            - --kubeconfig={{k8s_dir}}/kubeconfig.yaml
+            - --apiserver-host={{k8s_apiserver_url_remote}}
+          ports:
+            - containerPort: 9090
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 9090
+            initialDelaySeconds: 30
+            timeoutSeconds: 30
+          volumeMounts:
+            - mountPath: {{k8s_dir}}
+              name: k8s
+              readOnly: true
       volumes:
         - name: k8s
           hostPath:
