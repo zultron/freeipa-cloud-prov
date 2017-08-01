@@ -42,6 +42,5 @@ else
 	$DOCKER_EXTRA_ARGS \
 	--entrypoint /bin/bash \
 	-e DO_API_KEY=${DO_API_KEY} \
-	-p 9090:9090 \
 	${DOCKER_IMG} "$@"
 fi
