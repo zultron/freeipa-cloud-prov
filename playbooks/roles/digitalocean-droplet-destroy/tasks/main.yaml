@@ -37,13 +37,16 @@
   retries: 3
   delay: 1
 
-- name:  "Destroy freeipa volume {{freeipa_block_storage_name}}"
+- name:  "Destroy freeipa volume"
   digital_ocean_block_storage:
-    volume_name: "{{freeipa_block_storage_name}}"
-    region: "{{ region_id }}"
+    volume_name: "{{item.volume}}"
+    region: "{{item.region}}"
     state: absent
     command: create
     api_token:  "{{ do_token }}"
+  with_items:
+    - volume: "{{freeipa_block_storage_name}}"
+      region: "{{ region_id }}"
   # Droplet can take time to be destroyed
   retries: 3
   delay: 1
