@@ -23,10 +23,49 @@ possible to increase reliability.  The components are chosen to scale
 up, but the down-scaled, three-node bootstrap configuration is
 complete, and meant to be ready for production.
 
+## Current status
+
 Although the goal is production readiness, this is unfinished and
 experimental work.  It is not represented to be fit for any purpose.
 **Readers are strongly advised to contemplate the risks before using
 this work in any critical scenario.**
+
+At present, the Ansible playbooks can complete the following tasks for
+a 3-node cluster with no manual intervention.  The end result is a
+running Kubernetes cluster, still with a few minor known issues.
+
+- Provision DigitalOcean cloud servers
+  - Configure CoreOS image with ignition
+  - Add and configure block storage for filesystems and swap
+  - Other basic OS configuration
+- Install FreeIPA cluster
+  - Add and configure block storage for IPA data
+  - Configure and run FreeIPA server install
+  - Configure and run FreeIPA replica installs
+  - Harden publicly exposed services
+  - Basic DNS and other configuration
+- Configure Docker TLS
+  - IPA:  Create CA and install monitored service certificates
+  - Configure Docker TLS port with client cert authentication
+  - Create client cert
+  - Restart docker service with TLS configuration
+- Configure and start etcd
+  - IPA:  Create CA and install monitored service certificates
+  - Set up cluster DNS SRV records
+  - Start etcd service with TLS and client cert authentication
+  - Configure `etcdctl` client on nodes
+- Configure and start flannel networking
+  - Configure etcd TLS endpoints and etcd network configuration
+  - Start flanneld service
+- Configure and start kubernetes
+  - IPA:  Create CA and install monitored service certificates
+  - Template kube-system pod manifests, kubelet service, kube
+    configuration, etc. for API server and other nodes, with
+    inter-node TLS and etcd TLS endpoints
+  - Start kubelet service, wait for API availability, and check for
+    pod creation
+  - Install and configure `kubectl` client with TLS client certs
+  - Install and configure the k8s dns and dashboard add-ons
 
 ## Installing the cluster
 
@@ -58,21 +97,17 @@ this work in any critical scenario.**
 
         ansible-playbook playbooks/site.yaml
 
-- Install cluster with progressive steps:
+- Delete a node or the whole cluster
 
-        # Provision droplets on DigitalOcean and configure storage
-        ansible-playbook playbooks/provision.yaml
+        # Destroy host1
+        ansible-playbook playbooks/destroy.yaml -e confirm=host -l host1
 
-        # Install FreeIPA server/replica containers
-        ansible-playbook playbooks/freeipa.yaml
+        # Destroy whole cluster
+        ansible-playbook playbooks/destroy.yaml -e confirm=all
 
-        # Install and configure docker TLS, etcd3, flanneld, k8s
-        ansible-playbook playbooks/cluster.yaml
+-----------
 
-        # Install services in k8s:  email, PBX, web, etc.
-        ansible-playbook playbooks/services.yaml
-
-## Other commands
+## Commands for development
 
 - Misc commands:
 
@@ -80,12 +115,6 @@ this work in any critical scenario.**
         ansible host1 -m setup \
             -e ansible_python_interpreter=/home/core/bin/python \
             -e ansible_ssh_user=core
-
-        # Destroy host1
-        ansible-playbook playbooks/destroy.yaml -e confirm=host -l host1
-
-        # Destroy whole cluster
-        ansible-playbook playbooks/destroy.yaml -e confirm=all
 
         # List all variables for a host
         ansible host1 -m debug -a "var=hostvars[inventory_hostname]"
@@ -146,6 +175,8 @@ Misc. kubernetes commands
     kubectl --namespace=kube-system port-forward kubernetes-dashboard-v1.6.0-xcgh7 9090
     kubectl --namespace=kube-system exec kube-dns-v20-jh9sb -c kubedns -- nslookup host1
     kubectl --namespace=kube-system describe pods kube-dns-v20-jh9sb
+
+-----------
 
 ## Documentation used to develop this system
 
@@ -352,6 +383,8 @@ web services on a single IP.
 
 
 
+-----------
+
 ## Other links
 
 - [port.direct Harbor][pd-harbor] integrates K8s and FreeIPA (and others)
@@ -367,12 +400,6 @@ web services on a single IP.
 
 - Initial members may have incomplete endpoint list
 
-### Is certmonger actually running in ipaclient?
-
-- Should a new ipaclient Docker image be written from scratch?
-  - The fake systemd stuff is pretty irritating; why not a real
-    systemd like the `ipa` container seems to have?
-
 ### IPA configuration
 
 These should be added to automation
@@ -383,7 +410,6 @@ These should be added to automation
 
 - Create ipa sidekick `/etc/resolv.conf` service to install
   FreeIPA/Google DNS servers at start/stop
-
 
 ### Public SSL Certs
 
@@ -417,16 +443,30 @@ Possibilities:
 [k8s-es-kibana]: https://kubernetes.io/docs/tasks/debug-application-cluster/logging-elasticsearch-kibana/
 [k8s-logging-deis-blog]: https://deis.com/blog/2016/kubernetes-logging-with-elasticsearch-and-kibana/
 
-### Schedule pods on master
+### Schedule pods on k8s apiserver
 
-- Security recommendations say don't schedule pods on master
+- Security recommendations say don't schedule pods on k8s master
 - However, this is possible; see [master isolation docs][k8s-master-isolation]
 
 [k8s-master-isolation]: https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/#master-isolation
 
-### CA-less nodes
+### Memory
 
-- FreeIPA CA takes an enormous amount of RAM;
-  see [CA-less install][freeipa-ca-less]
+- The FreeIPA Dogtag CA and kubernetes API servers take an enormous
+  amount of RAM; 1GB is insufficient for both, even with 2GB swap
+- How can these pieces be distributed to ensure redundancy but
+  minimize RAM requirements?
 
 [freeipa-ca-less]: https://www.freeipa.org/page/V3/CA-less_install
+
+### DNS service
+
+- DNS service exposed at public IP won't recurse
+- DNS service exposed at internal IPs will recurse, but not routable
+  across nodes and thus no DNS redundancy
+- Probably the IPA servers need to be moved into Kubernetes so that
+  internal service can be routed
+
+### CoreOS SSSD
+
+- Enrol CoreOS in IPA
