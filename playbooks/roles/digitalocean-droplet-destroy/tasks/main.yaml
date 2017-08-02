@@ -33,6 +33,9 @@
     state: absent
     command: create
     api_token:  "{{ do_token }}"
+  # Droplet can take time to be destroyed
+  retries: 3
+  delay: 1
 
 - name:  "Destroy freeipa volume {{freeipa_block_storage_name}}"
   digital_ocean_block_storage:
@@ -41,4 +44,7 @@
     state: absent
     command: create
     api_token:  "{{ do_token }}"
+  # Droplet can take time to be destroyed
+  retries: 3
+  delay: 1
   when: '"freeipa" in group_names'
