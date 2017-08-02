@@ -13,7 +13,6 @@
         state: directory
       with_items:
         - "{{k8s_dir}}"
-        - "{{k8s_ssl_dir}}"
         - "{{k8s_manifest_dir}}"
         - "{{k8s_cni_dir}}"
         - "{{k8s_cni_dir}}/net.d"
@@ -27,19 +26,20 @@
           - kube-controller-manager
           - kube-scheduler
           # - calico
-      when:  hostname == master_host
+      when:  hostname in groups.k8s_apiserver
 
     - name:  "Set worker node facts"
       set_fact:
         manifests:
           - kube-proxy
           # - calico
-      when:  hostname != master_host
+      when:  hostname not in groups.k8s_apiserver
 
   become: true
   tags:
     - k8s-basics
-    - k8s-pod-manifests
+    - k8s-kubelet
+
 
 #################################
 # Deploy kubernetes master and worker
@@ -50,39 +50,7 @@
 # https://coreos.com/kubernetes/docs/latest/deploy-workers.html
 
 #
-# TLS Assets
-#
-
-- block:
-
-    - name:  "Set facts for creating certs"
-      set_fact:
-        cert_nick:  "k8s_ssl_cert"
-        service_principal: "{{k8s_service_basename}}"
-        ca_name:  "{{k8s_ca}}"
-        ca_subject_cn:  "{{k8s_ca_subject_cn}}"
-        cert_dir: "{{k8s_ssl_dir}}"
-        cacert_path:  "{{k8s_ssl_cacert}}"
-        cert_path:  "{{k8s_ssl_cert}}"
-        key_path:  "{{k8s_ssl_key}}"
-      tags:
-        - k8s-sub-ca
-        - k8s-certs
-
-    # Create Kubernetes sub-CA
-    - include: tasks/ipa_sub_ca.yaml
-      tags: k8s-sub-ca
-
-    # Create Kubernetes service certs
-    - include: tasks/ipa_certmonger_certs.yaml
-      tags: k8s-certs
-
-  tags:
-    - k8s-tls
-
-
-#
-# Flannel configuration
+# Install systemd kubelet.service unit:  master and workers
 #
 
 - block:
@@ -93,40 +61,12 @@
         dest: "{{k8s_cni_dir}}/net.d/10-flannel.conf"
       when: not k8s_use_calico
 
-  become: true
-  tags:
-    - k8s-docker
-
-
-#
-# Set up pods
-#
-
-- block:
-
     - name: "Template pod manifests in {{k8s_manifest_dir}}/*.yaml"
       template:
         src: "{{item}}.yaml.j2"
         dest: "{{k8s_manifest_dir}}/{{item}}.yaml"
       become: true
       with_items:  "{{manifests}}"
-
-    - name: "Template pod manifests locally in {{k8s_local_manifest_dir}}"
-      template:
-        src: "{{item}}.yaml.j2"
-        dest: "../{{k8s_local_manifest_dir}}/{{item}}.yaml"
-      with_items:  "{{manifests}}"
-      delegate_to: localhost
-
-  become: true
-  tags:
-    - k8s-pod-manifests
-
-#
-# Install systemd kubelet.service unit:  master and workers
-#
-
-- block:
 
     - name: "Template systemd kubelet.service unit file"
       template:
@@ -158,7 +98,7 @@
       wait_for:
         host:  localhost
         port:  9080
-      when:  hostname == master_host
+      when:  hostname in groups.k8s_apiserver
 
   become: true
   tags:
@@ -186,7 +126,7 @@
       with_items:
         - [ 0, 1, 2, 3 ]
 
-  when:  hostname == master_host
+  when:  hostname in groups.k8s_apiserver
   tags:
     - k8s-check
 
@@ -196,37 +136,13 @@
 # https://coreos.com/kubernetes/docs/latest/configure-kubectl.html
 
 #
-# Create the local k8s client cert
-#
-- block:
-
-    - name:  "Set facts for creating the kubernetes client cert"
-      set_fact:
-        principal: "{{manager_id}}"
-        email_address:  "{{manager_id}}@{{domain_name}}"
-        ca_name:  "{{k8s_ca}}"
-        client_cert_dir: "../{{k8s_client_ssl_dir}}"
-        client_cacert_path: "../{{k8s_client_ssl_cacert}}"
-        client_cert_path: "../{{k8s_client_ssl_cert}}"
-        client_key_path: "../{{k8s_client_ssl_key}}"
-        key_bits: "2048"
-
-    - include: tasks/ipa_client_certs.yaml
-
-  run_once:  true
-  tags:
-    - k8s-client-cert
-
-#
 # Download and configure the local kubectl executable
 #
 - block:
 
     - name: "Download the kubectl executable"
       get_url:
-        url: >-
-          {{ 'https://storage.googleapis.com/kubernetes-release/release' +
-             '/v%s/bin/linux/amd64/kubectl' % kubectl_version }}
+        url: "{{kubectl_url}}"
         dest: "{{kubectl_path}}"
         mode: 0755
 
@@ -268,35 +184,30 @@
     - name: "Template the k8s DNS add-on definition"
       template:
         src: "{{item}}.yaml.j2"
-        dest: "../var/k8s/{{item}}.yaml"
-      register:  k8s_dns_manifest
-      with_items:
-        - dns-addon
-
-    - name: "Template the k8s DNS add-on definition locally"
-      template:
-        src: "{{item}}.yaml.j2"
         dest: "../{{k8s_local_manifest_dir}}/{{item}}.yaml"
       with_items:
-        - dns-addon
+        - kube-dns-addon
       delegate_to: localhost
 
     - name: "Check the k8s DNS add-on"
       shell: "{{kubectl_path}} get pods --namespace=kube-system |
-                  grep -q kube-dns-v20 && echo yes || echo no"
+                  grep -q kube-dns && echo yes || echo no"
       register: k8s_dns_addon
       changed_when: "k8s_dns_addon.stdout == 'no'"
 
     - name: "Start the k8s DNS add-on"
       # FIXME use the Ansible kubernetes module
-      command: "{{kubectl_path}} create -f ../var/k8s/dns-addon.yaml"
-      when:  k8s_dns_addon.changed or k8s_dns_manifest.changed
+      command: "{{kubectl_path}} create
+                  -f ../{{k8s_local_manifest_dir}}/{{item}}.yaml"
+      with_items:
+        - kube-dns-addon
+      when:  k8s_dns_addon.changed
 
     - name: "Re-check the k8s DNS add-on"
       shell: "{{kubectl_path}} get pods --namespace=kube-system |
-                  grep kube-dns-v20"
+                  grep kube-dns"
       changed_when: false
-      when:  k8s_dns_addon.changed or k8s_dns_manifest.changed
+      when:  k8s_dns_addon.changed
 
   delegate_to: localhost
   run_once:  true
@@ -311,17 +222,9 @@
     - name: "Template the k8s kube dashboard add-on definition"
       template:
         src: "{{item}}.yaml.j2"
-        dest: "../var/k8s/{{item}}.yaml"
-      with_items:
-        - kube-dashboard
-
-    - name: "Template the k8s kube dashboard add-on definition locally"
-      template:
-        src: "{{item}}.yaml.j2"
         dest: "../{{k8s_local_manifest_dir}}/{{item}}.yaml"
       with_items:
-        - kube-dashboard
-      delegate_to: localhost
+        - kube-dashboard-addon
 
     - name: "Check the k8s kube dashboard add-on"
       shell: "{{kubectl_path}} get pods --namespace=kube-system |
@@ -331,8 +234,10 @@
 
     - name: "Start the k8s kube dashboard add-on"
       # FIXME use the Ansible kubernetes module
-      command: "{{kubectl_path}} create -f
-                     ../var/k8s/kube-dashboard.yaml"
+      command: "{{kubectl_path}} create
+                    -f ../{{k8s_local_manifest_dir}}/{{item}}.yaml"
+      with_items:
+        - kube-dashboard-addon
       when:  k8s_dashboard_addon.changed
 
     - name: "Re-check the k8s kube dashboard add-on"
@@ -341,16 +246,23 @@
       changed_when: false
       when:  k8s_dashboard_addon.changed
 
-    # - name: "Get k8s dashboard pod name"
-    #   shell: "kubectl get pods --namespace=kube-system |
-    #               awk '/kubernetes-dashboard/ { print $1 }'"
-    #   register: k8s_dashboard_pod
-
-    # - name: "Port forward k8s dashboard"
-    #   shell: "kubectl port-forward {{k8s_dashboard_pod.stdout}}
-    #               9090 --namespace=kube-system"
-
   delegate_to: localhost
   run_once:  true
   tags:
     - k8s-dashboard
+
+#
+# Download and configure the local kubectl executable
+#
+- block:
+
+    - name: "Download the kubeadm executable"
+      get_url:
+        url: "{{kubeadm_url}}"
+        dest: "{{kubeadm_path}}"
+        mode: 0755
+
+  delegate_to: localhost
+  run_once:  true
+  tags:
+    - k8s-kubeadm

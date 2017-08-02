@@ -11,16 +11,9 @@ all:
     # Docker detach keys:  uncomment to redefine
     #docker_detach_keys: "ctrl-^"
 
-# Define CoreOS cluster hosts
-coreos_master:
   hosts:
-    # Exactly one host must be in the `coreos_master` group
     host1:
       network_prefix: 10.1
-
-coreos:
-  # Other CoreOS cluster nodes here
-  hosts:
     host2:
       network_prefix: 10.2
     host3:
@@ -28,6 +21,17 @@ coreos:
       # Override defaults
       size_id: 2gb
       region_id: fra1
+
+coreos:
+  hosts:
+    host1:
+    host2:
+    host3:
+
+# There must be exactly one kubernetes apiserver, for now
+k8s_apiserver:
+  hosts:
+    host2:
 
 # DigitalOcean hosts must be defined here
 digitalocean:
@@ -50,3 +54,8 @@ freeipa:
   #   host1:
   #   host2:
   #   host3:
+
+# Define exactly one FreeIPA server to be provisioned first
+freeipa_master:
+  hosts:
+    host1:

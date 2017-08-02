@@ -28,7 +28,7 @@ etcd:
   discovery_srv: {{domain_name}}
   initial_cluster_state: new
   initial_advertise_peer_urls: https://{{fqdn}}:2380
-  initial_cluster_token: cluster_{{etcd_cluster_token}}
+  initial_cluster_token: cluster_{{cluster_id}}
   #
   # Exit (do not proxy) when discovery fails
   discovery_fallback: exit

@@ -8,7 +8,7 @@
 --principal=admin
 --admin-password={{freeipa_admin_password}}
 {# Enroll with this server; must be in /etc/hosts #}
---server={{master_fqdn}}
+--server={{freeipa_master_fqdn}}
 {# Config basic facts #}
 --hostname={{fqdn}}
 --realm={{kerberos_realm}}

@@ -12,7 +12,7 @@
       register:  resolved_conf
       vars:
         dns_servers:
-          - "{{ master_host }}"
+          - "{{ freeipa_master_host }}"
 
     - name:  "Reload systemd and restart systemd-resolved.service"
       systemd:
@@ -125,7 +125,7 @@
     # Wait for install to complete and service to come online
     - include:  tasks/freeipa-service-wait.yaml
 
-  when: hostname == master_host
+  when: hostname == freeipa_master_host
   tags:
     - docker-ipa-run
 
@@ -146,14 +146,14 @@
         zone: "{{domain_name}}"
         arecord: "{{item.a_rec}}"
         state: exact
-        ipa_host: "{{master_fqdn}}"
+        ipa_host: "{{freeipa_master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       with_items:
         - host: "{{hostname}}"
           a_rec: "{{ip_addr}}"
       delegate_to: localhost
-      when:  hostname != master_host
+      when:  hostname != freeipa_master_host
 
   tags:
     - docker-ipa-run
@@ -183,7 +183,7 @@
       shell: |
         echo {{freeipa_admin_password}} | {{ipa_exec}} kinit admin;
         {{ipa_exec}} ipa host-del {{hostname}} || true
-      delegate_to:  "{{master_host}}"
+      delegate_to:  "{{freeipa_master_host}}"
 
     - name: "Start ipa.service on IPA replicas"
       systemd:
@@ -199,7 +199,7 @@
     # Wait for install to complete and service to come online
     - include:  tasks/freeipa-service-wait.yaml
 
-  when: hostname != master_host
+  when: hostname != freeipa_master_host
   tags:
     - docker-ipa-run
 

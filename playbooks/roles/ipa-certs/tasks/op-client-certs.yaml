@@ -1,50 +1,28 @@
 ---
 #
-# Create TLS client certs and copy locally
-#
-# Usage, included in role/tasks/main.yaml:
-#
-# - set_fact:
-#     # Principal, e.g. 'me'; must be an IPA user ID
-#     principal:  "{{my_uid}}"
-#     # Email address, e.g. 'me@example.com'; must be an IPA email
-#     email_address:  "{{my_email}}"
-#     # Certificate authority IPA name, e.g. 'my_ca'
-#     ca_name:  "{{my_ca}}"
-#     # Local paths for certificates
-#     client_cert_dir: "{{my_ssl_dir}}"
-#     client_cacert_path:  "{{my_ssl_cacert}}"
-#     client_cert_path:  "{{my_ssl_cert}}"
-#     client_key_path:  "{{my_ssl_key}}"
-#     # Number of bits for key, default 2048
-#     key_bits:  "1024"
-#
-# - include: tasks/ipa_client_certs.yaml
-
-#
 # Check if client cert already exists and is valid
 #
 # Saves a lot of work later, if so
 - block:
 
-    - name: "Check if {{ca_name}} client cert already exists locally in
-      {{client_cert_path}}"
+    - name: "Check if {{args.ca_name}} client cert already exists locally in
+      {{args.client_cert_path}}"
       stat:
-        path: "{{client_cert_path}}"
+        path: "{{args.client_cert_path}}"
       register: client_cert_stat
       changed_when: not client_cert_stat.stat.exists
 
-    - name: "Check if {{ca_name}} client key already exists locally in
-      {{client_cert_path}}"
+    - name: "Check if {{args.ca_name}} client key already exists locally in
+      {{args.client_cert_path}}"
       stat:
-        path: "{{client_cert_path}}"
+        path: "{{args.client_cert_path}}"
       register: client_key_stat
       changed_when: not client_key_stat.stat.exists
 
-    - name: "Check if {{ca_name}} CA cert already exists locally in
-      {{client_cacert_path}}"
+    - name: "Check if {{args.ca_name}} CA cert already exists locally in
+      {{args.client_cacert_path}}"
       stat:
-        path: "{{client_cacert_path}}"
+        path: "{{args.client_cacert_path}}"
       register: ca_cert_stat
       changed_when: not ca_cert_stat.stat.exists
 
@@ -57,9 +35,10 @@
       register: cert_key_match
       changed_when: "cert_key_match.stdout != '1'"
 
-    - name: "Verify {{ca_name}} client cert validity"
+    - name: "Verify {{args.ca_name}} client cert validity"
       shell: |
-        openssl verify -CAfile {{client_cacert_path}} {{client_cert_path}} 1>&2 \
+        openssl verify -CAfile {{args.client_cacert_path}} \
+            {{args.client_cert_path}} 1>&2 \
             && echo yes || echo no
       register: client_cert_verify
       changed_when: client_cert_verify.stdout == "no"
@@ -75,54 +54,57 @@
 
     # Generate key and CSR
 
-    - name: "Create local {{ca_name}} client cert directory {{client_cert_dir}}"
+    - name: "Create local {{args.ca_name}} client cert directory
+             {{args.client_cert_dir}}"
       file:
-        path: "{{client_cert_dir}}"
+        path: "{{args.client_cert_dir}}"
         state: directory
         mode: 0700
 
-    - name: "Generate key in {{client_key_path}}"
+    - name: "Generate key in {{args.client_key_path}}"
       openssl_privatekey:
-        path: "{{client_key_path}}"
-        size: "{{ key_bits | default(2048) }}"
+        path: "{{args.client_key_path}}"
+        size: "{{ args.key_bits | default(2048) }}"
       register:  gen_client_key
 
-    - name:  "Create local client certificate request for {{principal}}"
+    - name:  "Create local client certificate request for {{args.principal}}"
       openssl_csr:
-        path: "{{client_cert_dir}}/csr.pem"
-        privatekey_path: "{{client_key_path}}"
-        commonName: "{{principal}}"
-        subjectAltName: "email:{{email_address}}"
+        path: "{{args.client_cert_dir}}/csr.pem"
+        privatekey_path: "{{args.client_key_path}}"
+        commonName: "{{args.principal}}"
+        subjectAltName: "email:{{args.email_address}}"
 
     # Request cert from IPA and create cert file
 
-    - name: "Ensure no current cert exists for {{principal}}"
+    - name: "Ensure no current cert exists for {{args.principal}}"
       ipa_cert:
-        principal: "{{principal}}"
-        cacn: "{{ca_name}}"
+        principal: "{{args.principal}}"
+        cacn: "{{args.ca_name}}"
         # Revocation reason:  'superceded'
         revocation_reason: "4"
         state: absent
-        ipa_host: "{{master_fqdn}}"
+        ipa_host: "{{freeipa_master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       when:  gen_client_key.changed or cert_key_match.changed
 
-    - name: "Request IPA CA {{ca_name}} client certificate for {{principal}}"
+    - name: "Request IPA CA {{args.ca_name}} client certificate for
+             {{args.principal}}"
       ipa_cert:
-        req: "{{ lookup('file', '%s/csr.pem' % client_cert_dir) }}"
-        principal: "{{principal}}"
-        cacn: "{{ca_name}}"
+        req: "{{ lookup('file', '%s/csr.pem' % args.client_cert_dir) }}"
+        principal: "{{args.principal}}"
+        cacn: "{{args.ca_name}}"
         state: present
-        ipa_host: "{{master_fqdn}}"
+        ipa_host: "{{freeipa_master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       register: client_cert_req
 
-    - name: "Dump {{ca_name}} client certificate into {{client_cert_path}}"
+    - name: "Dump {{args.ca_name}} client certificate into
+             {{args.client_cert_path}}"
       copy:
         content: "{{client_cert_req.cert.certificate | ipa_cert_to_pem}}"
-        dest: "{{client_cert_path}}"
+        dest: "{{args.client_cert_path}}"
         force: yes
 
   when: |
@@ -137,11 +119,11 @@
 #
 - block:
 
-    - name: "Read {{ca_name}} CA info"
+    - name: "Read {{args.ca_name}} CA info"
       ipa_ca:
-        name: "{{ca_name}}"
+        name: "{{args.ca_name}}"
         state: present
-        ipa_host: "{{master_fqdn}}"
+        ipa_host: "{{freeipa_master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       # Don't actually create, just read
@@ -149,12 +131,12 @@
       changed_when: False
       register: ca_info
 
-    - name: "Read {{ca_name}} CA cert"
+    - name: "Read {{args.ca_name}} CA cert"
       ipa_cert:
         cacn: ipa
         principal: "{{ca_info.ca.ipacasubjectdn[0]|cn_from_dn()}}"
         state: present
-        ipa_host: "{{master_fqdn}}"
+        ipa_host: "{{freeipa_master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       # Don't actually create, just read
@@ -167,23 +149,24 @@
         cacn: ipa
         principal: "Certificate Authority"
         state: present
-        ipa_host: "{{master_fqdn}}"
+        ipa_host: "{{freeipa_master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       # Don't actually create, just read
       check_mode: yes
       changed_when: False
-      when:  "ca_name != 'ipa'"
+      when:  "args.ca_name != 'ipa'"
       register: ca_cert
 
-    - name: "Dump {{ca_name}} CA cert chain into {{client_cacert_path}}"
+    - name: "Dump {{args.ca_name}} CA cert chain into
+             {{args.client_cacert_path}}"
       copy:
         content: |
           {{ sub_ca_cert.cert.certificate | ipa_cert_to_pem }}
-          {{ (ca_name != 'ipa')|ternary(
+          {{ (args.ca_name != 'ipa')|ternary(
                  ca_cert.cert.certificate | ipa_cert_to_pem,
                  '') }}
-        dest: "{{client_cacert_path}}"
+        dest: "{{args.client_cacert_path}}"
         force: yes
 
   run_once: True
@@ -195,9 +178,9 @@
 #
 - block:
 
-    - name: "Verify {{ca_name}} certificate chain"
+    - name: "Verify {{args.ca_name}} certificate chain"
       command: |
-        openssl verify -CAfile {{client_cacert_path}} {{client_cert_path}}
+        openssl verify -CAfile {{args.client_cacert_path}} {{args.client_cert_path}}
       changed_when: False
 
     - name: "Verify cert matches key"

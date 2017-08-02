@@ -9,12 +9,12 @@
     idnsname: "{{domain_name}}"
     state: present
     idnsallowtransfer: "none;"
-    ipa_host: "{{master_fqdn}}"
+    ipa_host: "{{freeipa_master_fqdn}}"
     ipa_user: "{{ipa_user}}"
     ipa_pass: "{{freeipa_admin_password}}"
   delegate_to: localhost
   register: create_fqdn_dnszone
-  when:  hostname == master_host
+  when:  hostname == freeipa_master_host
   run_once: true
   tags:
     - configure
@@ -29,11 +29,11 @@
     bind_pw: "{{freeipa_ds_password}}"
     dn: cn=config
     name: nsslapd-allow-anonymous-access
-    server_uri: "ldaps://{{master_fqdn}}"
+    server_uri: "ldaps://{{freeipa_master_fqdn}}"
     state: exact
     values: rootdse
   delegate_to: localhost
-  when:  hostname == master_host
+  when:  hostname == freeipa_master_host
   run_once: true
   tags:
     - configure
@@ -45,13 +45,13 @@
   ldap_attr:
     bind_dn: "{{bind_dn}}"
     bind_pw: "{{freeipa_ds_password}}"
-    server_uri: "ldaps://{{master_fqdn}}"
+    server_uri: "ldaps://{{freeipa_master_fqdn}}"
     dn: "cn=ipaConfig,cn=etc,{{domain_dn}}"
     name: ipaDefaultLoginShell
     values: /bin/bash
     state: exact
   delegate_to: localhost
-  when:  hostname == master_host
+  when:  hostname == freeipa_master_host
   run_once: true
   tags:
     - configure
@@ -63,29 +63,19 @@
 
 - block:
 
-    - name: "Remove container IP from ipa-ca A record"
+    - name: "Set ipa-ca A records"
       ipa_dnsrecord:
         name: ipa-ca
         zone: "{{domain_name}}"
         arecord: "{{item}}"
-        state: absent
-        ipa_host: "{{master_fqdn}}"
+        state: exact
+        ipa_host: "{{freeipa_master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
-      with_items:
-        - "{{freeipa_network_addr}}"
-
-    - name: "Add host IP to ipa-ca A record"
-      ipa_dnsrecord:
-        name: ipa-ca
-        zone: "{{domain_name}}"
-        arecord: "{{item}}"
-        state: present
-        ipa_host: "{{master_fqdn}}"
-        ipa_user: "{{ipa_user}}"
-        ipa_pass: "{{freeipa_admin_password}}"
-      with_items:
-        - "{{ip_addr}}"
+      with_items: 
+        -
+          - "{{ groups.freeipa | ip_addr_list(hostvars) }}"
+      run_once: true
 
   delegate_to: localhost
   tags:
@@ -101,7 +91,7 @@
       ipa_dnszone:
         idnsname: "{{item}}"
         state: present
-        ipa_host: "{{master_fqdn}}"
+        ipa_host: "{{freeipa_master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       with_items:
@@ -113,7 +103,7 @@
         name: "{{item}}"
         zone: "{{domain_name}}"
         state: absent
-        ipa_host: "{{master_fqdn}}"
+        ipa_host: "{{freeipa_master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       with_items:
@@ -125,7 +115,7 @@
         zone: "{{item.zone}}"
         arecord: "{{item.ip_addr}}"
         state: present
-        ipa_host: "{{master_fqdn}}"
+        ipa_host: "{{freeipa_master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       with_items:
@@ -138,7 +128,7 @@
         zone: "{{item.zone}}"
         arecord: "{{item.ip_addr}}"
         state: present
-        ipa_host: "{{master_fqdn}}"
+        ipa_host: "{{freeipa_master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       with_items:
@@ -147,6 +137,7 @@
 
   delegate_to: localhost
   tags:
+    - freeipa-host-zone
     - configure
     - dns
 
@@ -159,7 +150,7 @@
       ipa_dnszone:
         idnsname: "{{item}}"
         state: present
-        ipa_host: "{{master_fqdn}}"
+        ipa_host: "{{freeipa_master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       with_items:
@@ -171,7 +162,7 @@
         zone: "{{item.zone}}"
         ptrrecord: "{{item.ptr}}"
         state: present
-        ipa_host: "{{master_fqdn}}"
+        ipa_host: "{{freeipa_master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       with_items:
@@ -181,6 +172,7 @@
 
   delegate_to: localhost
   tags:
+    - freeipa-reverse-zone
     - configure
     - dns
 
@@ -194,7 +186,7 @@
         name: "{{item.ca_acl}}"
         certprofile: "{{item.certprofile}}"
         state: enabled
-        ipa_host: "{{master_fqdn}}"
+        ipa_host: "{{freeipa_master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       with_items:
@@ -210,7 +202,7 @@
         givenname: Manager
         sn: User
         # password: "{{freeipa_admin_password}}"
-        ipa_host: "{{master_fqdn}}"
+        ipa_host: "{{freeipa_master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       tags: manager-user
@@ -220,7 +212,7 @@
         name: "{{item}}"
         user: "{{manager_id}}"
         state: present
-        ipa_host: "{{master_fqdn}}"
+        ipa_host: "{{freeipa_master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       with_items:
@@ -228,7 +220,7 @@
       tags: manager-user
 
   delegate_to: localhost
-  when:  hostname == master_host
+  when:  hostname == freeipa_master_host
   run_once: True
   tags:
     - ca-acl

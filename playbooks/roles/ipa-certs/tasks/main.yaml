@@ -1,0 +1,57 @@
+---
+#
+# Create TLS certs with certmonger in ipa container
+#
+# The cert is actually created and maintained by certmonger running in
+# ipa.  The {{cert_dir}} directory must be bind-mounted in the ipa
+# container for this purpose.
+#
+# Usage, included in role/tasks/main.yaml:
+#
+# - role: ipa-certs
+#   # Which operations to carry out
+#   ops:
+#     - ca
+#     - service-certs
+#     - client-certs
+#   args:
+#     #
+#     # Common options:
+#     # - IPA sub-CA name
+#     ca_name:  "{{my_ca}}"
+#     # - Number of bits for key, default 2048 (service/client-certs only)
+#     key_bits:  "1024"
+#     #
+#     # CA aptions:
+#     # - CA subject CN
+#     ca_subject_cn:  "{{my_ca_subject_cn}}"
+#     #
+#     # Service cert options:
+#     # - A human-friendly nickname for `ipa-getcert -i`
+#     cert_nick:  "my_cert"
+#     # - Service principal basename, without /{{fqdn}}@{{kerberos_realm}}
+#     service_principal: "{{my_service_basename}}"
+#     # Paths for certificates
+#     cert_dir: "{{my_ssl_dir}}"
+#     cacert_path:  "{{my_ssl_cacert}}"
+#     cert_path:  "{{my_ssl_cert}}"
+#     key_path:  "{{my_ssl_key}}"
+#     #
+#     # Client cert options:
+#     # - Principal, e.g. 'me'; must be an IPA user ID (client-certs)
+#     principal:  "{{my_uid}}"
+#     # - Email address, e.g. 'me@example.com'; must be an IPA email (client-certs)
+#     email_address:  "{{my_email}}"
+#     # - Local paths for certificates (client-certs)
+#     client_cert_dir: "{{my_ssl_dir}}"
+#     client_cacert_path:  "{{my_ssl_cacert}}"
+#     client_cert_path:  "{{my_ssl_cert}}"
+#     client_key_path:  "{{my_ssl_key}}"
+#     #
+#     # Parallel IPA operations break
+#     serial: 1
+
+- include:  "op-{{opname}}.yaml"
+  with_items:  "{{ops}}"
+  loop_control:
+    loop_var: opname

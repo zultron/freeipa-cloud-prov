@@ -35,6 +35,16 @@
     - role: freeipa-install
       tags: freeipa-install
 
+- name: Configure FreeIPA
+  hosts: freeipa
+  # FIXME WTF?  Suddenly needed why?
+  environment:
+    PYTHONPATH: "../lib/python"
+  # Parallel IPA requests break
+  serial: 1
+
+  roles:
+
     # IPA settings for http, DNS, CA, LDAP
     - role: freeipa-configure
       tags: freeipa-configure

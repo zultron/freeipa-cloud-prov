@@ -1,0 +1,103 @@
+---
+- name: "Create cert directory {{args.cert_dir}}"
+  file:
+    path: "{{args.cert_dir}}"
+    state: directory
+    mode: 0755
+  become: true
+
+- name:  "Create service principal managed by FreeIPA host"
+  ipa_service:
+    name: "{{item.princ}}/{{fqdn}}@{{kerberos_realm}}"
+    managedby_host: "{{item.managedby}}"
+    state: present
+    ipa_host: "{{freeipa_master_fqdn}}"
+    ipa_user: "{{ipa_user}}"
+    ipa_pass: "{{freeipa_admin_password}}"
+  with_items:
+    - princ: "{{args.service_principal}}"
+      managedby: "{{freeipa_fqdn}}"
+  delegate_to: localhost
+
+- name: "Read {{args.ca_name}} CA info"
+  ipa_ca:
+    name: "{{args.ca_name}}"
+    state: present
+    ipa_host: "{{freeipa_master_fqdn}}"
+    ipa_user: "{{ipa_user}}"
+    ipa_pass: "{{freeipa_admin_password}}"
+  # Don't actually create, just read
+  check_mode: yes
+  changed_when: False
+  run_once: true
+  delegate_to: localhost
+  register: ca_info
+
+- name: "Read {{args.ca_name}} CA cert"
+  ipa_cert:
+    cacn: "ipa"
+    principal: "{{ca_info.ca.ipacasubjectdn[0]|cn_from_dn()}}"
+    state: present
+    ipa_host: "{{freeipa_master_fqdn}}"
+    ipa_user: "{{ipa_user}}"
+    ipa_pass: "{{freeipa_admin_password}}"
+  delegate_to: localhost
+  # Don't actually create, just read
+  check_mode: yes
+  run_once: true
+  changed_when: False
+  register: ca_cert
+
+# FIXME The top-level CA cert should be grabbed just like the sub-CA
+# cert
+
+- name: "Dump  CA cert chain into {{args.cacert_path}}"
+  copy:
+    content: |
+      {{ca_cert.cert.certificate | ipa_cert_to_pem}}
+      {{ lookup('file', '../var/cacert.pem') }}
+    dest: "{{args.cacert_path}}"
+    force: yes
+  become: true
+  register: cacert_path_create
+
+- name:  "Check cert tracking status of {{args.cert_path}}"
+  shell: "{{ipa_exec}}
+             ipa-getcert status -f {{args.cert_path}} |
+             grep -q 'No request found' && echo no || echo yes"
+  register: cert_tracking
+  changed_when:  cert_tracking.stdout == "no"
+
+- name:  "Start tracking server cert in {{args.cert_path}}"
+  # FIXME Tell ipa-getcert (-F) to put CA cert into
+  # {{args.cacert_path}}.top.pem so that we might notice if saving the
+  # whole CA cert chain is fixed
+  shell: "{{ipa_exec}}
+            ipa-getcert request -w
+              -I {{args.cert_nick}}
+              -f {{args.cert_path}}
+              -k {{args.key_path}}
+              -F {{args.cacert_path}}.top.pem
+              -K {{args.service_principal}}/{{fqdn}}@{{kerberos_realm}}
+              -N {{fqdn}}
+              -g {{args.key_bits|default(2048)}}
+              -X {{args.ca_name}}"
+  when: cert_tracking.changed
+
+- name:  "Double-check tracking of {{args.cert_path}}"
+  shell: "{{ipa_exec}} ipa-getcert list -i {{args.cert_nick}} |
+             awk '/^\tstatus: / {print $2}'"
+  register: cert_tracking
+  changed_when:  false
+  failed_when:  cert_tracking.stdout != "MONITORING"
+  when: cert_tracking.changed
+
+- name:  "Double-check cert chain"
+  command:  "{{ipa_exec}} openssl verify -CAfile {{args.cacert_path}}
+                 {{args.cert_path}}"
+  changed_when: False
+
+- name:  "Set certmonger_certs_changed fact"
+  set_fact:
+    certmonger_certs_changed:
+      "{{ cacert_path_create.changed or cert_tracking.changed }}"

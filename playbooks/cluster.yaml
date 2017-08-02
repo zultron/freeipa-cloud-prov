@@ -2,17 +2,96 @@
 # Set up clustering on CoreOS
 
 ############################################
-- name: Install CoreOS cluster
+- name: Install docker CA and service certs
+  hosts: coreos
+  # This must be specified, or IPA operations will break
+  serial: 1
+  # FIXME WTF?  Suddenly needed why?
+  environment:
+    PYTHONPATH: "../lib/python"
+
+  roles:
+    - role: ipa-certs
+      ops:
+        # Install sub-CA and service certs
+        - ca
+        - service-certs
+        - client-certs
+      args:
+        # Create CA
+        ca_name:  "{{docker_ca}}"
+        ca_subject_cn: "{{docker_ca_subject_cn}}"
+        # Create Docker service cert
+        cert_nick:  "docker_ssl_cert"
+        service_principal: "{{docker_service_principal}}"
+        cert_dir: "{{docker_ssl_dir}}"
+        cacert_path:  "{{docker_ssl_cacert}}"
+        cert_path:  "{{docker_ssl_cert}}"
+        key_path:  "{{docker_ssl_key}}"
+        # Create Docker client cert
+        principal:  "{{manager_id}}"
+        email_address:  "{{manager_id}}@{{domain_name}}"
+        client_cert_dir: "../{{docker_client_ssl_dir}}"
+        client_cacert_path: "../{{docker_client_ssl_cacert}}"
+        client_cert_path: "../{{docker_client_ssl_cert}}"
+        client_key_path: "../{{docker_client_ssl_key}}"
+      tags:
+        - docker-certs
+        # Prereqs for `docker-tls` tasks
+        - docker-tls
+
+
+- name: Install Docker TLS
   hosts: coreos
   # FIXME WTF?  Suddenly needed why?
   environment:
     PYTHONPATH: "../lib/python"
 
   roles:
-
     # Configure CoreOS Docker TLS
     - role: docker-tls
       tags: docker-tls
+
+
+- name: Install etcd CA and service certs
+  hosts: coreos
+  # This must be specified, or IPA operations will break
+  serial: 1
+  # FIXME WTF?  Suddenly needed why?
+  environment:
+    PYTHONPATH: "../lib/python"
+
+  roles:
+    - role: ipa-certs
+      ops:
+        # Install sub-CA and service certs
+        - ca
+        - service-certs
+      args:
+        # ca
+        ca_name:  "{{etcd_ca}}"
+        ca_subject_cn:  "{{etcd_ca_subject_cn}}"
+        # service-certs
+        cert_nick:  "etcd_ssl_cert"
+        service_principal: "{{etcd_service_principal}}"
+        cert_dir: "{{etcd_ssl_dir}}"
+        cacert_path:  "{{etcd_ssl_cacert}}"
+        cert_path:  "{{etcd_ssl_cert}}"
+        key_path:  "{{etcd_ssl_key}}"
+      tags:
+        - etcd-certs
+        # Prereqs for `etcd3-bootstrap` tasks
+        - etcd-start
+        - etcd
+
+
+- name: Install etcd and flanneld services
+  hosts: coreos
+  # FIXME WTF?  Suddenly needed why?
+  environment:
+    PYTHONPATH: "../lib/python"
+
+  roles:
 
     # Set up etcd
     - role: etcd3-bootstrap
@@ -21,6 +100,53 @@
     # Set up flannel
     - role: flannel-bootstrap
       tags: flannel
+
+
+- name: Install Kubernetes CA and service certs
+  hosts: coreos
+  # This must be specified, or IPA operations will break
+  serial: 1
+  # FIXME WTF?  Suddenly needed why?
+  environment:
+    PYTHONPATH: "../lib/python"
+
+  roles:
+    - role: ipa-certs
+      ops:
+        # Install sub-CA and service certs
+        - ca
+        - service-certs
+        - client-certs
+      args:
+        # ca
+        ca_name:  "{{k8s_ca}}"
+        ca_subject_cn:  "{{k8s_ca_subject_cn}}"
+        # service-certs
+        cert_nick:  "k8s_ssl_cert"
+        service_principal: "{{k8s_service_basename}}"
+        cert_dir: "{{k8s_ssl_dir}}"
+        cacert_path:  "{{k8s_ssl_cacert}}"
+        cert_path:  "{{k8s_ssl_cert}}"
+        key_path:  "{{k8s_ssl_key}}"
+        # client-certs
+        principal: "{{manager_id}}"
+        email_address:  "{{manager_id}}@{{domain_name}}"
+        client_cert_dir: "../{{k8s_client_ssl_dir}}"
+        client_cacert_path: "../{{k8s_client_ssl_cacert}}"
+        client_cert_path: "../{{k8s_client_ssl_cert}}"
+        client_key_path: "../{{k8s_client_ssl_key}}"
+
+      tags:
+        - k8s-certs
+
+
+- name: Install Kubernetes cluster
+  hosts: coreos
+  # FIXME WTF?  Suddenly needed why?
+  environment:
+    PYTHONPATH: "../lib/python"
+
+  roles:
 
     # Set up kubernetes
     - role: kubernetes-bootstrap

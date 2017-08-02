@@ -1,3 +1,7 @@
+# Alternative:
+# https://github.com/kubernetes/kubernetes.github.io/blob/master/docs/admin/high-availability/kube-controller-manager.yaml
+# CL args:
+# https://kubernetes.io/docs/admin/kube-controller-manager/
 apiVersion: v1
 kind: Pod
 metadata:
@@ -7,6 +11,8 @@ spec:
   hostNetwork: true
   containers:
   - name: kube-controller-manager
+    # Alternative:
+    # https://console.cloud.google.com/gcr/images/google-containers/GLOBAL/kube-controller-manager
     image: quay.io/coreos/hyperkube:v{{k8s_version}}
     command:
       - /hyperkube

@@ -15,46 +15,6 @@
 #
 # Instructions for enabling TLS with auth
 # https://coreos.com/os/docs/latest/customizing-docker.html#enable-the-remote-api-with-tls-authentication
-
-#
-# Configure cert creation parameters
-#
-- name:  "Set facts for creating docker SSL certs"
-  set_fact:
-    # Create CA
-    ca_name:  "{{docker_ca}}"
-    ca_subject_cn: "{{docker_ca_subject_cn}}"
-    # Create Docker service cert
-    cert_nick:  "docker_ssl_cert"
-    service_principal: "{{docker_service_principal}}"
-    key_bits:  "2048"
-    cert_dir: "{{docker_ssl_dir}}"
-    cacert_path:  "{{docker_ssl_cacert}}"
-    cert_path:  "{{docker_ssl_cert}}"
-    key_path:  "{{docker_ssl_key}}"
-    # Create Docker client cert
-    principal:  "{{manager_id}}"
-    email_address:  "{{manager_id}}@{{domain_name}}"
-    client_cert_dir: "../{{docker_client_ssl_dir}}"
-    client_cacert_path: "../{{docker_client_ssl_cacert}}"
-    client_cert_path: "../{{docker_client_ssl_cert}}"
-    client_key_path: "../{{docker_client_ssl_key}}"
-  tags:
-    - docker-ca
-    - dockerd-tls
-    - docker-client-cert
-
-
-#
-# Create docker sub-CA for Docker authentication
-#
-- include: tasks/ipa_sub_ca.yaml
-  when:  hostname == master_host
-  tags: docker-ca
-
-
-#
-# Configure docker TLS
 #
 # Docker TLS socket instructions require separate
 # `docker-tls-tcp.socket` unit.  Doing it this way requires the docker
@@ -73,9 +33,6 @@
 # https://www.freedesktop.org/software/systemd/man/systemd.socket.html
 #
 - block:
-
-    # Generate Docker service certs
-    - include: tasks/ipa_certmonger_certs.yaml
 
     - name: "Install docker.socket systemd dropin directory"
       file:
@@ -108,10 +65,3 @@
 
   become: true
   tags: dockerd-tls
-
-
-#
-# Generate docker client cert
-#
-- include: tasks/ipa_client_certs.yaml
-  tags: docker-client-cert

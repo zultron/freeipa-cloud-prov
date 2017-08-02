@@ -5,13 +5,17 @@ hostname: "{{inventory_hostname}}"
 fqdn: "{{hostname}}.{{domain_name}}"
 ip_addr: "{{ansible_default_ipv4.address}}"
 
-# Master host name and IP
-master_host: "{{groups.coreos_master[0]}}"
-master_fqdn: "{{groups.coreos_master[0]}}.{{domain_name}}"
-master_ip_addr: "{{hostvars[master_host].ansible_default_ipv4.address}}"
+# FreeIPA master server
+freeipa_master_host: "{{groups.freeipa_master[0]}}"
+freeipa_master_fqdn: "{{freeipa_master_host}}.{{domain_name}}"
+freeipa_master_ip_addr:
+  "{{hostvars[freeipa_master_host].ansible_default_ipv4.address}}"
 
 # Manager user ID
 manager_id: "manager"
 
 # Replica host list
 replica_hosts: "{{ groups.coreos | difference(groups.coreos_master) }}"
+
+# Host architecture
+host_arch: "amd64"

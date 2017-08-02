@@ -137,13 +137,15 @@ Misc. kubernetes commands
 
     kubectl config *
     kubectl cluster-info
-    kubectl --all-namespaces get pods
+    kubectl get cs
     kubectl --namespace=kube-system get pods
     kubectl --namespace=kube-system describe pods kube-dns-v20-d7crm
     kubectl --namespace=kube-system logs kube-dns-v20-d7crm kubedns
     kubectl --namespace=kube-system replace --force -f var/k8s/dns-addon.yaml
     kubectl --namespace=kube-system delete pods kube-dns-v20-d7crm
     kubectl --namespace=kube-system port-forward kubernetes-dashboard-v1.6.0-xcgh7 9090
+    kubectl --namespace=kube-system exec kube-dns-v20-jh9sb -c kubedns -- nslookup host1
+    kubectl --namespace=kube-system describe pods kube-dns-v20-jh9sb
 
 ## Documentation used to develop this system
 
@@ -389,3 +391,42 @@ These should be added to automation
 
 [letsencrypt]: https://letsencrypt.org/
 
+### Cheaper VPSs
+
+DO isn't the cheapest anymore, and Dogtag struggles in a $10/month 1gb
+droplet.
+
+- [Scaleway][scaleway]:  For 30% less money, get 300% more CPU and RAM
+  and 150% more disk, and 300% more disk for the same money.
+  Apparently no Ansible modules, but there is an API and a
+  (read-only?) Python module.
+
+[scaleway]: https://www.scaleway.com/pricing/
+
+### Logging
+
+Possibilities:
+
+- Kubernetes [Logging Agent For Elasticsearch][k8s-fluentd-es] add-on
+- Kubernetes [Logging Using Elasticsearch and Kibana][k8s-es-kibana]
+  docs
+  - Deis.com blog,
+    [Kubernetes Logging With Elasticsearch and Kibana][k8s-logging-deis-blog]
+
+[k8s-fluentd-es]: https://github.com/kubernetes/kubernetes/tree/master/cluster/addons/fluentd-elasticsearch
+[k8s-es-kibana]: https://kubernetes.io/docs/tasks/debug-application-cluster/logging-elasticsearch-kibana/
+[k8s-logging-deis-blog]: https://deis.com/blog/2016/kubernetes-logging-with-elasticsearch-and-kibana/
+
+### Schedule pods on master
+
+- Security recommendations say don't schedule pods on master
+- However, this is possible; see [master isolation docs][k8s-master-isolation]
+
+[k8s-master-isolation]: https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/#master-isolation
+
+### CA-less nodes
+
+- FreeIPA CA takes an enormous amount of RAM;
+  see [CA-less install][freeipa-ca-less]
+
+[freeipa-ca-less]: https://www.freeipa.org/page/V3/CA-less_install

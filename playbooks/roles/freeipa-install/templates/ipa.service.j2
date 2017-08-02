@@ -35,7 +35,7 @@ ExecStart=/usr/bin/docker run \
 			  --ip={{freeipa_network_addr}} \
 			  --env=IPA_SERVER_IP={{ip_addr}} \
 			  --env=DEBUGOPTS \
-			  --add-host={{master_fqdn}}:{{master_ip_addr}} \
+			  --add-host={{freeipa_master_fqdn}}:{{freeipa_master_ip_addr}} \
 {% for p in freeipa_ports|docker_port_list %}
 			  --publish={{p}} \
 {% endfor %}

@@ -1,0 +1,4 @@
+# Used in kubedns manifest
+pillar:
+  dns_server:  "{{k8s_dns_service_ip}}"
+  dns_domain:  "{{k8s_cluster_domain}}"

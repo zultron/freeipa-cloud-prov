@@ -13,3 +13,4 @@
 !/var/retries/
 /var/retries/*.retry
 /lib/bin/kubectl
+/lib/bin/kubeadm

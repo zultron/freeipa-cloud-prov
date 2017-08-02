@@ -44,7 +44,7 @@
         zone: "{{domain_name}}"
         srvrecord: "{{item.srvrec}}"
         state: exact
-        ipa_host: "{{master_fqdn}}"
+        ipa_host: "{{freeipa_master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       with_items:
@@ -61,72 +61,6 @@
   delegate_to: localhost
   tags:
     - etcd-dns-srv
-
-#
-# Configure DNS resolvers to point at FreeIPA
-#
-- block:
-    # Point CoreOS resolver at FreeIPA to read etcd SRV records and
-    # resolve member names
-    - name: "Template /etc/systemd/resolved.conf with all FreeIPA servers"
-      template:
-        src: resolved.conf.j2
-        dest: /etc/systemd/resolved.conf
-      register:  resolved_conf
-      vars:
-        dns_servers: "{{ groups.coreos }}"
-
-    - name:  "Reload systemd and restart systemd-resolved.service"
-      systemd:
-        name: systemd-resolved
-        daemon_reload: yes
-        state: restarted
-      when:  resolved_conf.changed
-
-  become: true
-  tags:
-    - etcd-resolv-conf
-
-#
-# Create etcd sub-CA and service certs
-#
-- name:  "Set facts for creating etcd SSL certs"
-  set_fact:
-    # Create CA
-    ca_name:  "{{etcd_ca}}"
-    ca_subject_cn: "{{etcd_ca_subject_cn}}"
-    # Create Etcd service cert
-    cert_nick:  "etcd_ssl_cert"
-    service_principal: "{{etcd_service_principal}}"
-    key_bits:  "2048"
-    cert_dir: "{{etcd_ssl_dir}}"
-    cacert_path:  "{{etcd_ssl_cacert}}"
-    cert_path:  "{{etcd_ssl_cert}}"
-    key_path:  "{{etcd_ssl_key}}"
-    # Create Etcd client cert
-    principal:  "{{manager_id}}"
-    email_address:  "{{manager_id}}@{{domain_name}}"
-    client_cert_dir: "../{{etcd_client_ssl_dir}}"
-    client_cacert_path: "../{{etcd_client_ssl_cacert}}"
-    client_cert_path: "../{{etcd_client_ssl_cert}}"
-    client_key_path: "../{{etcd_client_ssl_key}}"
-  tags:
-    - etcd-ca
-    - etcd-server-cert
-    - etcd-client-cert
-    - etcd-start
-
-# Create etcd sub-CA
-- include: tasks/ipa_sub_ca.yaml
-  tags:
-    - etcd-ca
-    - etcd-start
-
-# Etcd service certs
-- include: tasks/ipa_certmonger_certs.yaml
-  tags:
-    - etcd-server-cert
-    - etcd-start
 
 #
 # Start etcd-member service

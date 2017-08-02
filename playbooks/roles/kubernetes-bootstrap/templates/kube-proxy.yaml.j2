@@ -1,3 +1,6 @@
+# CL args:
+# https://kubernetes.io/docs/admin/kube-proxy/
+# Absent from https://github.com/kubernetes/kubernetes.github.io/blob/master/docs/admin/high-availability/
 apiVersion: v1
 kind: Pod
 metadata:
@@ -7,6 +10,8 @@ spec:
   hostNetwork: true
   containers:
     - name: kube-proxy
+      # Alternative:
+      # https://console.cloud.google.com/gcr/images/google-containers/GLOBAL/kube-proxy
       image: quay.io/coreos/hyperkube:v{{k8s_version}}
       command:
         - /hyperkube

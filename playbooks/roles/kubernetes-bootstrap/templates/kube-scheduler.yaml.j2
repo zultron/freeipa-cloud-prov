@@ -1,3 +1,7 @@
+# CL args:
+# https://kubernetes.io/docs/admin/kube-proxy/
+# Alternative:
+# https://github.com/kubernetes/kubernetes.github.io/blob/master/docs/admin/high-availability/kube-scheduler.yaml
 apiVersion: v1
 kind: Pod
 metadata:
@@ -7,6 +11,8 @@ spec:
   hostNetwork: true
   containers:
   - name: kube-scheduler
+    # Alternative:
+    # https://console.cloud.google.com/gcr/images/google-containers/GLOBAL/kube-scheduler
     image: quay.io/coreos/hyperkube:v{{k8s_version}}
     command:
     - /hyperkube

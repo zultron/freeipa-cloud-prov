@@ -7,10 +7,8 @@
     src: "{{freeipa_volume_path}}/etc/ipa/ca.crt"
     dest: "../var/cacert.pem"
     flat: yes
-  run_once: true
+  when:  hostname == freeipa_master_host
   register: fetch_ca_cert
-  tags:
-    - local-setup
 
 - block:
 
@@ -34,5 +32,3 @@
   delegate_to: localhost
   become: true
   run_once: true
-  tags:
-    - local-setup

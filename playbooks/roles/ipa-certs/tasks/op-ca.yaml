@@ -1,0 +1,34 @@
+---
+- block:
+
+    - name: "Create {{args.ca_name}} sub-CA"
+      ipa_ca:
+        name: "{{args.ca_name}}"
+        ipacasubjectdn: "CN={{args.ca_subject_cn}},O={{kerberos_realm}}"
+        description: "{{args.ca_subject_cn}}"
+        state: present
+        ipa_host: "{{freeipa_master_fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+
+    - name: "Add {{args.ca_name}} CA to CA ACL '{{user_cert_acl}}'"
+      ipa_caacl:
+        name: "{{user_cert_acl}}"
+        ca: "{{args.ca_name}}"
+        state: present
+        ipa_host: "{{freeipa_master_fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+
+    - name: "Add {{args.ca_name}} CA to CA ACL 'hosts_services_caIPAserviceCert'"
+      ipa_caacl:
+        name: "hosts_services_caIPAserviceCert"
+        ca: "{{args.ca_name}}"
+        state: present
+        ipa_host: "{{freeipa_master_fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+
+  delegate_to: localhost
+  # Run once
+  run_once: True

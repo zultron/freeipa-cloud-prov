@@ -120,24 +120,24 @@ flanneld_dir:  "{{ data_volume_path }}/flanneld"
 #################################
 # Kubernetes configuration
 
-# Master node
-k8s_master: "{{master_host}}"
-
-# Kubernetes version
+# CoreOS Kubernetes version
 # https://quay.io/repository/coreos/hyperkube?tag=latest&tab=tags
-#k8s_version: "1.7.0_coreos.0"
-k8s_version: "1.6.1_coreos.0"
+k8s_version: "1.7.2_coreos.0"
+# - Upstream Kubernetes release
+k8s_upstream_release: "1.7"
 # - DNS add-on
 k8s_kubedns_version: "1.8"
 k8s_kube_dnsmasq_version: "1.4"
 k8s_exechealthz_version: "1.2"
 # - kube dashboard add-on
-k8s_dashboard_version: "1.6.0"
+k8s_dashboard_version: "1.6.3"
 
 # Directory/file paths
 k8s_dir: "{{data_volume_path}}/k8s"
 
 # Networking
+# FIXME change to {{etcd_cluster_token}}.{{domain_name}}?
+k8s_cluster_domain:  "cluster.local."
 k8s_pod_network:  10.2.0.1/16
 k8s_service_ip_range:  10.3.0.0/24
 k8s_service_ip: 10.3.0.1
@@ -145,10 +145,13 @@ k8s_dns_service_ip: 10.3.0.10
 k8s_apiserver_secure_port: 6443
 k8s_apiserver_insecure_port: 9080
 k8s_apiserver_url_local:  "http://127.0.0.1:{{k8s_apiserver_insecure_port}}"
+# FIXME What should this be?
+#   Maybe IPA DNS name for 10.3.0.1, and add service cert?
 k8s_apiserver_url_remote:
-  "https://{{master_fqdn}}:{{k8s_apiserver_secure_port}}"
+  "https://{{groups.k8s_apiserver[0]}}.{{domain_name}}:{{k8s_apiserver_secure_port}}"
+# FIXME What should this be?
 k8s_apiserver_url:
-  "{{ (hostname==master_host)|ternary(
+  "{{ (hostname==groups.k8s_apiserver[0])|ternary(
   k8s_apiserver_url_local, k8s_apiserver_url_remote) }}"
 k8s_use_calico:  no
 
@@ -173,9 +176,15 @@ k8s_client_ssl_key: "{{k8s_client_ssl_dir}}/key.pem"
 # - local manifests
 k8s_local_manifest_dir: "var/k8s"
 
-# kubectl
-kubectl_version: "1.6.1"
+# kubectl and kubeadm
+kubeutils_version: "1.6.1"
+kubeutils_base_url: >-
+  {{ 'https://storage.googleapis.com/kubernetes-release/release' +
+     '/v%s/bin/linux/%s' % (kubeutils_version, host_arch) }}
+kubectl_url:  "{{kubeutils_base_url}}/kubectl"
 kubectl_path:  "../lib/bin/kubectl"
+kubeadm_url:  "{{kubeutils_base_url}}/kubeadm"
+kubeadm_path:  "../lib/bin/kubeadm"
 
 # Calico CNI
 # - versions
