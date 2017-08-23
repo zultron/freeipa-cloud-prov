@@ -62,8 +62,7 @@
 
     - name:  Check if install is already complete
       stat:
-        path: "{{freeipa_volume_path}}/etc/systemd/system/{{ ''
-                 }}container-ipa.target.wants/ipa-server-upgrade.service"
+        path: "{{freeipa_volume_path}}/volume-version"
       register: install_path_stat
       changed_when:  not install_path_stat.stat.exists
 
@@ -171,10 +170,10 @@
 
 - block:
 
-    - name: Install FreeIPA replica config
+    - name: Install FreeIPA replica/client config
       template:
-        src: ipa-replica-install-options.j2
-        dest: "{{freeipa_volume_path}}/ipa-replica-install-options"
+        src: "ipa-{{freeipa_role}}-install-options.j2"
+        dest: "{{freeipa_volume_path}}/ipa-{{freeipa_role}}-install-options"
       register: ipa_install_options
       become: true
 
@@ -232,6 +231,7 @@
 
   tags:
     - freeipa-config-external
+  when:  freeipa_role != 'client'
 
 #################################
 # Configure httpd files
@@ -273,3 +273,4 @@
 
   tags:
     - freeipa-config-external
+  when:  freeipa_role != 'client'

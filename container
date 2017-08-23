@@ -3,7 +3,6 @@
 DIR="$(readlink -f $(dirname $0))"
 UID_GID=`id -u`:`id -g`
 DOCKER_IMG="zultron/freeipa-cloud-prov:latest"
-DO_API_KEY=$(awk '/^token:/ {print $2}' config.yaml)
 CONTAINER_NAME=freeipa-cloud-prov
 EXISTING_CONTAINER=$(docker ps -aq --filter=name=$CONTAINER_NAME)
 
@@ -41,6 +40,5 @@ else
 	-u $UID_GID \
 	$DOCKER_EXTRA_ARGS \
 	--entrypoint /bin/bash \
-	-e DO_API_KEY=${DO_API_KEY} \
 	${DOCKER_IMG} "$@"
 fi

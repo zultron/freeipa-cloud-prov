@@ -2,8 +2,9 @@
 # Provision FreeIPA in Docker
 
 ############################################
-- name: Provision FreeIPA in Docker
-  hosts: freeipa
+- name: Provision FreeIPA storage
+  hosts:
+    - freeipa
   # FIXME WTF?  Suddenly needed why?
   environment:
     PYTHONPATH: "../lib/python"
@@ -30,6 +31,16 @@
       mount_path: "{{freeipa_volume_path}}"
       tags: freeipa-volume
 
+############################################
+- name: Provision FreeIPA in Docker
+  hosts:
+    - freeipa
+    - freeipa_client
+  # FIXME WTF?  Suddenly needed why?
+  environment:
+    PYTHONPATH: "../lib/python"
+
+  roles:
     # Install FreeIPA server in Docker container
     # - Initial IPA server is installed before IPA configuration
     - role: freeipa-install

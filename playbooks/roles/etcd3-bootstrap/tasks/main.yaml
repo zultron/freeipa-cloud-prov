@@ -50,11 +50,11 @@
       with_items:
         -
           role: "server"
-          srvrec: "{{ groups.freeipa |
+          srvrec: "{{ groups.coreos |
                       formatmaplist('0 100 2380 {}.%s.' % domain_name) }}"
         -
           role: "client"
-          srvrec: "{{ groups.freeipa |
+          srvrec: "{{ groups.coreos |
                    formatmaplist('0 100 2379 {}.%s.' % domain_name) }}"
       # Once per run to install latest list
       run_once: yes

@@ -1,0 +1,96 @@
+{# ---------------------------------------------------------------------#}
+{# Options to `ipa-client-install`; place in {{freeipa_volume_path}}    #}
+{# ---------------------------------------------------------------------#}
+
+--unattended
+{# Use --principal and --password #}
+--principal=admin
+--password={{freeipa_admin_password}}
+{# Enroll with this server; must be in /etc/hosts #}
+--server={{freeipa_master_fqdn}}
+{# Config basic facts #}
+--realm={{kerberos_realm}}
+--domain={{domain_name}}
+{# Other options #}
+--no-ntp
+
+{#
+Usage: ipa-client-install [options]
+
+Options:
+  --version             show program's version number and exit
+  -h, --help            show this help message and exit
+
+  basic options:
+    --domain=DOMAIN     domain name
+    --server=SERVER     IPA server
+    --realm=REALM_NAME  realm name
+    --fixed-primary     Configure sssd to use fixed server as primary IPA
+                        server
+    -p PRINCIPAL, --principal=PRINCIPAL
+                        principal to use to join the IPA realm
+    -w PASSWORD, --password=PASSWORD
+                        password to join the IPA realm (assumes bulk password
+                        unless principal is also set)
+    -k KEYTAB, --keytab=KEYTAB
+                        path to backed up keytab from previous enrollment
+    -W                  Prompt for a password to join the IPA realm
+    --mkhomedir         create home directories for users on their first login
+    --hostname=HOSTNAME
+                        The hostname of this machine (FQDN). If specified, the
+                        hostname will be set and the system configuration will
+                        be updated to persist over reboot. By default a
+                        nodename result from uname(2) is used.
+    --force-join        Force client enrollment even if already enrolled
+    --ntp-server=NTP_SERVERS
+                        ntp server to use. This option can be used multiple
+                        times
+    -N, --no-ntp        do not configure ntp
+    --force-ntpd        Stop and disable any time&date synchronization
+                        services besides ntpd
+    --nisdomain=NISDOMAIN
+                        NIS domain name
+    --no-nisdomain      do not configure NIS domain name
+    --ssh-trust-dns     configure OpenSSH client to trust DNS SSHFP records
+    --no-ssh            do not configure OpenSSH client
+    --no-sshd           do not configure OpenSSH server
+    --no-sudo           do not configure SSSD as data source for sudo
+    --no-dns-sshfp      do not automatically create DNS SSHFP records
+    --noac              do not modify the nsswitch.conf and PAM configuration
+    -f, --force         force setting of LDAP/Kerberos conf
+    --kinit-attempts=KINIT_ATTEMPTS
+                        number of attempts to obtain host TGT (defaults to 5).
+    -d, --debug         print debugging information
+    -U, --unattended    unattended (un)installation never prompts the user
+    --ca-cert-file=CA_CERT_FILE
+                        load the CA certificate from this file
+    --request-cert      request certificate for the machine
+    --automount-location=LOCATION
+                        Automount location
+    --configure-firefox 
+                        configure Firefox to use IPA domain credentials
+    --firefox-dir=FIREFOX_DIR
+                        specify directory where Firefox is installed (for
+                        example: '/usr/lib/firefox')
+    --ip-address=IP_ADDRESSES
+                        Specify IP address that should be added to DNS. This
+                        option can be used multiple times
+    --all-ip-addresses  All routable IP addresses configured on any inteface
+                        will be added to DNS
+
+  SSSD options:
+    --permit            disable access rules by default, permit all access.
+    --enable-dns-updates
+                        Configures the machine to attempt dns updates when the
+                        ip address changes.
+    --no-krb5-offline-passwords
+                        Configure SSSD not to store user password when the
+                        server is offline
+    -S, --no-sssd       Do not configure the client to use SSSD for
+                        authentication
+    --preserve-sssd     Preserve old SSSD configuration if possible
+
+  uninstall options:
+    --uninstall         uninstall an existing installation. The uninstall can
+                        be run with --unattended option
+#}

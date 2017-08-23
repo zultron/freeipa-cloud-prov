@@ -26,6 +26,11 @@ container_network_prefix: "{{network_prefix}}.32"
 container_network_cidr: "{{container_network_prefix}}.0/24"
 container_network_gateway: "{{container_network_prefix}}.1"
 
+# Toolbox image; this one is customized for FreeIPA
+toolbox_image_base: "zultron/freeipa-cloud-prov"
+toolbox_image_tag: "ipaclient"
+toolbox_image: "{{toolbox_image_base}}:{{toolbox_image_tag}}"
+
 ##################################
 # Docker
 

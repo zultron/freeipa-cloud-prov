@@ -5,25 +5,44 @@
 # Multi-pronged approach to ensure FreeIPA service has been fully
 # installed, and service is available and ready
 
+#
+# FreeIPA server/replicas
+#
 - name:  Check if install is already complete
   stat:
-    path: "{{freeipa_volume_path}}/etc/systemd/system/{{ ''
-             }}container-ipa.target.wants/ipa-server-upgrade.service"
+    path: "{{freeipa_volume_path}}/volume-version"
   register: install_path_stat
 
-- name: "Wait for FreeIPA install to complete"
-  wait_for:
-    # This file is updated at the end of the install
-    path: "/media/freeipa/etc/openldap/ldap.conf"
-    state: present
-    search_regex: "^TLS_CACERT /etc/ipa/ca.crt"
-    # Install can take almost minutes to install on a 1GB droplet
-    timeout: 900
-  when: not install_path_stat.stat.exists
+- block:
 
-- name: "Wait for FreeIPA service to start"
-  # This command blocks until ipa.service is up and running
-  command: "docker exec ipa systemctl start ipa.service"
-  changed_when: False
-  when: not install_path_stat.stat.exists
+    - name: "Wait for FreeIPA install to complete"
+      wait_for:
+        # This file is updated at the end of the install
+        path: "{{freeipa_volume_path}}/etc/openldap/ldap.conf"
+        state: present
+        search_regex: "^TLS_CACERT /etc/ipa/ca.crt"
+        # Install can take almost 15 minutes to install on a 1GB droplet
+        timeout: 900
+      when: not install_path_stat.stat.exists
 
+    - name: "Wait for FreeIPA service to start"
+      # This command blocks until ipa.service is up and running
+      command: "docker exec ipa systemctl start ipa.service"
+      changed_when: False
+      when: not install_path_stat.stat.exists
+
+  when:  hostname in groups.freeipa
+
+#
+# FreeIPA clients
+#
+- block:
+
+    - name: "Wait for FreeIPA client install to complete"
+      wait_for:
+        # This file is updated at the end of the install
+        path: "{{freeipa_volume_path}}/volume-version"
+        state: present
+      when: not install_path_stat.stat.exists
+
+  when:  hostname in groups.freeipa_client

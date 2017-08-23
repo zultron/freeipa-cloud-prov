@@ -36,15 +36,19 @@ ExecStart=/usr/bin/docker run \
 			  --env=IPA_SERVER_IP={{ip_addr}} \
 			  --env=DEBUGOPTS \
 			  --add-host={{freeipa_master_fqdn}}:{{freeipa_master_ip_addr}} \
+{% if freeipa_role != 'client' %}
 {% for p in freeipa_ports|docker_port_list %}
 			  --publish={{p}} \
 {% endfor %}
+{% endif %}
 			  {{freeipa_docker_image}}
 
+{% if freeipa_role != 'client' %}
 # Wait for DNS to come online; this takes a minute normally, or over
 # 10 minutes when bootstrapping on a 1GB DigitalOcean host
 ExecStartPost=/usr/bin/dig +noall +norecurse +comments +time=1 +tries=1200 \
 			   @{{freeipa_network_addr}} {{domain_name}}
+{% endif %}
 # Stop
 ExecStop=/usr/bin/docker stop ipa
 

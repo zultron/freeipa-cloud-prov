@@ -261,7 +261,7 @@ Next step is to install and configure FreeIPA in a Docker container.
 - [Configure SSSD on CoreOS][coreos-sssd]
 
 [freeipa]: http://www.freeipa.org/page/Main_Page
-[freeipa-docker]: https://github.com/adelton/docker-freeipa
+[freeipa-docker]: https://github.com/freeipa/freeipa-container
 [freeipa-docker-client]: https://github.com/zultron/docker-freeipa/tree/centos-7-client
 [ipa-server-install-man]: https://linux.die.net/man/1/ipa-server-install
 [ipa-replica-prepare-man]: https://linux.die.net/man/1/ipa-replica-prepare
@@ -396,10 +396,6 @@ web services on a single IP.
 
 ## TODO
 
-### Adjust etcd endpoints after cluster complete
-
-- Initial members may have incomplete endpoint list
-
 ### IPA configuration
 
 These should be added to automation
@@ -470,3 +466,7 @@ Possibilities:
 ### CoreOS SSSD
 
 - Enrol CoreOS in IPA
+
+### Adding later nodes
+
+- This probably won't work at all right now.

@@ -11,6 +11,10 @@ freeipa_master_fqdn: "{{freeipa_master_host}}.{{domain_name}}"
 freeipa_master_ip_addr:
   "{{hostvars[freeipa_master_host].ansible_default_ipv4.address}}"
 
+# FreeIPA credentials
+ipa_user: admin
+# freeipa_admin_password: (in vault.yaml)
+
 # Manager user ID
 manager_id: "manager"
 
@@ -19,3 +23,7 @@ replica_hosts: "{{ groups.coreos | difference(groups.coreos_master) }}"
 
 # Host architecture
 host_arch: "amd64"
+
+# CA ACL
+user_cert_acl: user_cert_acl
+user_cert_profile: IECUserRoles

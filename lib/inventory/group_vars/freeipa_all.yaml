@@ -1,13 +1,19 @@
 ---
 # Vars for FreeIPA
 
-# Docker images
-freeipa_docker_image: "freeipa/freeipa-server:centos-7"
+freeipa_role: "{{ (hostname in groups.freeipa_master) | ternary(
+        'server',
+        (hostname in groups.freeipa) | ternary(
+            'replica', 'client')) }}"
 
-# Toolbox image; this one is customized for FreeIPA
-toolbox_image_base: "zultron/freeipa-cloud-prov"
-toolbox_image_tag: "ipaclient"
-toolbox_image: "{{toolbox_image_base}}:{{toolbox_image_tag}}"
+# Docker images
+
+# - Use official image for server/replica; use customized version for
+#   client running certmonger; rationale:
+#   https://github.com/freeipa/freeipa-container/pull/155
+freeipa_docker_image: "{{ (hostname in groups.freeipa) | ternary(
+        'freeipa/freeipa-server:centos-7',
+        'zultron/freeipa-container:centos-7') }}"
 
 # FreeIPA container network
 freeipa_network_bridge: "br-ipa"
@@ -17,14 +23,15 @@ freeipa_network_gateway: "{{freeipa_network_prefix}}.1"
 freeipa_network_addr: "{{freeipa_network_prefix}}.2"
 
 # FreeIPA data volume
-freeipa_volume_path:  "/media/freeipa"
+freeipa_volume_path:  "{{ (hostname in groups.freeipa) | ternary(
+        '/media/freeipa','%s/freeipa' % data_volume_path) }}"
 freeipa_volume_block_device:  "{{ block_device_path_pat % 'freeipa' }}"
 freeipa_volume_device:  "{{freeipa_volume_block_device}}-part1"
 freeipa_volume_size: 1
 freeipa_block_storage_name: "{{ block_storage_name_pat % 'freeipa' }}"
 freeipa_volume_systemd_unit: "{{freeipa_volume_path|systemd_escape}}.mount"
 
-# FreeIPA server/replica container
+# FreeIPA server/replica/client container
 freeipa_hostname: "ipa"
 freeipa_dns_zone: "{{fqdn}}"
 freeipa_fqdn: "{{freeipa_hostname}}.{{freeipa_dns_zone}}"
@@ -49,10 +56,8 @@ freeipa_ports:
   # - "8080"
   # - "7839"
 
-# FreeIPA credentials
+# FreeIPA host; FIXME is this relevant?
 ipa_host: "{{fqdn}}"
-ipa_user: admin
-# freeipa_admin_password: (in vault.yaml)
 
 # Shortcut commands
 ipa_exec: "docker exec -i ipa"
@@ -61,7 +66,3 @@ ipa_exec: "docker exec -i ipa"
 bind_dn: "cn=Directory Manager"
 domain_dn: "{{ domain_name | domain_to_dn }}"
 # freeipa_ds_password: (in vault.yaml)
-
-# CA ACL
-user_cert_acl: user_cert_acl
-user_cert_profile: IECUserRoles

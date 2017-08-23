@@ -1,5 +1,8 @@
 #                                                              -*-yaml-*-
 ---
+########################################################################
+# The following settings must be customized for your site
+#
 all:
   vars:
     # Top-level domain name of cluster
@@ -11,51 +14,49 @@ all:
     # Docker detach keys:  uncomment to redefine
     #docker_detach_keys: "ctrl-^"
 
+# Each host in cluster must be in exactly one of the following FreeIPA
+# groups
+freeipa_master:
+  # Initial FreeIPA server:  only one host may be in this group
   hosts:
     host1:
       network_prefix: 10.1
+freeipa_replica:
+  # FreeIPA replicas:  multiple hosts may be in this group
+  hosts:
     host2:
       network_prefix: 10.2
+freeipa_client:
+  # FreeIPA clients:  hosts not running FreeIPA master/replicas must go here
+  hosts:
     host3:
       network_prefix: 10.3
       # Override defaults
       size_id: 2gb
       region_id: fra1
 
-coreos:
-  hosts:
-    host1:
-    host2:
-    host3:
-
-# There must be exactly one kubernetes apiserver, for now
+# Kubernetes API server:  exactly one host
 k8s_apiserver:
   hosts:
-    host2:
+    host3:
 
-# DigitalOcean hosts must be defined here
+########################################################################
+# The following defaults don't need to be changed for basic setups
+#
+
+# Assume all hosts are running CoreOS Container Linux
+coreos:
+  children:
+    freeipa_master:
+    freeipa_replica:
+    freeipa_client:
+
+# Assume all hosts are running in DigitalOcean droplets
 digitalocean:
-  # Assume all CoreOS hosts are on DigitalOcean
   children:
     coreos:
-  # Otherwise, list individually
+  # Hosts may also be listed individually
   # hosts:
   #   host1:
   #   host2:
   #   host3:
-
-# FreeIPA server and replicas must be listed here
-freeipa:
-  # Assume all CoreOS hosts are FreeIPA servers
-  children:
-    coreos:
-  # If not all hosts are FreeIPA servers, list individually
-  # hosts:
-  #   host1:
-  #   host2:
-  #   host3:
-
-# Define exactly one FreeIPA server to be provisioned first
-freeipa_master:
-  hosts:
-    host1:
