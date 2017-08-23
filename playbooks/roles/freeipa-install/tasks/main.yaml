@@ -96,6 +96,20 @@
       become: true
       register:  ipa_unit_file
 
+    - name: Ensure FreeIPA data directory exists
+      file:
+        path:  "{{freeipa_volume_path}}"
+        state: directory
+        mode: 0755
+      become: true
+
+    - name: Install FreeIPA server/replica/client config
+      template:
+        src: "ipa-{{freeipa_role}}-install-options.j2"
+        dest: "{{freeipa_volume_path}}/ipa-{{freeipa_role}}-install-options"
+      register: ipa_install_options
+      become: true
+
   tags:
     - docker-ipa-run
 
@@ -103,13 +117,6 @@
 # Run server
 #
 - block:
-
-    - name: Install FreeIPA server config
-      template:
-        src: ipa-server-install-options.j2
-        dest: "{{freeipa_volume_path}}/ipa-server-install-options"
-      register: ipa_install_options
-      become: true
 
     - name: "Start ipa.service on IPA server"
       systemd:
