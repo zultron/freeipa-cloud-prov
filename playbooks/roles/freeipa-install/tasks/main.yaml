@@ -131,15 +131,12 @@
 #
 # Set up certs in local container
 #
-# FIXME The next two tasks shouldn't be needed, since the
-# freeipa-container init scripts are supposed to do this when
-# $IPA_SERVER_IP is set in the environment
 - block:
 
     # Copy CA cert to container
     - include: tasks/local-ca-cert.yaml
 
-    - name: "Ensure replica has correct A-record in DNS"
+    - name: "Ensure replica/client has correct A-record in DNS"
       ipa_dnsrecord:
         name: "{{item.host}}"
         zone: "{{domain_name}}"
@@ -170,18 +167,13 @@
 
 - block:
 
-    - name: Install FreeIPA replica/client config
-      template:
-        src: "ipa-{{freeipa_role}}-install-options.j2"
-        dest: "{{freeipa_volume_path}}/ipa-{{freeipa_role}}-install-options"
-      register: ipa_install_options
-      become: true
-
-    - name: "Ensure {{hostname}} not enrolled in IPA"
+    - name: "Ensure host not enrolled in IPA"
       # FIXME this should be done with an ipa_host module
       shell: |
         echo {{freeipa_admin_password}} | {{ipa_exec}} kinit admin;
-        {{ipa_exec}} ipa host-del {{hostname}} || true
+        {{ipa_exec}} ipa host-del {{item}} || true
+      with_items:
+        - "{{hostname}}"
       delegate_to:  "{{freeipa_master_host}}"
 
     - name: "Start ipa.service on IPA replicas"

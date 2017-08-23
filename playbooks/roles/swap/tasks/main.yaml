@@ -6,33 +6,43 @@
 ##############################
 # Check swap status
 
-- name:  "Get canonical device path of {{swap_device}}"
-  shell: "readlink -f {{ swap_device|quote }}"
+- name:  "Get canonical device path of swap_device"
+  shell: "readlink -f {{ item }}"
   register: swap_device_canon_cmd
   # Never report "changed"
   changed_when: False  
+  with_items:
+    - "{{swap_device|quote}}"
 
-# - name: Debug canonical device path
-#   debug:
-#     var: swap_device_canon_cmd
+- name: Debug canonical device path
+  debug:
+    var: swap_device_canon_cmd
+    verbosity: 1
 
-- name:  "Set swap_device_canon fact to {{ swap_device_canon_cmd.stdout }}"
+- name:  "Set swap_device_canon fact"
   set_fact:
-    swap_device_canon:  "{{ swap_device_canon_cmd.stdout }}"
+    swap_device_canon:  "{{ item }}"
+  with_items:
+    - "{{ swap_device_canon_cmd.results[0].stdout }}"
 
-- name:  "Check if already swapping to device {{swap_device_canon}}"
-  shell:  "swapon -s | grep -q '{{ swap_device_canon|quote }}'
+- name:  "Check if already swapping to device"
+  shell:  "swapon -s | grep -q '{{ item }}'
             && echo 'swapping' || echo 'not swapping'"
+  with_items:
+    - "{{ swap_device_canon|quote }}"
   register:  swap_status_cmd
   changed_when: False  
 
-# - name: Debug swap status
-#   debug:
-#     var: swap_status_cmd
+- name: Debug swap status
+  debug:
+    var: swap_status_cmd
+    verbosity: 1
 
-- name:  "Set is_swapping fact to {{ swap_status_cmd.stdout == 'swapping' }}"
+- name:  "Set is_swapping fact"
   set_fact:
-    is_swapping:  "{{ swap_status_cmd.stdout == 'swapping' }}"
+    is_swapping:  "{{ item }}"
+  with_items:
+    - "{{ swap_status_cmd.results[0].stdout == 'swapping' }}"
 
 # - name: Debug swap facts
 #   debug:
@@ -41,8 +51,10 @@
 - block:
     # Stuff to do if the swap device isn't swapping
 
-    - name:  "Format swap partition {{ swap_device_canon }}"
-      command: "mkswap {{ swap_device_canon }}"
+    - name:  "Format swap partition"
+      command: "mkswap {{ item }}"
+      with_items:
+        - "{{ swap_device_canon }}"
       become: true
       register:  mkswap_cmd
 
@@ -50,16 +62,20 @@
     #   debug:
     #     var:  mkswap_cmd
 
-    - name:  "Start {{swap_device_systemd_unit}}"
+    - name:  "Start swap device systemd unit"
       systemd:
-        name: "{{swap_device_systemd_unit}}"
+        name: "{{ item }}"
         enabled: true
         state: "started"
+      with_items:
+        - "{{swap_device_systemd_unit}}"
       become: true
 
-    - name:  "Verify swapon status of device {{ swap_device_canon }}"
-      shell:  "swapon -s | grep -q '{{ swap_device_canon|quote }}'
+    - name:  "Verify swapon status of device"
+      shell:  "swapon -s | grep -q '{{ item }}'
                 && echo 'swapping' || echo 'not swapping'"
+      with_items:
+        - "{{ swap_device_canon|quote }}"
       register:  verify_swap_status_cmd
       failed_when: verify_swap_status_cmd.stderr == 'not swapping'
       changed_when:  False

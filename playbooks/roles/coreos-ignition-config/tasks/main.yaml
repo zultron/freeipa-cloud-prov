@@ -8,7 +8,7 @@
       set_fact:
         ssh_pub_key: "{{ lookup('file', '../var/ssh_id_rsa.pub') }}"
 
-    - name: "Generate human-readable Container Linux Config"
+    - name: "Generate Container Linux Config"
       template:
         src: "container_linux_config.yaml.j2"
         dest: "{{clc_tmp}}"
@@ -35,7 +35,7 @@
         msg: "Ignition config:  {{ic_tmp_contents.content | b64decode}}"
         verbosity: 1
 
-    - name: "Set DigitalOcean user_data fact from ignition config"
+    - name: "Set DO API user_data from Ignition Config"
       set_fact:
         user_data: " {{ic_tmp_contents.content | b64decode}}"
 

@@ -13,15 +13,17 @@
   tags:
     - setup
 
-- name: "Ensure block storage volume {{volume_name}} exists"
+- name: "Ensure block storage volume exists"
   digital_ocean_block_storage:
-    volume_name: "{{volume_name}}"
-    description: "{{volume_name}} volume for {{hostname}}"
+    volume_name: "{{item}}"
+    description: "{{item}} volume for {{hostname}}"
     state: present
     command: create
     api_token:  "{{ do_token }}"
     region: "{{ region_id }}"
     block_size: "{{ volume_size }}"
+  with_items:
+    - "{{volume_name}}"
   register: block_storage_volume
   tags:
     - setup
@@ -33,14 +35,16 @@
 #   tags:
 #     - setup
 
-- name: "Attach block storage volume {{volume_name}} to droplet"
+- name: "Attach block storage volume to droplet"
   digital_ocean_block_storage:
-    volume_name: "{{volume_name}}"
+    volume_name: "{{item}}"
     state: present
     command: attach
     droplet_id: "{{ do_droplet.id }}"
     region: "{{ region_id }}"
     api_token:  "{{ do_token }}"
+  with_items:
+    - "{{volume_name}}"
   register: block_storage_attach
   tags:
     - setup

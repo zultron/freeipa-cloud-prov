@@ -21,45 +21,52 @@
 ##############################
 # Label volume
 
-- name: "Collect volume info for {{ device }}"
+- name: "Collect volume info"
   parted:
-    device: "{{ device }}"
+    device: "{{ item }}"
     state: info
     unit: GiB
+  with_items:
+    - "{{ device }}"
   become: true
   register: parted_info
   tags:
     - setup
 
-# - name: debug volume info
-#   debug:
-#     var: parted_info
-#   tags:
-#     - setup
-
-- name: "Create device {{ device }} volume label {{ label|default('gpt') }}"
-  parted:
-    device: "{{ device }}"
-    label: "{{ label|default('gpt') }}"
-    state: present
-    unit: GiB
-  become: true
-  register: parted_label
-  when: parted_info.disk.table == 'unknown'
+- name: debug volume info
+  debug:
+    var: parted_info
+    verbosity: 1
   tags:
     - setup
 
-# - name: debug data volume label
-#   debug:
-#     var: parted_label
-#   tags:
-#     - setup
+- name: "Create device volume label"
+  parted:
+    device: "{{ item.device }}"
+    label: "{{ item.label }}"
+    state: present
+    unit: GiB
+  with_items:
+    - device: "{{ device }}"
+      label: "{{ label|default('gpt') }}"
+  become: true
+  register: parted_label
+  when: parted_info.results.0.disk.table == 'unknown'
+  tags:
+    - setup
+
+- name: debug data volume label
+  debug:
+    var: parted_label
+    verbosity: 1
+  tags:
+    - setup
 
 
 ##############################
 # Create partitions
 
-- name: "Device {{device}}, create partition"
+- name: "Create partition on device"
   parted:
     align: "{{ align|default('optimal') }}"
     device: "{{ device }}"
