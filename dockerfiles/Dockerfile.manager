@@ -95,6 +95,14 @@ ADD https://github.com/coreos/container-linux-config-transpiler/releases/downloa
     /usr/local/bin/ct
 RUN chmod 755 /usr/local/bin/ct
 
+# Cloudflare PKI and TLS tool
+RUN curl -s -L -o /usr/local/bin/cfssl \
+        https://pkg.cfssl.org/R1.2/cfssl_linux-amd64 && \
+    chmod +x /usr/local/bin/cfssl
+RUN curl -s -L -o /usr/local/bin/cfssljson \
+        https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64 && \
+    chmod +x /usr/local/bin/cfssljson
+
 # Final container configuration
 RUN useradd -s /bin/bash user
 
