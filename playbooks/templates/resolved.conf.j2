@@ -1,7 +1,7 @@
 # https://www.freedesktop.org/software/systemd/man/resolved.conf.html
 
 [Resolve]
-DNS={{ dns_servers | ip_addr_list(hostvars) | join(' ') }}
+DNS={{ dns_servers }}
 Domains={{domain_name}}
 Cache=no
 #FallbackDNS=

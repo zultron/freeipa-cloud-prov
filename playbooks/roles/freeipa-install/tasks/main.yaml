@@ -12,7 +12,7 @@
       register:  resolved_conf
       vars:
         dns_servers:
-          - "{{ freeipa_master_host }}"
+          "{{ freeipa_master_host | ip_addr_list(hostvars) | join(' ') }}"
 
     - name:  "Reload systemd and restart systemd-resolved.service"
       systemd:
