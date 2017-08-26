@@ -1,0 +1,82 @@
+---
+# Generate temporary SSL certificates for bootstrapping etcd
+# https://coreos.com/os/docs/latest/generate-self-signed-certificates.html
+
+#
+# Generate cfssl bootstrap CA
+#
+
+- block:
+
+    - name: "Create cfssl CA directory"
+      file:
+        path: "{{cfssl_dir}}"
+        state: directory
+        mode: 0700
+
+    - name: "Create cfssl CA configuration"
+      copy:
+        content: "{{cfssl_ca_config | to_nice_json }}"
+        dest: "{{cfssl_dir}}/ca-config.json"
+
+    - name: "Create cfssl CSR configuration"
+      copy:
+        content: "{{cfssl_ca_csr | to_nice_json }}"
+        dest: "{{cfssl_dir}}/ca-csr.json"
+
+    - name: "Generate cfssl CA"
+      shell: "cfssl gencert -initca ca-csr.json | cfssljson -bare ca -"
+      args:
+        chdir: "{{cfssl_dir}}"
+        creates: "ca.pem"
+
+  delegate_to: localhost
+  run_once: true
+
+#
+# Generate cfssl bootstrap certificates locally
+#
+
+- block:
+
+    - name: "Create host CSR configuration"
+      copy:
+        content: "{{cfssl_host_csr | to_nice_json}}"
+        dest: "{{cfssl_dir}}/{{hostname}}.json"
+
+    - name: "Generate cfssl host certificate"
+      shell: "cfssl gencert
+                  -ca=ca.pem -ca-key=ca-key.pem
+                  -config=ca-config.json -profile=peer
+                  -hostname={{fqdn}} {{hostname}}.json |
+              cfssljson -bare {{hostname}}"
+      args:
+        chdir: "{{cfssl_dir}}"
+        creates: "{{hostname}}.pem"
+
+  delegate_to: localhost
+
+#
+# Install bootstrap certificates
+#
+
+- block:
+
+    - name: "Create etcd SSL directory on host"
+      file:
+        path: "{{etcd_ssl_dir}}"
+        state: directory
+
+    - name: "Copy etcd certificates to host"
+      copy:
+        src: "{{cfssl_dir}}/{{item.src}}"
+        dest: "{{item.dest}}"
+      with_items:
+        - src: "ca.pem"
+          dest: "{{etcd_ssl_cacert}}"
+        - src: "{{hostname}}.pem"
+          dest: "{{etcd_ssl_cert}}"
+        - src: "{{hostname}}-key.pem"
+          dest: "{{etcd_ssl_key}}"
+
+  become: true

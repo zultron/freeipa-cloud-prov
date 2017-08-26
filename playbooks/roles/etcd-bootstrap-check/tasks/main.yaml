@@ -1,0 +1,21 @@
+---
+# Check if master host etcd cluster is bootstrapped with IPA SSL certs
+
+- block:
+
+    - name: "Query etcd service certs on {{freeipa_master_host}}"
+      shell:
+        "openssl s_client -connect {{freeipa_master_ip_addr}}:2380 -showcerts |
+            grep '^issuer='"
+      failed_when:  false
+      changed_when:  false
+      register: etcd_service_cert_check
+
+    - name: "Set etcd_ssl_bootstrapped fact"
+      set_fact:
+        etcd_ssl_bootstrapped:
+          "{{etcd_service_cert_check.stdout ==
+             'issuer=/O=%s/CN=%s' % (kerberos_realm, etcd_ca_subject_cn)}}"
+
+  run_once: true
+  delegate_to: localhost

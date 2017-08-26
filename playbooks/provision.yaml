@@ -68,10 +68,47 @@
       mount_path: "{{data_volume_path}}"
 
 ############################################
-- name: Configure etc files
+- name: Deploy etcd and flannel
   hosts: coreos
   tags:  etcd-deploy
 
   roles:
-    - role: etc-hosts
-      tags: etc-hosts
+
+    # Set etcd_ssl_bootstrapped if etcd is already using IPA certs
+    - role: etcd-bootstrap-check
+      tags: always
+
+    # If IPA is not available,
+    # - generate temporary etcd certs
+    - role: bootstrap-certs
+      when: not etcd_ssl_bootstrapped
+      tags: bootstrap-certs
+    # - set up temporary DNS server
+    - role: bootstrap-dnsmasq
+      vars:
+        bootstrap_dnsmasq_mode: start
+      when: not etcd_ssl_bootstrapped
+      tags: bootstrap-dnsmasq
+
+    # If IPA IS available,
+    # - generate etcd certs with certmonger
+    - role: ipa-certs
+      when: etcd_ssl_bootstrapped
+      tags: etcd-certs
+
+    # Deploy etcd
+    - role: etcd-deploy
+      tags: etcd-setup
+
+    # Stop temporary DNS server
+    # - If docker containers are running, flannel won't be used
+    # - SRV records only needed for joining cluster
+    # - A records may be taken from /etc/hosts
+    - role: bootstrap-dnsmasq
+      vars:
+        bootstrap_dnsmasq_mode: stop
+      tags: bootstrap-dnsmasq-stop
+
+    # Deploy flannel
+    - role: flannel-deploy
+      tags: flannel-setup

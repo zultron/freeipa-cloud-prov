@@ -1,0 +1,67 @@
+---
+
+# Set up dnsmasq Docker container with SRV records sufficient to
+# bootstrap the etcd cluster before IPA is deployed
+
+- block:
+
+    - name: "Pull dnsmasq docker image"
+      docker_image:
+        name: "{{dnsmasq_docker_image}}"
+
+    - name: "Create dnsmasq config directory"
+      file:
+        path: "{{dnsmasq_config_dir}}"
+        state: directory
+      become: true
+
+    - name: "Template dnsmasq.conf"
+      template:
+        src: "{{item}}.conf.j2"
+        dest: "{{dnsmasq_config_dir}}/{{item}}.conf"
+      with_items:
+        - 01-base
+        - 10-etcd-srv
+      become: true
+      register: dnsmasq_conf
+
+    - name: "Run dnsmasq Docker container"
+      docker_container:
+        name: dnsmasq
+        image: "{{dnsmasq_docker_image}}"
+        capabilities:
+          - "NET_ADMIN"
+        exposed_ports:
+          - "53/udp"
+          - "53/tcp"
+        volumes:
+          - "{{dnsmasq_config_dir}}:/etc/dnsmasq.d"
+        command:
+          - "dnsmasq"
+          - "--conf-dir=/etc/dnsmasq.d"
+        state: started
+        restart: "{{ dnsmasq_conf | ternary('yes', 'no') }}"
+        recreate: "{{ dnsmasq_conf | ternary('yes', 'no') }}"
+      register: dnsmasq_container
+
+#################################
+# Point /etc/resolv.conf at dnsmasq container
+- block:
+
+    - name: "Template /etc/systemd/resolved.conf with temporary dnsmasq"
+      template:
+        src: resolved.conf.j2
+        dest: /etc/systemd/resolved.conf
+      register:  resolved_conf
+      vars:
+        dns_servers:
+          "{{ dnsmasq_container.ansible_facts.docker_container.NetworkSettings.IPAddress }}"
+
+    - name:  "Reload systemd and restart systemd-resolved.service"
+      systemd:
+        name: systemd-resolved
+        daemon_reload: yes
+        state: restarted
+      when:  resolved_conf.changed
+
+  become: true

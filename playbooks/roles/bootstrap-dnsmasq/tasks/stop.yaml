@@ -1,0 +1,33 @@
+---
+# Stop dnsmasq Docker container and unconfigure it in resolv.conf
+
+- block:
+
+    - name: "Template /etc/systemd/resolved.conf with no entries"
+      template:
+        src: resolved.conf.j2
+        dest: /etc/systemd/resolved.conf
+      register:  resolved_conf
+      vars:
+        dns_servers: ""
+
+    - name:  "Reload systemd and restart systemd-resolved.service"
+      systemd:
+        name: systemd-resolved
+        daemon_reload: yes
+        state: restarted
+      when:  resolved_conf.changed
+
+  become: true
+
+- name: "Stop dnsmasq Docker container"
+  docker_container:
+    name: dnsmasq
+    state: absent
+
+- name: "Restart Docker to pick up flannel settings"
+  systemd:
+    name: docker
+    state: restarted
+  become: true
+  when:  resolved_conf.changed

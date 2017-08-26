@@ -1,0 +1,6 @@
+---
+
+# Set up dnsmasq Docker container with SRV records sufficient to
+# bootstrap the etcd cluster before IPA is deployed
+
+- include: "{{bootstrap_dnsmasq_mode|default('start')}}.yaml"

@@ -72,7 +72,6 @@ docker:
   # Additional flags to pass to the docker daemon when it is started
   flags:
     - "--live-restore"
-    - "--bip={{k8s_pod_network}}"
 
 locksmith:
   # The reboot strategy for locksmithd to follow.  Must be one of:
@@ -132,19 +131,6 @@ systemd:
               --uuid-file-save=/var/lib/coreos/flannel-wrapper.uuid \
               --volume etcd-certs,kind=host,source={{etcd_ssl_dir}},readOnly=true \
               --mount volume=etcd-certs,target={{etcd_ssl_dir}}"
-
-    - name: flannel-docker-opts.service
-      mask: true
-      dropins:
-        - name: 30-env-file-link.conf
-          contents: |
-            [Service]
-            #
-            # Set EnvironmentFile symlink
-            # - Docker CNI options
-            ExecStartPre=/usr/bin/ln -sf \
-                /etc/flannel_docker_opts.env \
-                /run/flannel/flannel_docker_opts.env
 
 
     #######################################

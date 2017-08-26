@@ -85,6 +85,15 @@ swap_device_systemd_unit: "{{swap_device|systemd_escape}}.swap"
 data_volume_systemd_unit: "{{data_volume_path|systemd_escape}}.mount"
 
 #################################
+# bootstrap configuration
+
+# dnsmasq
+# - Docker image for bootstrapping etcd
+dnsmasq_docker_image: "zultron/freeipa-cloud-prov:dnsmasq"
+# - configuration directory
+dnsmasq_config_dir: "{{data_volume_path}}/dnsmasq"
+
+#################################
 # etcd configuration
 
 # TLS

@@ -34,35 +34,6 @@
     - etcdctl-alias
 
 #
-# Create SRV records for etcd service discovery
-#
-- block:
-
-    - name:  Create SRV records for etcd servers and clients
-      ipa_dnsrecord:
-        name: "_etcd-{{item.role}}-ssl._tcp"
-        zone: "{{domain_name}}"
-        srvrecord: "{{item.srvrec}}"
-        state: exact
-        ipa_host: "{{freeipa_master_fqdn}}"
-        ipa_user: "{{ipa_user}}"
-        ipa_pass: "{{freeipa_admin_password}}"
-      with_items:
-        -
-          role: "server"
-          srvrec: "{{ groups.coreos |
-                      formatmaplist('0 100 2380 {}.%s.' % domain_name) }}"
-        -
-          role: "client"
-          srvrec: "{{ groups.coreos |
-                   formatmaplist('0 100 2379 {}.%s.' % domain_name) }}"
-      # Once per run to install latest list
-      run_once: yes
-  delegate_to: localhost
-  tags:
-    - etcd-dns-srv
-
-#
 # Start etcd-member service
 #
 - block:
@@ -81,8 +52,7 @@
         enabled: true
         masked: false
         daemon_reload: yes
-        state: restarted
-      when:  "cert_tracking.changed or etcd_initial_mask.changed"
+        state: "{{ etcd_initial_mask.changed | ternary('restarted','started') }}"
       
   become: true
   tags:

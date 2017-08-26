@@ -1,0 +1,49 @@
+cfssl_dir: ../var/cfssl
+
+# cfssl ca-config.json contents
+cfssl_ca_config:
+  signing:
+    default:
+      expiry: "43800h"
+    profiles:
+      server:
+        expiry: "43800h"
+        usages:
+          - "signing"
+          - "key encipherment"
+          - "server auth"
+      client:
+        expiry: "43800h"
+        usages:
+          - "signing"
+          - "key encipherment"
+          - "client auth"
+      peer:
+        expiry: "43800h"
+        usages:
+          - "signing"
+          - "key encipherment"
+          - "server auth"
+          - "client auth"
+
+# cfssl ca-csr.json contents
+cfssl_ca_csr:
+  CN:  "Bootstrap CA"
+  key:
+    algo: "rsa"
+    size: 2048
+  names:
+    - O: "{{kerberos_realm}}"
+      OU: "etcd cluster {{cluster_id}}"
+
+# cfssl host-csr.json contents
+cfssl_host_csr:
+  CN: "{{fqdn}}"
+  hosts:
+    - "{{fqdn}}"
+  key:
+    algo: "rsa"
+    size: 2048
+  names:
+    - O: "{{kerberos_realm}}"
+      OU: "etcd cluster {{cluster_id}}"
