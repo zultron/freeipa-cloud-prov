@@ -6,6 +6,10 @@
   gather_facts: False
 
   vars_prompt:
+  - name: digitalocean_token
+    prompt: Please enter the DigitalOcean token
+    private: yes
+
   - name: freeipa_admin_password
     prompt: Please enter the FreeIPA admin pass
     private: yes

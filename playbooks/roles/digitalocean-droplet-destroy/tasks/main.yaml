@@ -12,7 +12,7 @@
     command: droplet
     name: "{{ fqdn }}"
     unique_name: yes
-    api_token:  "{{ do_token }}"
+    api_token:  "{{ digitalocean_token }}"
 
 - name:  "Destroy cached files in var/"
   file:
@@ -32,7 +32,7 @@
     region: "{{ region_id }}"
     state: absent
     command: create
-    api_token:  "{{ do_token }}"
+    api_token:  "{{ digitalocean_token }}"
   # Droplet can take time to be destroyed
   retries: 3
   delay: 1
@@ -43,7 +43,7 @@
     region: "{{item.region}}"
     state: absent
     command: create
-    api_token:  "{{ do_token }}"
+    api_token:  "{{ digitalocean_token }}"
   with_items:
     - volume: "{{freeipa_block_storage_name}}"
       region: "{{ region_id }}"

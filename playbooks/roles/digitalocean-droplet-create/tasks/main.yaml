@@ -10,7 +10,7 @@
     command: ssh
     name: my_rsa_ssh_key
     ssh_pub_key: "{{ ssh_pub_key }}"
-    api_token:  "{{ do_token }}"
+    api_token:  "{{ digitalocean_token }}"
   register: DO_ssh_key
   delegate_to: localhost
   delegate_facts: true
@@ -36,7 +36,7 @@
     command: droplet
     ssh_key_ids: "{{ digitalocean_ssh_key_id }}"
     name: "{{ fqdn }}"
-    api_token:  "{{ do_token }}"
+    api_token:  "{{ digitalocean_token }}"
     size_id: "{{ size_id }}"
     region_id: "{{ region_id }}"
     image_id: "{{ image_id }}"

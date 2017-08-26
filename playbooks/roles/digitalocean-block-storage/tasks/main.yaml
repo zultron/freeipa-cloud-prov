@@ -9,6 +9,7 @@
 - name: Get droplet ID
   do_droplet_info:
     name: "{{fqdn}}"
+    api_token:  "{{ digitalocean_token }}"
   register: do_droplet
   tags:
     - setup
@@ -19,7 +20,7 @@
     description: "{{item}} volume for {{hostname}}"
     state: present
     command: create
-    api_token:  "{{ do_token }}"
+    api_token:  "{{ digitalocean_token }}"
     region: "{{ region_id }}"
     block_size: "{{ volume_size }}"
   with_items:
@@ -42,7 +43,7 @@
     command: attach
     droplet_id: "{{ do_droplet.id }}"
     region: "{{ region_id }}"
-    api_token:  "{{ do_token }}"
+    api_token:  "{{ digitalocean_token }}"
   with_items:
     - "{{volume_name}}"
   register: block_storage_attach

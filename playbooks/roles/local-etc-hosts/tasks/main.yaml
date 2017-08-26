@@ -7,6 +7,7 @@
     - name: "Get DigitalOcean inventory"
       do_droplet_info:
         names: "{{ groups.digitalocean|formatmaplist('{}.%s' % domain_name)}}"
+        api_token: "{{digitalocean_token}}"
       register: droplet_info
 
     - name: "Print hosts and IPs"
