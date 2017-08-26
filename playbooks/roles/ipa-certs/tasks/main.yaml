@@ -52,6 +52,6 @@
 #     serial: 1
 
 - include:  "op-{{opname}}.yaml"
-  with_items:  "{{ops}}"
+  with_items:  "{{ops|default([])}}"
   loop_control:
     loop_var: opname
