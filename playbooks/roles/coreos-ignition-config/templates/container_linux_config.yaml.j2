@@ -190,9 +190,17 @@ storage:
       # https://coreos.com/os/docs/latest/install-debugging-tools.html
       contents:
         inline: |
+          #                                   -*-shell-script-*-
           TOOLBOX_DOCKER_IMAGE={{toolbox_image_base}}
           TOOLBOX_DOCKER_TAG={{toolbox_image_tag}}
           TOOLBOX_USER=root
+          # Mount host /media/* on same path in chroot
+          for dir in /media/*; do
+              if [ $dir = /media/root ]; then
+                  continue # reserved for host root fs
+              fi
+              TOOLBOX_BIND+=" --bind=$dir:$dir"
+          done
       mode: 0644
       user:
         id: 500
