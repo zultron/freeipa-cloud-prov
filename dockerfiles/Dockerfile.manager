@@ -62,7 +62,8 @@ RUN apt-get install -y \
         telnet \
         dnsutils \
         ldap-utils \
-        git
+        git \
+        psmisc
 
 # Install docker for client remote access
 # https://docs.docker.com/engine/installation/linux/debian/
