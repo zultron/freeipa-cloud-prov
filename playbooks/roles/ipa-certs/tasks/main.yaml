@@ -9,11 +9,14 @@
 # Usage, included in role/tasks/main.yaml:
 #
 # - role: ipa-certs
+#   #
 #   # Which operations to carry out
 #   ops:
 #     - ca
 #     - service-certs
 #     - client-certs
+#   #
+#   # Arguments to operations
 #   args:
 #     #
 #     # Common options:
@@ -36,6 +39,9 @@
 #     cacert_path:  "{{my_ssl_cacert}}"
 #     cert_path:  "{{my_ssl_cert}}"
 #     key_path:  "{{my_ssl_key}}"
+#     # Optional list of services to restart after `service-certs` operation
+#     restart_services:
+#       - my-tls-service.service
 #     #
 #     # Client cert options:
 #     # - Principal, e.g. 'me'; must be an IPA user ID (client-certs)
@@ -47,9 +53,6 @@
 #     client_cacert_path:  "{{my_ssl_cacert}}"
 #     client_cert_path:  "{{my_ssl_cert}}"
 #     client_key_path:  "{{my_ssl_key}}"
-#     #
-#     # Parallel IPA operations break
-#     serial: 1
 
 - include:  "op-{{opname}}.yaml"
   with_items:  "{{ops|default([])}}"

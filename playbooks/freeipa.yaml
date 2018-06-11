@@ -5,6 +5,7 @@
 - name: Provision FreeIPA storage
   hosts:
     - freeipa
+  tags: freeipa-volume
   # FIXME WTF?  Suddenly needed why?
   environment:
     PYTHONPATH: "../lib/python"
@@ -15,7 +16,6 @@
       volume_name: "{{freeipa_block_storage_name}}"
       volume_size: "{{freeipa_volume_size}}"
       tags:
-        - freeipa-volume
         - freeipa-volume-provision
 
     # Label and partition block device
@@ -25,7 +25,6 @@
       partitions:
         - number: 1
       tags:
-        - freeipa-volume
         - freeipa-volume-label
 
     # Make ext4 fs on data partition and install+start systemd mount
@@ -34,18 +33,23 @@
       device: "{{freeipa_volume_device}}"
       mount_path: "{{freeipa_volume_path}}"
       tags:
-        - freeipa-volume
         - freeipa-volume-mkfs
 
 ############################################
-- name: Provision FreeIPA in Docker
+- name: Deploy FreeIPA in Docker
   hosts:
     - freeipa_all
+  tags: freeipa-deploy
   # FIXME WTF?  Suddenly needed why?
   environment:
     PYTHONPATH: "../lib/python"
 
   roles:
+    # FIXME
+    # # Prepare flannel IPA network
+    # - role: flannel-ipa
+    #   tags: freeipa-flannel
+
     # Install FreeIPA server in Docker container
     # - Initial IPA server is installed before IPA configuration
     - role: freeipa-install

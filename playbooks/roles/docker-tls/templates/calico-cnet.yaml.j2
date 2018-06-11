@@ -1,0 +1,29 @@
+# /media/state/calico/calico-cnet.yaml
+
+# Profile resource docs
+# https://docs.projectcalico.org/v2.5/reference/calicoctl/resources/profile
+# Policy resource docs
+# https://docs.projectcalico.org/v2.5/reference/calicoctl/resources/policy
+
+- apiVersion: v1
+  kind: profile
+  metadata:
+    name: cnet
+    labels:
+      # The `cnet` network 
+      role: cnet
+
+# FIXME no suitable policy yet
+# - apiVersion: v1
+#   kind: policy
+#   metadata:
+#     name: cnet
+#   spec:
+#     order: 10
+#     selector: role == 'cnet'
+#     ingress:
+#       # Incoming traffic:  Allow all
+#       - action: allow
+#     egress:
+#       # Outgoing traffic:  Allow all
+#       - action: allow

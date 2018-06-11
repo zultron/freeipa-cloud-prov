@@ -1,4 +1,5 @@
 ---
 dependencies:
+  - role: digitalocean-ips
   - role: local-etc-hosts
   - role: local-ca-certs

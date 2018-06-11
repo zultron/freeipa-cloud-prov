@@ -1,0 +1,20 @@
+---
+# Install iptables-restore.service
+
+- block:
+
+    - name:  Template /var/lib/iptables/rules-save
+      template:
+        src: rules-save.j2
+        dest: /var/lib/iptables/rules-save
+      register:  iptables_config
+
+    - name:  Start iptables-restore.service
+      systemd:
+        name: iptables-restore.service
+        enabled:  yes
+        state: restarted
+      when:
+        iptables_config.changed
+
+  become: true

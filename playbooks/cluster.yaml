@@ -4,8 +4,6 @@
 ############################################
 - name: Install docker CA and service certs
   hosts: coreos
-  # This must be specified, or IPA operations will break
-  serial: 1
   # FIXME WTF?  Suddenly needed why?
   environment:
     PYTHONPATH: "../lib/python"
@@ -28,6 +26,8 @@
         cacert_path:  "{{docker_ssl_cacert}}"
         cert_path:  "{{docker_ssl_cert}}"
         key_path:  "{{docker_ssl_key}}"
+        restart_services:
+          - docker.service
         # Create Docker client cert
         principal:  "{{manager_id}}"
         email_address:  "{{manager_id}}@{{domain_name}}"
@@ -40,23 +40,9 @@
         # Prereqs for `docker-tls` tasks
         - docker-tls
 
-
-- name: Install Docker TLS
-  hosts: coreos
-  # FIXME WTF?  Suddenly needed why?
-  environment:
-    PYTHONPATH: "../lib/python"
-
-  roles:
-    # Configure CoreOS Docker TLS
-    - role: docker-tls
-      tags: docker-tls
-
-
+############################################
 - name: Install etcd CA and service certs
   hosts: coreos
-  # This must be specified, or IPA operations will break
-  serial: 1
   # FIXME WTF?  Suddenly needed why?
   environment:
     PYTHONPATH: "../lib/python"
@@ -78,6 +64,11 @@
         cacert_path:  "{{etcd_ssl_cacert}}"
         cert_path:  "{{etcd_ssl_cert}}"
         key_path:  "{{etcd_ssl_key}}"
+        restart_services:
+          - etcd-member.service
+          # Also services that use the etcd certs
+          - docker.service
+          - calico.service
       tags:
         - etcd-certs
         # Prereqs for `etcd3-bootstrap` tasks
@@ -85,27 +76,9 @@
         - etcd
 
 
-- name: Install etcd and flanneld services
-  hosts: coreos
-  # FIXME WTF?  Suddenly needed why?
-  environment:
-    PYTHONPATH: "../lib/python"
-
-  roles:
-
-    # Set up etcd
-    - role: etcd3-bootstrap
-      tags: etcd
-
-    # Set up flannel
-    - role: flannel-bootstrap
-      tags: flannel
-
-
+############################################
 - name: Install Kubernetes CA and service certs
   hosts: coreos
-  # This must be specified, or IPA operations will break
-  serial: 1
   # FIXME WTF?  Suddenly needed why?
   environment:
     PYTHONPATH: "../lib/python"
@@ -139,12 +112,8 @@
       tags:
         - k8s-certs
 
-
 - name: Install Kubernetes cluster
   hosts: coreos
-  # FIXME WTF?  Suddenly needed why?
-  environment:
-    PYTHONPATH: "../lib/python"
 
   roles:
 

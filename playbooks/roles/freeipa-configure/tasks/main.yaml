@@ -17,8 +17,7 @@
   when:  hostname == freeipa_master_host
   run_once: true
   tags:
-    - configure
-    - dns
+    - freeipa-restrict-zone-transfers
 
 #################################
 # Harden LDAP settings
@@ -36,7 +35,8 @@
   when:  hostname == freeipa_master_host
   run_once: true
   tags:
-    - configure
+    - freeipa-restrict-ldap
+
 
 #################################
 # Misc
@@ -54,7 +54,7 @@
   when:  hostname == freeipa_master_host
   run_once: true
   tags:
-    - configure
+    - freeipa-default-login
 
 #################################
 # Fix up ipa-ca DNS record
@@ -72,15 +72,14 @@
         ipa_host: "{{freeipa_master_fqdn}}"
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
-      with_items: 
+      with_items:
         -
-          - "{{ groups.freeipa | ip_addr_list(hostvars) }}"
+          - "{{freeipa_dns_servers}}"
       run_once: true
 
   delegate_to: localhost
   tags:
-    - configure
-    - dns
+    - freeipa-dns-ipaca
 
 #################################
 # Add host DNS zone and transfer A record
@@ -132,21 +131,19 @@
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       with_items:
-        - ip_addr: "{{freeipa_network_addr}}"
+        - ip_addr: "{{ipa_ip_addr}}"
           zone: "{{fqdn}}"
 
   delegate_to: localhost
   tags:
     - freeipa-host-zone
-    - configure
-    - dns
 
 #################################
 # Add host DNS freeipa network reverse zone
 
 - block:
 
-    - name: "Add FreeIPA network reverse zone"
+    - name: "Add container network reverse zone"
       ipa_dnszone:
         idnsname: "{{item}}"
         state: present
@@ -154,11 +151,13 @@
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       with_items:
-        - "{{freeipa_network_prefix|reverse_zone}}"
+        - "{{network_reverse_zone}}"
+      run_once:  true
+      when:  hostname in groups.freeipa_master
 
     - name: "Add IPA container PTR to IPA network reverse zone"
       ipa_dnsrecord:
-        name: "{{item.last_octet}}"
+        name: "{{item.last_octets}}"
         zone: "{{item.zone}}"
         ptrrecord: "{{item.ptr}}"
         state: present
@@ -166,8 +165,10 @@
         ipa_user: "{{ipa_user}}"
         ipa_pass: "{{freeipa_admin_password}}"
       with_items:
-        - last_octet: "{{freeipa_network_addr|last_octet}}"
-          zone: "{{freeipa_network_prefix|reverse_zone}}"
+        - last_octets:
+            "{{ipa_ip_addr|ipaddr('revdns')|
+                 regex_replace('^([0-9]+\\.[0-9]+)\\..*','\\1')}}"
+          zone: "{{network_reverse_zone}}"
           ptr: "ipa.{{fqdn}}"
 
   delegate_to: localhost
@@ -175,6 +176,35 @@
     - freeipa-reverse-zone
     - configure
     - dns
+
+#################################
+# Create SRV records for etcd service discovery
+
+- block:
+
+    - name:  Create SRV records for etcd servers and clients
+      ipa_dnsrecord:
+        name: "_etcd-{{item.role}}-ssl._tcp"
+        zone: "{{domain_name}}"
+        srvrecord: "{{item.srvrec}}"
+        state: exact
+        ipa_host: "{{freeipa_master_fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      with_items:
+        -
+          role: "server"
+          srvrec: "{{ groups.coreos |
+                      formatmaplist('0 100 2380 {}.%s.' % domain_name) }}"
+        -
+          role: "client"
+          srvrec: "{{ groups.coreos |
+                   formatmaplist('0 100 2379 {}.%s.' % domain_name) }}"
+      # Once per run to install latest list
+      run_once: yes
+  delegate_to: localhost
+  tags:
+    - etcd-dns-srv
 
 #################################
 # Set up CA ACL for IECUserRoles cert profile and add manager user

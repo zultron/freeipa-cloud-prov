@@ -1,38 +1,43 @@
 ---
 #################################
-# Configure Docker server and client TLS
+# Configure Docker server and client TLS and multi-host overlay networking
+
 #
-# Enable TLS service on port 2375; afterwards, run docker remotely like this
-#
-# docker --tlsverify \
-#     -H tcp://host1.example.com:2375 \
-#     --tlscacert ~/.docker/ca.pem
-#     --tlscert ~/.docker/cert.pem
-#     --tlskey ~/.docker/key.pem
-#
-# or
-# export DOCKER_HOST=tcp://server.example.com:2376 DOCKER_TLS_VERIFY=1
-#
-# Instructions for enabling TLS with auth
-# https://coreos.com/os/docs/latest/customizing-docker.html#enable-the-remote-api-with-tls-authentication
-#
-# Docker TLS socket instructions require separate
-# `docker-tls-tcp.socket` unit.  Doing it this way requires the docker
-# service to be stopped, the docker socket restarted, and the docker
-# service started again, or the socket will fail with the following
-# error:
-#
-#     docker-tls-tcp.socket: Socket service docker.service already active, refusing.
-#     Failed to listen on Docker Secured Socket for the API.
-#
-# Interleaved service stopping/starting is complicated in Ansible.
-# Instead, just run both the TCP and local socket from the same
-# service.  See https://github.com/coreos/bugs/issues/1362
-#
-# systemd socket unit docs
-# https://www.freedesktop.org/software/systemd/man/systemd.socket.html
+# Docker configuration
 #
 - block:
+
+    # Enable TLS service on port 2375
+    #
+    # Docker remote access:
+    #
+    # docker --tlsverify \
+    #     -H tcp://host1.example.com:2375 \
+    #     --tlscacert ~/.docker/ca.pem
+    #     --tlscert ~/.docker/cert.pem
+    #     --tlskey ~/.docker/key.pem
+    #
+    # or
+    # export DOCKER_HOST=tcp://server.example.com:2376 DOCKER_TLS_VERIFY=1
+    #
+    # Instructions for enabling TLS with auth
+    # https://coreos.com/os/docs/latest/customizing-docker.html#enable-the-remote-api-with-tls-authentication
+    #
+    # Docker TLS socket instructions require separate
+    # `docker-tls-tcp.socket` unit.  Doing it this way requires the docker
+    # service to be stopped, the docker socket restarted, and the docker
+    # service started again, or the socket will fail with the following
+    # error:
+    #
+    #     docker-tls-tcp.socket: Socket service docker.service already active, refusing.
+    #     Failed to listen on Docker Secured Socket for the API.
+    #
+    # Interleaved service stopping/starting is complicated in Ansible.
+    # Instead, just run both the TCP and local socket from the same
+    # service.  See https://github.com/coreos/bugs/issues/1362
+    #
+    # systemd socket unit docs
+    # https://www.freedesktop.org/software/systemd/man/systemd.socket.html
 
     - name: "Install docker.socket systemd dropin directory"
       file:
@@ -44,24 +49,74 @@
       template:
         src: 10-docker-tcp-socket.conf.j2
         dest: "{{dropin_dir_pat % 'docker.socket'}}/10-docker-tcp-socket.conf"
-      register: systemd_docker_socket
+      register: docker_socket_dropin
 
-    # Docker daemon command line docs
+    # Docker is configured with multi-host overlay networking to work
+    # with Calico.  Start Docker after Calico is running to avoid
+    # stale configuration hanging around, such as in
+    # https://github.com/projectcalico/libnetwork-plugin/issues/49
+
+    - name: "Install docker.service dropin to start after calico"
+      template:
+        src: 50-docker-wants-calico.conf.j2
+        dest: "{{dropin_dir_pat % 'docker.service'}}/50-docker-wants-calico.conf"
+      register: docker_calico_dropin
+
+    # Docker daemon configuration for TLS and multi-host overlay
+    # networking
+    #
+    # Docker daemon configuration docs:
     # https://docs.docker.com/engine/reference/commandline/dockerd/
-    - name: "Install dockerd daemon.json with TLS enabled"
+    - name: "Install dockerd daemon.json with TLS and multi-host net"
       template:
         src: daemon.json.j2
         dest: "/etc/docker/daemon.json"
       register: dockerd_conf
 
-    - name: "Restart docker service to pick up TLS configuration"
+    - name: "Restart docker service to pick up new configuration"
       systemd:
         name: docker.service
         daemon_reload: yes
         state: restarted
       when:
-        systemd_docker_socket.changed or certmonger_certs_changed
+        docker_socket_dropin.changed
+        or docker_calico_dropin.changed
+        or dockerd_conf.changed
         
 
   become: true
-  tags: dockerd-tls
+
+#
+# Docker container network
+#
+- block:
+
+    - name:  Template calico cnet resources
+      template:
+        src: "{{item}}.j2"
+        dest: "{{calico_data_dir}}/{{item}}"
+      with_items:
+        - calico-ip-pool.yaml
+        - calico-cnet.yaml
+      register:  calico_cnet_templates
+      become: true
+
+    - name:  Create calico cnet resources
+      # Use 'apply', equiv. to 'create' or 'replace' as appropriate
+      shell:  "bin/calicoctl apply -f {{calico_data_dir}}/{{item}}"
+      with_items:
+        - calico-ip-pool.yaml
+        - calico-cnet.yaml
+      when:  calico_cnet_templates.changed
+
+    - name:  Create Docker cnet container network
+      docker_network:
+        name: cnet
+        driver:  calico
+        ipam_driver:  calico-ipam
+        ipam_options:
+          subnet:  "{{network_cidr}}"
+
+  # This only needs to happen once on the master
+  when:  hostname in groups.freeipa_master
+

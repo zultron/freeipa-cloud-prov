@@ -4,8 +4,10 @@ Description=FreeIPA service
 # Requirements and dependency ordering
 Wants=etcd-member.service
 Wants=docker.service
+Wants=calico.service
 After=etcd-member.service
 After=docker.service
+After=calico.service
 
 [Service]
 # Let processes take awhile to start up (for first run Docker
@@ -17,28 +19,55 @@ TimeoutStartSec=0
 KillMode=none
 
 # Debug opts
-#Environment="DEBUGOPTS=KRB5_TRACE=/data/var/log/kinit.log"
+# - `set -x` in scripts
+#Environment="DEBUG_TRACE=1"
+# - Don't exit container after ipa.service failure
+Environment="DEBUG_NO_EXIT=1"
 
-# Pre-start and Start
-ExecStartPre=-/usr/bin/docker kill ipa
-ExecStartPre=-/usr/bin/docker rm ipa
+# Delete any existing container
+ExecStartPre=-/usr/bin/docker kill ipa-{{hostname}}
+ExecStartPre=-/usr/bin/docker rm ipa-{{hostname}}
+
+# Delete any existing workload endpoint and IP
+# - Workaround for stale IP configuration left around, possibly:
+#   https://github.com/projectcalico/libnetwork-plugin/issues/49
+ExecStartPre=-\
+    /home/core/bin/calicoctl get -o json workloadEndpoint -n {{fqdn}} | \
+    /usr/bin/jq -c '.[] | select(.spec.ipNetworks[0] == "{{ipa_ip_addr}}/32")' | \
+    /home/core/bin/calicoctl delete -f -
+ExecStartPre=-\
+    /home/core/bin/calicoctl ipam release --ip={{ipa_ip_addr}}
+
+# FIXME added --privileged for FreeIPA 4.5:
+# 2017-08-31T19:57:03Z DEBUG stderr=pkispawn    : ERROR    ....... subprocess.CalledProcessError:  Command '['sysctl', 'crypto.fips_enabled', '-bn']' returned non-zero exit status 255!
+# FIXME removed again; above error is non-fatal and is because
+# CoreOS kernel doesn't have capability
+#			  --privileged \
+#
+
 ExecStart=/usr/bin/docker run \
+			  --privileged \
 			  --interactive \
 			  --restart=no \
 			  --hostname={{fqdn}} \
 			  --security-opt=seccomp=unconfined \
-			  --name=ipa \
+			  --name=ipa-{{hostname}} \
 			  --volume={{freeipa_volume_path}}:/data \
 			  --volume={{data_volume_path}}:{{data_volume_path}} \
 			  --volume=/sys/fs/cgroup:/sys/fs/cgroup:ro \
-			  --net=ipa \
-			  --ip={{freeipa_network_addr}} \
+			  --net=cnet \
 			  --env=IPA_SERVER_IP={{ip_addr}} \
-			  --env=DEBUGOPTS \
-			  --add-host={{freeipa_master_fqdn}}:{{freeipa_master_ip_addr}} \
+			  --env=DEBUG_TRACE \
+			  --env=DEBUG_NO_EXIT \
+			  --env=DISABLE_UPDATE_SERVER_IP=1 \
+			  --ip={{ipa_ip_addr}} \
+			  --label=org.projectcalico.label.role=ipa \
 {% if freeipa_role != 'client' %}
-{% for p in freeipa_ports|docker_port_list %}
-			  --publish={{p}} \
+{% for p in freeipa_ports.tcp %}
+			  --publish={{p}}:{{p}} \
+{% endfor %}
+{% for p in freeipa_ports.udp %}
+			  --publish={{p}}:{{p}}/udp \
 {% endfor %}
 {% endif %}
 			  {{freeipa_docker_image}}
@@ -47,10 +76,10 @@ ExecStart=/usr/bin/docker run \
 # Wait for DNS to come online; this takes a minute normally, or over
 # 10 minutes when bootstrapping on a 1GB DigitalOcean host
 ExecStartPost=/usr/bin/dig +noall +norecurse +comments +time=1 +tries=1200 \
-			   @{{freeipa_network_addr}} {{domain_name}}
+			   @{{ipa_ip_addr}} {{domain_name}}
 {% endif %}
 # Stop
-ExecStop=/usr/bin/docker stop ipa
+ExecStop=/usr/bin/docker stop ipa-{{hostname}}
 
 [Install]
 WantedBy=multi-user.target

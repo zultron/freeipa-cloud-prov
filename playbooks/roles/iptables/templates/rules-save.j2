@@ -1,0 +1,17 @@
+{# https://docs.projectcalico.org/v2.5/usage/troubleshooting/faq#how-can-i-enable-nat-for-incoming-traffic-to-containers-with-private-ip-addresses #}
+*nat
+:expose-ports - [0:0]
+-A OUTPUT -j expose-ports
+-A PREROUTING -j expose-ports
+
+{# Open FreeIPA ports #}
+{% if freeipa_role != 'client' %}
+{%     for proto in ('tcp','udp') %}
+{%         for port in freeipa_ports[proto] %}
+-A expose-ports -i {{ansible_default_ipv4.interface
+    }} -p {{proto}} --dport {{port}} -j DNAT --to {{ipa_ip_addr}}:{{port}}
+{%         endfor %}
+{%     endfor %}
+{% endif %}
+
+COMMIT

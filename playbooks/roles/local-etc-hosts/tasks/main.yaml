@@ -4,28 +4,12 @@
 
 - block:
 
-    - name: "Get DigitalOcean inventory"
-      do_droplet_info:
-        names: "{{ groups.digitalocean|formatmaplist('{}.%s' % domain_name)}}"
-        api_token: "{{digitalocean_token}}"
-      register: droplet_info
-
-    - name: "Print hosts and IPs"
-      debug:
-        msg: "{{item|shortname}} {{droplet_info.d[item].ip_address}}"
-      with_items: "{{droplet_info.d}}"
-
     - name: "Add/update host IP in /etc/hosts"
       lineinfile:
         dest: /etc/hosts
-        regexp: " {{item}}"
+        regexp: " {{fqdn}} "
         state: present
-        line: "{{droplet_info.d[item].ip_address}} {{item}} {{item|shortname}}"
+        line: "{{ip_addr}} {{fqdn}} {{hostname}}"
         unsafe_writes: yes
       become: true
       delegate_to: localhost
-      with_items: "{{droplet_info.d}}"
-
-  run_once: true
-  tags:
-    - local-setup

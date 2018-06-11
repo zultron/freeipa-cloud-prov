@@ -7,10 +7,12 @@
 #   device:  /dev/disk/by-id/myvol
 #   mount_path: /media/myvol
 
-- name:  "Create ext4 fs on {{device}}"
+- name:  "Create ext4 fs on device"
   filesystem:
-    dev: "{{ device }}"
+    dev: "{{ item }}"
     fstype: ext4
+  with_items:
+    - "{{ device }}"
   become: true
   register: mkfs_ext4
   tags:
@@ -22,11 +24,12 @@
 #   tags:
 #     - setup
 
-- name:  "Add systemd mount unit to
-            /etc/systemd/system/{{ mount_path|systemd_escape }}.mount"
+- name:  "Add systemd mount unit in /etc/systemd/system"
   template:
     src: fs.mount.j2
-    dest: "/etc/systemd/system/{{ mount_path|systemd_escape }}.mount"
+    dest: "/etc/systemd/system/{{ item }}"
+  with_items:
+    - "{{ mount_path|systemd_escape }}.mount"
   become: true
   register: systemd_mount_unit
   tags:

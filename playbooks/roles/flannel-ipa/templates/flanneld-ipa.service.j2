@@ -1,0 +1,53 @@
+# /usr/lib/systemd/system/flanneld-ipa.service
+#
+# Set up flannel for 'ipa' Docker network.
+# A 30-bit CIDR guarantees the IPA container will always have the same IP.
+[Unit]
+Description=flannel-ipa - Network fabric for IPA containers
+Documentation=https://github.com/coreos/flannel
+After=etcd-member.service
+Before=docker.service
+
+[Service]
+Type=notify
+Restart=always
+RestartSec=10s
+TimeoutStartSec=300
+LimitNOFILE=40000
+LimitNPROC=1048576
+
+Environment="FLANNEL_IMAGE_TAG=v0.7.1"
+Environment="FLANNEL_OPTS=--ip-masq=true"
+Environment="RKT_RUN_ARGS=--uuid-file-save=/var/lib/coreos/flannel-ipa-wrapper.uuid"
+
+# Mount a non-standard directory containing SSL certs
+Environment="RKT_RUN_ARGS=\
+  --uuid-file-save=/var/lib/coreos/flannel-wrapper.uuid \
+  --volume etcd-certs,kind=host,source={{etcd_ssl_dir}},readOnly=true \
+  --mount volume=etcd-certs,target={{etcd_ssl_dir}}"
+
+# Etcd cluster
+Environment="FLANNELD_ETCD_ENDPOINTS={{etcd_endpoints}}"
+
+# Set network config with 30-bit subnet mask
+ExecStartPre={{etcdctl_command}} \
+    set /coreos.com/network-ipa/config \
+    '{ "Network": "{{flannel_ipa_network}}", \
+       "Backend": {"Type": "vxlan"}, \
+       "SubnetLen": 30}'
+
+ExecStartPre=/sbin/modprobe ip_tables
+ExecStartPre=/usr/bin/mkdir --parents /var/lib/coreos /run/flannel
+ExecStartPre=-/usr/bin/rkt rm --uuid-file=/var/lib/coreos/flannel-wrapper.uuid
+
+ExecStart=/usr/lib/coreos/flannel-wrapper $FLANNEL_OPTS \
+  --etcd-cafile="{{etcd_ssl_cacert}}" \
+  --etcd-certfile="{{etcd_ssl_cert}}" \
+  --etcd-keyfile="{{etcd_ssl_key}}" \
+  --etcd-prefix=/coreos.com/network-ipa \
+  --subnet-file=/run/flannel/subnet-ipa.env
+ExecStop=-/usr/bin/rkt stop --uuid-file=/var/lib/coreos/flannel-wrapper.uuid
+
+[Install]
+WantedBy=multi-user.target
+

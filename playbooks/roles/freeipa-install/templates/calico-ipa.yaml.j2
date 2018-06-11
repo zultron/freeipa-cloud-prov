@@ -1,0 +1,39 @@
+# /media/state/calico/calico-ipa-subnet.yaml
+
+# Profile resource docs
+# https://docs.projectcalico.org/v2.5/reference/calicoctl/resources/profile
+# Policy resource docs
+# https://docs.projectcalico.org/v2.5/reference/calicoctl/resources/policy
+
+# `ipa` role profile
+- apiVersion: v1
+  kind: profile
+  metadata:
+    name: ipa
+    labels:
+      # FreeIPA hosts are labeled role=ipa
+      role: ipa
+
+# Create the traffic policy for the `ipa` network
+- apiVersion: v1
+  kind: policy
+  metadata:
+    name: ipa
+  spec:
+    order: 0
+    selector: role == 'ipa'
+    ingress:
+      # Incoming traffic:  Allow known tcp/udp ports
+{%    for proto in ('tcp','udp') %}
+      - action: allow
+        protocol: {{proto}}
+        destination:
+          ports:
+{%          for port in freeipa_ports[proto] %}
+            -  {{port}}
+{%          endfor %}
+{%    endfor %}
+    egress:
+      # Allow anything out to anywhere
+      - action: allow
+

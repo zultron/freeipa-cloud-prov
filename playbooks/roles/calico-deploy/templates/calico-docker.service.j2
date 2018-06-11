@@ -1,0 +1,73 @@
+# https://docs.projectcalico.org/v2.5/usage/configuration/as-service
+# https://github.com/projectcalico/libnetwork-plugin
+[Unit]
+Description=Calico networking service
+
+# Calico uses etcd as datastore
+Wants=etcd-member.service
+After=etcd-member.service
+# Calico manages Docker networking
+After=docker.service
+Requires=docker.service
+
+[Service]
+# Let processes take awhile to start up (for first run Docker
+# containers)
+TimeoutStartSec=0
+
+# Change killmode from "control-group" to "none" to let Docker remove
+# work correctly.
+KillMode=none
+
+# Create profile resource for Docker networks
+Environment="CALICO_LIBNETWORK_CREATE_PROFILES=true"
+# Copy Docker container labels to Calico workload endpoint
+Environment="CALICO_LIBNETWORK_LABEL_ENDPOINTS=true"
+# Enable debugging
+#Environment="CALICO_DEBUG=true"
+
+
+# Delete any existing container
+ExecStartPre=-/usr/bin/docker kill calico-node
+ExecStartPre=-/usr/bin/docker rm calico-node
+
+ExecStart=\
+    /usr/bin/docker run \
+        --interactive \
+        --restart=no \
+        --hostname={{fqdn}} \
+        --name=calico-node \
+        --net=host \
+        --privileged \
+        --name=calico-node \
+        -e ETCD_ENDPOINTS={{etcd_endpoints}} \
+        -e ETCD_CERT_FILE={{etcd_ssl_cert}} \
+        -e ETCD_KEY_FILE={{etcd_ssl_key}} \
+        -e ETCD_CA_CERT_FILE={{etcd_ssl_cacert}} \
+        -e NODENAME={{fqdn}} \
+	-e NO_DEFAULT_POOLS=true \
+        -e CALICO_NETWORKING_BACKEND=bird \
+        -e CALICO_LIBNETWORK_ENABLED=true \
+	-e CALICO_LIBNETWORK_CREATE_PROFILES \
+	-e CALICO_LIBNETWORK_LABEL_ENDPOINTS \
+	-e CALICO_DEBUG \
+        -v {{calico_log_dir}}:/var/log/calico \
+        -v /var/run/calico:/var/run/calico \
+        -v /lib/modules:/lib/modules \
+        -v /run:/run \
+        -v /run/docker/plugins:/run/docker/plugins \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        -v {{etcd_ssl_dir}}:{{etcd_ssl_dir}} \
+        quay.io/calico/node:v{{calico_version}}
+# Other environment vars:
+# - IP
+#       -e IP=${CALICO_IP}
+#       -e IP6=${CALICO_IP6}
+# - BGP ASN
+#       -e AS=${CALICO_AS}
+
+# Stop
+ExecStop=-/usr/bin/docker stop calico-node
+
+[Install]
+WantedBy=multi-user.target

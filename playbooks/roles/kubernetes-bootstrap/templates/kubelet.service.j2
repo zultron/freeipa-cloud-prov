@@ -15,6 +15,7 @@ ExecStartPre=-/usr/bin/rkt rm --uuid-file=/var/run/kubelet-pod.uuid
 ExecStartPre=/usr/bin/mkdir -p /opt/cni/bin
 {% endif %}
 ExecStart=/usr/lib/coreos/kubelet-wrapper \
+  --uuid-file-save=/var/run/kubelet-pod.uuid \
   --api-servers={{k8s_apiserver_url}} \
   --cni-conf-dir={{k8s_cni_dir}}/net.d \
   --network-plugin={{ k8s_use_calico | ternary('cni','') }} \

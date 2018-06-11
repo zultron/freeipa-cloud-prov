@@ -1,7 +1,20 @@
+{#                                                 -*-javascript-*- #}
+{# https://docs.docker.com/engine/reference/commandline/dockerd/    #}
 {
-"tls": true,
-"tlscacert": "{{docker_ssl_cacert}}",
-"tlscert": "{{docker_ssl_cert}}",
-"tlskey": "{{docker_ssl_key}}",
-"tlsverify": true
+
+{# TLS options #}
+    "tls": true,
+    "tlscacert": "{{docker_ssl_cacert}}",
+    "tlscert": "{{docker_ssl_cert}}",
+    "tlskey": "{{docker_ssl_key}}",
+    "tlsverify": true,
+
+{# Multi-host overlay networking w/ etcd #}
+    "cluster-store": "etcd://{{fqdn}}:2379",
+    "cluster-advertise": "{{ip_addr}}:2375",
+    "cluster-store-opts": {
+	"kv.cacertfile": "{{etcd_ssl_cacert}}",
+	"kv.certfile": "{{etcd_ssl_cert}}",
+	"kv.keyfile": "{{etcd_ssl_key}}"
+    }
 }

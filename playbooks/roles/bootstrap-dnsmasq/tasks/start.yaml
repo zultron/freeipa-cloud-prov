@@ -48,7 +48,7 @@
 # Point /etc/resolv.conf at dnsmasq container
 - block:
 
-    - name: "Template /etc/systemd/resolved.conf with temporary dnsmasq"
+    - name: "Template resolved.conf with temporary dnsmasq"
       template:
         src: resolved.conf.j2
         dest: /etc/systemd/resolved.conf
@@ -57,7 +57,7 @@
         dns_servers:
           "{{ dnsmasq_container.ansible_facts.docker_container.NetworkSettings.IPAddress }}"
 
-    - name:  "Reload systemd and restart systemd-resolved.service"
+    - name:  "Reload and restart systemd-resolved.service"
       systemd:
         name: systemd-resolved
         daemon_reload: yes

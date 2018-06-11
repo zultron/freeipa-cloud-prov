@@ -27,11 +27,12 @@
 
     - name: "Wait for FreeIPA service to start"
       # This command blocks until ipa.service is up and running
-      command: "docker exec ipa systemctl start ipa.service"
+      command: "docker exec ipa-{{hostname}} systemctl start ipa.service"
       changed_when: False
       when: not install_path_stat.stat.exists
 
-  when:  hostname in groups.freeipa
+  when:  hostname in groups.freeipa_servers
+
 
 #
 # FreeIPA clients
@@ -45,4 +46,4 @@
         state: present
       when: not install_path_stat.stat.exists
 
-  when:  hostname in groups.freeipa_client
+  when:  hostname in groups.freeipa_clients

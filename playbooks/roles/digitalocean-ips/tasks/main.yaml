@@ -1,0 +1,14 @@
+---
+
+- name: Get DigitalOcean inventory
+  do_droplet_info:
+    name: "{{fqdn}}"
+    api_token:  "{{ digitalocean_token }}"
+  register: do_droplet
+  check_mode: yes
+
+- name: Set IP address fact
+  set_fact:
+    ip_addr: "{{item}}"
+  with_items:
+    - "{{do_droplet.ip_address}}"

@@ -2,58 +2,40 @@
 # Provision FreeIPA Docker container
 
 #################################
-# Set up DNS for replicas
+# Prepare Docker for IPA
+
+- name:  Pull FreeIPA docker image
+  docker_image:
+    name: "{{item}}"
+  with_items:
+    - "{{freeipa_docker_image}}"
+  tags:
+    - freeipa-docker-prepare
+
 - block:
 
-    - name: "Template /etc/systemd/resolved.conf with only master"
+    - name:  Template calico ipa resources
       template:
-        src: resolved.conf.j2
-        dest: /etc/systemd/resolved.conf
-      register:  resolved_conf
-      vars:
-        dns_servers:
-          "{{ freeipa_master_host | ip_addr_list(hostvars) | join(' ') }}"
+        src: "{{item}}.j2"
+        dest: "{{calico_data_dir}}/{{item}}"
+      with_items:
+        -  calico-ipa.yaml
+      become: true
+      register:  calico_ipa_templates
 
-    - name:  "Reload systemd and restart systemd-resolved.service"
-      systemd:
-        name: systemd-resolved
-        daemon_reload: yes
-        state: restarted
-      when:  resolved_conf.changed
+    - name:  Create calico ipa resources
+      shell:  "bin/calicoctl apply -f {{calico_data_dir}}/{{item}}"
+      with_items:
+        -  calico-ipa.yaml
+      when:  calico_ipa_templates.changed
 
-  become: true
+  # run_once: true
+  # when:  hostname in groups.freeipa_master
   tags:
-    - setup
-    - resolved-conf
-
-
-#################################
-# Prepare Docker for IPA
-- name: Pull FreeIPA docker image
-  docker_image:
-    name: "{{freeipa_docker_image}}"
-  tags:
-    - docker-ipa-config
-
-- name: Create FreeIPA container network
-  docker_network:
-    name: ipa
-    driver_options:
-      com.docker.network.bridge.name: "{{freeipa_network_bridge}}"
-      com.docker.network.bridge.enable_ip_masquerade: "true"
-      com.docker.network.bridge.enable_icc: "true"
-      com.docker.network.bridge.default_bridge: "false"
-      com.docker.network.bridge.host_binding_ipv4: "0.0.0.0"
-      com.docker.network.driver.mtu: "1450"
-    ipam_options:
-      subnet: "{{freeipa_network_cidr}}"
-      gateway: "{{freeipa_network_gateway}}"
-  tags:
-    - docker-ipa-config
+    - freeipa-docker-prepare
 
 #################################
 # Install IPA server/replica
-
 
 #
 # Set up files
@@ -111,7 +93,7 @@
       become: true
 
   tags:
-    - docker-ipa-run
+    - freeipa-install-prepare
 
 #
 # Run server
@@ -121,48 +103,74 @@
     - name: "Start ipa.service on IPA server"
       systemd:
         name: ipa.service
-        daemon_reload: "{{ ipa_unit_file.changed | ternary('yes','no') }}"
+        daemon_reload: "{{ (ipa_unit_file|default({'changed':True})).changed
+                              | ternary('yes','no') }}"
         enabled: true
-        state: "{{  (ipa_unit_file.changed or install_path_stat.changed)
+        state: "{{ ((ipa_unit_file|default({'changed':True})).changed
+                      or (install_path_stat|default({'changed':True})).changed)
                       | ternary('restarted','started') }}"
       register: ipa_service_start
       become: true
 
-    # Wait for install to complete and service to come online
-    - include:  tasks/freeipa-service-wait.yaml
-
   when: hostname == freeipa_master_host
   tags:
-    - docker-ipa-run
+    - freeipa-install-server
 
 #
-# Set up certs in local container
+# Wait for install to complete and service to come online; replicas
+# and clients must not continue if IPA master isn't running
+#
+
+- include:  tasks/freeipa-service-wait.yaml
+  when: hostname == freeipa_master_host
+  tags:
+    - freeipa-install-server
+
+- name:  Do not continue unless FreeIPA master is running
+  shell:  "dig +noall +norecurse +comments +time=1 +tries=3
+               @{{hostvars[freeipa_master_host].ipa_ip_addr}} {{domain_name}}"
+  changed_when:  False
+  when:  hostname not in groups.freeipa_master
+
+
+#
+# Set up client cert in local container for remote access
+#
+- include: tasks/local-ca-cert.yaml
+  tags:
+    - freeipa-local-certs
+
+#
+# Set up DNS with IPA IPs
 #
 - block:
 
-    # Copy CA cert to container
-    - include: tasks/local-ca-cert.yaml
+    - name:  "Construct FreeIPA internal IP fact"
+      set_fact:
+        ipa_dns_servers: "{{freeipa_dns_servers | join(' ')}}"
 
-    - name: "Ensure replica/client has correct A-record in DNS"
-      ipa_dnsrecord:
-        name: "{{item.host}}"
-        zone: "{{domain_name}}"
-        arecord: "{{item.a_rec}}"
-        state: exact
-        ipa_host: "{{freeipa_master_fqdn}}"
-        ipa_user: "{{ipa_user}}"
-        ipa_pass: "{{freeipa_admin_password}}"
-      with_items:
-        - host: "{{hostname}}"
-          a_rec: "{{ip_addr}}"
-      delegate_to: localhost
-      when:  hostname != freeipa_master_host
+    - name: "Template resolved.conf with FreeIPA IPs"
+      template:
+        src: resolved.conf.j2
+        dest: /etc/systemd/resolved.conf
+      register:  resolved_conf
+      vars:
+        dns_servers: "{{ipa_dns_servers}}"
+      become: true
+
+    - name:  "Reload systemd and restart systemd-resolved.service"
+      systemd:
+        name: systemd-resolved
+        daemon_reload: yes
+        state: restarted
+      when:  resolved_conf.changed
+      become: true
 
   tags:
-    - docker-ipa-run
+    - freeipa-dns
 
 #
-# Run replica
+# Start replicas and clients
 #
 # FIXME
 #
@@ -183,14 +191,33 @@
         - "{{hostname}}"
       delegate_to:  "{{freeipa_master_host}}"
 
+    - name: "Ensure replica/client has correct A-record in DNS"
+      ipa_dnsrecord:
+        name: "{{item.host}}"
+        zone: "{{domain_name}}"
+        arecord: "{{item.a_rec}}"
+        state: exact
+        ipa_host: "{{freeipa_master_fqdn}}"
+        ipa_user: "{{ipa_user}}"
+        ipa_pass: "{{freeipa_admin_password}}"
+      with_items:
+        - host: "{{hostname}}"
+          a_rec: "{{ip_addr}}"
+      delegate_to: localhost
+      when:  hostname != freeipa_master_host
+
     - name: "Start ipa.service on IPA replicas"
       systemd:
         name: ipa.service
-        daemon_reload: "{{ ipa_unit_file.changed | ternary('yes','no') }}"
+        daemon_reload:
+          "{{ (ipa_unit_file|default({'changed':True})).changed
+               | ternary('yes','no') }}"
         enabled: true
-        state: "{{  (ipa_unit_file.changed or install_path_stat.changed
-                     or ipa_install_options.changed)
-                      | ternary('restarted','started') }}"
+        state:
+          "{{ ((ipa_unit_file|default({'changed':True})).changed
+                or install_path_stat.changed
+                or ipa_install_options.changed)
+                  | ternary('restarted','started') }}"
       register: ipa_service_start
       become: true
 
@@ -199,7 +226,7 @@
 
   when: hostname != freeipa_master_host
   tags:
-    - docker-ipa-run
+    - freeipa-install-replicas-and-clients
 
 #################################
 # Harden DNS server config files
@@ -267,8 +294,8 @@
 
     - name: Wait for httpd service
       wait_for:
+        host:  "{{ipa_ip_addr}}"
         port:  443
-        delay: 10
 
   tags:
     - freeipa-config-external

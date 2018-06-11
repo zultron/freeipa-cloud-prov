@@ -1,0 +1,72 @@
+---
+# Deploy calico networking for Docker
+#
+# https://docs.projectcalico.org/v2.5/getting-started/docker/installation/manual
+
+
+#
+# Basics
+#
+- block:
+
+    - name:  Create Calico directories
+      file:
+        path:  "{{item}}"
+        state:  directory
+      with_items:
+        - /etc/calico
+        - "{{calico_data_dir}}"
+        - "{{calico_log_dir}}"
+        - /etc/rkt/trustedkeys/prefix.d/quay.io
+        - /etc/rkt/trustedkeys/prefix.d/quay.io/calico
+        - /etc/rkt/trustedkeys/prefix.d/quay.io/calico/node
+
+  become: true
+
+#
+# calicoctl utility
+#
+- block:
+
+    - name:  Download the calicoctl binary
+      get_url:
+        url: "https://github.com/projectcalico/calicoctl/releases/download/v{{calicoctl_version}}/calicoctl"
+        dest: /home/core/bin/calicoctl
+        mode: 0755
+
+    - name:  Template calicoctl.cfg
+      template:
+        src:  calicoctl.cfg.yaml.j2
+        dest:  /etc/calico/calicoctl.cfg
+      become: true
+
+#
+# Calico service
+#
+- block:
+
+    - name:  Install quay.io/calico/node ACI key
+      # gpg key fingerprint: BFF3 13CD AA56 0B16 A898  7B8F 72AB F5F6 799D 33BC
+      template:
+        src: quay.io_calico_node_key.j2
+        dest: "/etc/rkt/trustedkeys/prefix.d/quay.io/calico/node/{{fp}}"
+      vars:
+        # GPG key fingerprint
+        fp: "bff313cdaa560b16a8987b8f72abf5f6799d33bc"
+
+    - name:  Template calico.service unit
+      template:
+        # src: calico-docker.service.j2
+        src: calico-rkt.service.j2
+        dest: "/etc/systemd/system/calico.service"
+      register:  calico_service
+
+    - name:  Start calico.service
+      systemd:
+        name: calico.service
+        enabled: true
+        daemon_reload: "{{calico_service.changed|ternary('yes','no')}}"
+        state: "{{calico_service.changed|ternary('restarted','started')}}"
+
+  become:  true
+  tags:  calico-service

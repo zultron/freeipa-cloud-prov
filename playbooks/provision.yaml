@@ -68,7 +68,7 @@
       mount_path: "{{data_volume_path}}"
 
 ############################################
-- name: Deploy etcd and flannel
+- name: Deploy etcd
   hosts: coreos
   tags:  etcd-deploy
 
@@ -78,8 +78,8 @@
     - role: etcd-bootstrap-check
       tags: always
 
-    # If IPA is not available,
-    # - generate temporary etcd certs
+    # *** If IPA is not available ***
+    # - generate temporary etcd and docker certs
     - role: bootstrap-certs
       when: not etcd_ssl_bootstrapped
       tags: bootstrap-certs
@@ -90,7 +90,7 @@
       when: not etcd_ssl_bootstrapped
       tags: bootstrap-dnsmasq
 
-    # If IPA IS available,
+    # *** If IPA IS available ***
     # - generate etcd certs with certmonger
     - role: ipa-certs
       when: etcd_ssl_bootstrapped
@@ -109,6 +109,23 @@
         bootstrap_dnsmasq_mode: stop
       tags: bootstrap-dnsmasq-stop
 
-    # Deploy flannel
-    - role: flannel-deploy
-      tags: flannel-setup
+############################################
+- name: Configure Docker networking
+  hosts: coreos
+  tags: docker-networking
+
+  roles:
+    # Configure Calico networking
+    - role: calico-deploy
+      tags: calico-deploy
+
+    # Configure Docker for Calico:
+    # - TLS
+    # - Multi-host overlay networking with etcd cluster-store
+    # - Calico network
+    - role: docker-tls
+      tags: docker-tls
+
+    # Expose container ports
+    - role: iptables
+      tags: iptables

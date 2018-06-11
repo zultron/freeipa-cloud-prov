@@ -4,7 +4,11 @@
 Environment="FLANNELD_ETCD_ENDPOINTS={{etcd_endpoints}}"
 
 # Set network config
+# ExecStartPre={{etcdctl_command}} \
+#     set /coreos.com/network/config \
+#     '{ "Network": "{{k8s_pod_network}}", \
+#        "Backend": {"Type": "vxlan"}}'
 ExecStartPre={{etcdctl_command}} \
     set /coreos.com/network/config \
-    '{ "Network": "{{k8s_pod_network}}", \
+    '{ "Network": "{{network_cidr}}", \
        "Backend": {"Type": "vxlan"}}'

@@ -1,0 +1,16 @@
+# IPAM tutorial
+# https://docs.projectcalico.org/v2.5/getting-started/docker/tutorials/ipam
+# IP pool reference
+# https://docs.projectcalico.org/v2.5/reference/calicoctl/resources/ippool
+# Configuring IP-in-IP guide
+# https://docs.projectcalico.org/v2.5/usage/configuration/ip-in-ip
+- apiVersion: v1
+  kind: ipPool
+  metadata:
+    cidr: {{network_cidr}}
+  spec:
+    ipip:
+      enabled: true
+      mode: always
+    nat-outgoing: true
+    disabled: false

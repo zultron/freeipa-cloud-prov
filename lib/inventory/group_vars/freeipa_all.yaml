@@ -1,30 +1,45 @@
 ---
 # Vars for FreeIPA
 
-freeipa_role: "{{ (hostname in groups.freeipa_master) | ternary(
-        'server',
-        (hostname in groups.freeipa) | ternary(
-            'replica', 'client')) }}"
+# FreeIPA role:  server, replica or client
+freeipa_role:
+  "{{ (hostname in groups.freeipa_master) | ternary(
+    'server', (hostname in groups.freeipa_replicas) | ternary(
+    'replica',
+    'client')) }}"
 
 # Docker images
-
 # - Use official image for server/replica; use customized version for
 #   client running certmonger; rationale:
 #   https://github.com/freeipa/freeipa-container/pull/155
-freeipa_docker_image: "{{ (hostname in groups.freeipa) | ternary(
-        'freeipa/freeipa-server:centos-7',
-        'zultron/freeipa-container:centos-7') }}"
 
-# FreeIPA container network
-freeipa_network_bridge: "br-ipa"
-freeipa_network_prefix: "{{network_prefix}}.128"
-freeipa_network_cidr: "{{freeipa_network_prefix}}.0/24"
-freeipa_network_gateway: "{{freeipa_network_prefix}}.1"
-freeipa_network_addr: "{{freeipa_network_prefix}}.2"
+# FIXME:  Testing FreeIPA 4.5 and 4.6 (F26) with my own image build:
+# - Issue: https://pagure.io/freeipa/issue/7117
+# - COPR: https://copr.fedorainfracloud.org/coprs/g/freeipa/freeipa-4-5/
+# - COPR: https://copr.fedorainfracloud.org/coprs/g/freeipa/freeipa-4-6/
+# - GH:  https://github.com/zultron/freeipa-container/tree/client-merged
+#
+# - Server image
+#freeipa_server_docker_image_base: freeipa/freeipa-server
+freeipa_server_docker_image_base: zultron/freeipa-container
+#freeipa_server_docker_image_tag: centos-7
+freeipa_server_docker_image_tag: fedora-26-freeipa-4-5
+freeipa_server_docker_image:
+  "{{freeipa_server_docker_image_base}}:{{freeipa_server_docker_image_tag}}"
+# - Client image
+#freeipa_client_docker_image_base: freeipa/freeipa-server
+freeipa_client_docker_image_base: zultron/freeipa-container
+#freeipa_client_docker_image_tag: centos-7
+freeipa_client_docker_image_tag: fedora-26-freeipa-4-5
+freeipa_client_docker_image:
+  "{{freeipa_client_docker_image_base}}:{{freeipa_client_docker_image_tag}}"
+freeipa_docker_image: "{{ (freeipa_role == 'client') | ternary(
+        freeipa_client_docker_image, freeipa_server_docker_image) }}"
 
 # FreeIPA data volume
-freeipa_volume_path:  "{{ (hostname in groups.freeipa) | ternary(
-        '/media/freeipa','%s/freeipa' % data_volume_path) }}"
+freeipa_volume_path:
+  "{{ (freeipa_role == 'client') | ternary(
+        '%s/freeipa' % data_volume_path, '/media/freeipa') }}"
 freeipa_volume_block_device:  "{{ block_device_path_pat % 'freeipa' }}"
 freeipa_volume_device:  "{{freeipa_volume_block_device}}-part1"
 freeipa_volume_size: 1
@@ -36,31 +51,37 @@ freeipa_hostname: "ipa"
 freeipa_dns_zone: "{{fqdn}}"
 freeipa_fqdn: "{{freeipa_hostname}}.{{freeipa_dns_zone}}"
 
+# FreeIPA DNS server list
+freeipa_dns_servers:
+  "{{ hostvars
+        | json_query('[%s]' % groups.freeipa_servers|join(','))
+        | json_query('[].ipa_ip_addr')
+    }}"
+
+
 # FreeIPA published ports
 freeipa_ports:
-  # HTTP/HTTPS
-  - "80"
-  - "443"
-  # DNS
-  - "53"
-  - "53/udp"
-  # LDAP/LDAPS
-  - "389"
-  - "636"
-  # Kerberos
-  - "88"
-  - "88/udp"
-  - "464"
-  - "464/udp"
-  # Dogtag
-  # - "8080"
-  # - "7839"
-
-# FreeIPA host; FIXME is this relevant?
-ipa_host: "{{fqdn}}"
+  tcp:
+    # HTTP/HTTPS
+    - "80"
+    - "443"
+    # DNS
+    - "53"
+    # LDAP/LDAPS
+    - "389"
+    - "636"
+    # Kerberos
+    - "88"
+    - "464"
+  udp:
+    # DNS
+    - "53"
+    # Kerberos
+    - "88"
+    - "464"
 
 # Shortcut commands
-ipa_exec: "docker exec -i ipa"
+ipa_exec: "docker exec -i ipa-{{hostname}}"
 
 # LDAP values
 bind_dn: "cn=Directory Manager"

@@ -1,0 +1,109 @@
+# Cribbed from
+# https://coreos.com/rkt/docs/latest/using-rkt-with-systemd.html
+# `rkt run` docs
+# https://coreos.com/rkt/docs/latest/subcommands/run.html
+# Install Calico with rkt
+# https://docs.projectcalico.org/v2.5/getting-started/rkt/installation/manual
+
+[Unit]
+# Metadata
+Description=Calico networking service
+
+# Calico uses etcd as datastore
+Wants=etcd-member.service
+After=etcd-member.service
+# Calico manages Docker networking
+Before=docker.service
+
+[Service]
+
+# Trust image keys
+# - Enabling this may be dangerous
+#ExecStartPre=-/usr/bin/bash -c "\
+# /usr/bin/test -d /etc/rkt/trustedkeys/prefix.d/quay.io/calico/node \
+# || /usr/bin/rkt trust --prefix "quay.io/calico/node" --skip-fingerprint-review"
+
+# Fetch the ACI
+ExecStartPre=-/usr/bin/rkt fetch quay.io/calico/node:v{{calico_version}}
+
+# Create directories
+ExecStartPre=/usr/bin/mkdir -p \
+  /run/docker/plugins \
+  /var/run/calico \
+  {{calico_log_dir}}
+
+# Kill any existing pod
+ExecStartPre=-/usr/bin/rkt rm --uuid-file=/var/run/calico-pod.uuid
+
+# Start the app
+ExecStart=/usr/bin/rkt \
+  --trust-keys-from-https \
+  run \
+  --stage1-path=/usr/share/rkt/stage1-fly.aci \
+  --insecure-options=image \
+  --net=host \
+  --uuid-file-save=/var/run/calico-pod.uuid \
+  --volume logs,kind=host,source={{calico_log_dir}},readOnly=false \
+  --mount volume=logs,target=/var/log/calico \
+  --volume var-run,kind=host,source=/var/run,readOnly=false \
+  --mount volume=var-run,target=/var/run \
+  --volume lib-modules,kind=host,source=/lib/modules,readOnly=false \
+  --mount volume=lib-modules,target=/lib/modules \
+  --volume run,kind=host,source=/run \
+  --mount volume=run,target=/run \
+  --volume docker-plugins,kind=host,source=/run/docker/plugins,readOnly=false \
+  --mount volume=docker-plugins,target=/run/docker/plugins \
+  --volume etc-hosts,kind=host,source=/etc/hosts \
+  --mount volume=etc-hosts,target=/etc/hosts \
+  --volume resolv-conf,kind=host,source=/etc/resolv.conf \
+  --mount volume=resolv-conf,target=/etc/resolv.conf \
+  --volume etcd-ssl,kind=host,source={{etcd_ssl_dir}} \
+  --mount volume=etcd-ssl,target={{etcd_ssl_dir}} \
+  --set-env=ETCD_ENDPOINTS={{etcd_endpoints}} \
+  --set-env=ETCD_CERT_FILE={{etcd_ssl_cert}} \
+  --set-env=ETCD_KEY_FILE={{etcd_ssl_key}} \
+  --set-env=ETCD_CA_CERT_FILE={{etcd_ssl_cacert}} \
+  --set-env=NODENAME={{fqdn}} \
+  --set-env=NO_DEFAULT_POOLS=true \
+  --set-env=CALICO_NETWORKING_BACKEND=bird \
+  --set-env=CALICO_LIBNETWORK_ENABLED=true \
+  --set-env=CALICO_LIBNETWORK_CREATE_PROFILES=true \
+  --set-env=CALICO_LIBNETWORK_LABEL_ENDPOINTS=true \
+  quay.io/calico/node:v{{calico_version}} \
+    --name=calico-node
+
+# Wait until service is running:
+# - Watch for IPAM socket to exist
+# - Check for libnetwork-plugin responsiveness on socket
+# - Timeout after 60 seconds (30 may not be enough!)
+ExecStartPost=\
+  /usr/bin/bash -c '\
+    echo ExecStartPost waiting for IPAM socket to come online; \
+    i=60; \
+    while \
+      test ! -S /run/docker/plugins/calico-ipam.sock || \
+      { ! \
+        echo -e "GET /IpamDriver.GetCapabilities HTTP/1.0\r\n\r\n" | \
+        /usr/bin/ncat -U /run/docker/plugins/calico-ipam.sock 2>/dev/null | \
+        /usr/bin/grep -q "HTTP/.* OK"; \
+      }; \
+    do \
+      test $((i--)) -gt 1 || { \
+        echo ExecStartPost IPAM socket failed to come online; \
+        exit 1; \
+      }; \
+      /usr/bin/sleep 1; \
+    done; \
+    echo ExecStartPost detected IPAM socket online:  success'
+
+# Stop the pod with rkt
+ExecStop=-/usr/bin/rkt stop --uuid-file=/var/run/calico-pod.uuid
+KillMode=control-group
+
+# Always restart
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
+

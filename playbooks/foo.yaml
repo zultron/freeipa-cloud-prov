@@ -1,0 +1,61 @@
+---
+# Set up etcd2 on CoreOS hosts
+
+# ############################################
+# - name: Add ipaclient container as host
+#   hosts: freeipa
+
+#   tasks:
+#     - name: add the host
+#       add_host: name="{{ freeipa_container_name }}"
+
+############################################
+- name: Configure etcd2 on CoreOS master node
+  hosts: coreos
+  gather_facts: no
+  # strategy: debug
+
+  roles:
+
+    - role: digitalocean-ips
+
+  #   # Install certs
+  #   - role: bootstrap-certs
+  #     tags: bootstrap-certs
+
+  #   # Configure Docker multi-host overlay networking with etcd
+  #   - role: docker-tls
+  #     tags: docker-swarm
+
+  #   # - role: flannel-deploy
+  #   #   tags: flannel-deploy
+
+  #   - role: iptables
+  #     tags: iptables
+
+  #   - role: calico-deploy
+  #     tags: calico-deploy
+
+
+  # tasks:
+
+  #   - debug:
+  #       var:  network_cidr|ipv4('revdns')
+
+  #   - debug:
+  #       var:  hostvars
+  #             | json_query('[%s]' % groups.freeipa_servers|join(','))
+  #             | json_query('[].ipa_ip_addr')
+  #     tags:  debug
+
+  #   - set_fact:
+  #       foo:
+  #         - h01:
+  #             buggy: 1
+  #             baggy: 2
+  #         - h11:
+  #             buggy: 3
+  #             baggy: 4
+
+  #   - debug:
+  #       var:  foo|json_query('')

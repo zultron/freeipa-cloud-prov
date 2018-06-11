@@ -1,0 +1,104 @@
+---
+#################################
+# Setup flanneld for ipa network
+
+# The special 'ipa' Docker network is required to guarantee the
+# FreeIPA container a fixed IP address for its DNS service, which we
+# accomplish using two features of flannel:
+#
+# - A 30-bit flannel network CIDR affords only a single usable IP,
+#   ensuring the container always has the same relative address within
+#   the network
+#
+# - A network reservaton ensures the network address stays fixed as
+#   long as the node IP remains unchanged.
+
+#
+# Configure and start flanneld-ipa service
+#
+- block:
+
+    - name:  "Template flanneld-ipa.service unit"
+      template:
+        src: "flanneld-ipa.service.j2"
+        dest: "/etc/systemd/system/flanneld-ipa.service"
+      register:  flanneld_ipa_service
+
+    - name:  "Start flanneld-ipa.service"
+      systemd:
+        name: flanneld-ipa.service
+        enabled: true
+        daemon_reload: yes
+        state: "{{flanneld_ipa_service.changed|ternary('restarted','started')}}"
+
+  become: true
+  tags:
+    - flanneld-ipa-service
+
+
+#
+# Create Docker network 'ipa' and set reservation
+#
+# 
+# https://coreos.com/flannel/docs/latest/reservations.html#reservations
+- block:
+
+    - name: Get IPA flannel network CIDR
+      shell: "bash -c '. /run/flannel/subnet-ipa.env; echo ${FLANNEL_SUBNET}'"
+      register:  flanneld_ipa_cidr
+      changed_when:  false
+
+    - name: Create flannel network for FreeIPA container
+      # command line equivalent:
+      # docker network create ipa -d bridge \
+      #   --subnet=10.4.1.36/30 --gateway=10.4.1.37 \
+      #   --opt=com.docker.network.bridge.name=br-ipa \
+      #   --opt=com.docker.network.bridge.enable_ip_masquerade=true \
+      #   --opt=com.docker.network.bridge.default_bridge=false
+      docker_network:
+        name: ipa
+        driver_options:
+          com.docker.network.bridge.name: "br-ipa"
+          com.docker.network.bridge.enable_ip_masquerade: "false"
+          com.docker.network.bridge.enable_icc: "true"
+          com.docker.network.bridge.default_bridge: "false"
+          com.docker.network.bridge.host_binding_ipv4: "0.0.0.0"
+          com.docker.network.driver.mtu: "1450"
+        ipam_options:
+          subnet: "{{item}}"
+          # Convert CIDR to address, e.g. 10.4.1.36/30 -> 10.4.1.36
+          gateway: "{{item | ipaddr('address')}}"
+      with_items:
+        - "{{flanneld_ipa_cidr.stdout}}"
+      register:  freeipa_docker_network
+
+    - name:  Restart Docker service to pick up new network
+      systemd:
+        name: docker.service
+        state: restarted
+      when: freeipa_docker_network.changed
+      become: true
+
+    - name:  Check that IPA flannel network reservation exists
+      shell: "{{etcdctl_command}} -o extended get {{item}}
+                  | awk '/^TTL:/ { print $2 }'"
+      with_items:
+        # Convert CIDR to flannel etcd key, e.g. 10.4.1.36/30 -> 10.4.1.36-30
+        - "/coreos.com/network-ipa/subnets/{{flanneld_ipa_cidr.stdout
+           | ipaddr('0')
+           | regex_replace('^([0-9.]*)/([0-9]*)$','\\1-\\2')}}"
+      register: ipa_flannel_network_ttl
+      changed_when:  ipa_flannel_network_ttl.stdout != '0'
+
+    - name:  Create IPA flannel network reservation
+      shell:  "{{etcdctl_command}} set -ttl 0 {{item}}
+                   $({{etcdctl_command}} get {{item}})"
+      with_items:
+        # Convert CIDR to flannel etcd key, e.g. 10.4.1.36/30 -> 10.4.1.36-30
+        - "/coreos.com/network-ipa/subnets/{{flanneld_ipa_cidr.stdout
+           | ipaddr('0')
+           | regex_replace('^([0-9.]*)/([0-9]*)$','\\1-\\2')}}"
+      when:  ipa_flannel_network_ttl.changed
+
+  tags:
+    - flanneld-ipa-network

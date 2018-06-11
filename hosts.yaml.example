@@ -11,8 +11,22 @@ all:
     kerberos_realm: EXAMPLE.COM
     # etcd "initial cluster token" must be unique
     etcd_cluster_token: c1
+    # container network CIDR
+    network_cidr: "10.1.0.0/16"
     # Docker detach keys:  uncomment to redefine
     #docker_detach_keys: "ctrl-^"
+
+  # List all hosts here, along with IPA container IP and other configs
+  hosts:
+    host1:
+      ipa_ip_addr:  10.1.1.1
+    host2:
+      ipa_ip_addr:  10.1.2.1
+    host3:
+      ipa_ip_addr:  10.1.3.1
+      # Override defaults
+      size_id: 2gb
+      region_id: fra1
 
 # Each host in cluster must be in exactly one of the following FreeIPA
 # groups
@@ -20,20 +34,14 @@ freeipa_master:
   # Initial FreeIPA server:  only one host may be in this group
   hosts:
     host1:
-      network_prefix: 10.1
-freeipa_replica:
+freeipa_replicas:
   # FreeIPA replicas:  multiple hosts may be in this group
   hosts:
     host2:
-      network_prefix: 10.2
-freeipa_client:
+freeipa_clients:
   # FreeIPA clients:  hosts not running FreeIPA master/replicas must go here
   hosts:
     host3:
-      network_prefix: 10.3
-      # Override defaults
-      size_id: 2gb
-      region_id: fra1
 
 # Kubernetes API server:  exactly one host
 k8s_apiserver:
@@ -48,8 +56,8 @@ k8s_apiserver:
 coreos:
   children:
     freeipa_master:
-    freeipa_replica:
-    freeipa_client:
+    freeipa_replicas:
+    freeipa_clients:
 
 # Assume all hosts are running in DigitalOcean droplets
 digitalocean:

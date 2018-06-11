@@ -3,7 +3,10 @@
 # This host name and IP
 hostname: "{{inventory_hostname}}"
 fqdn: "{{hostname}}.{{domain_name}}"
-ip_addr: "{{ansible_default_ipv4.address}}"
+
+# Container network reverse zone
+network_reverse_zone:
+  "{{network_cidr|ipaddr('revdns')|regex_replace('^[0-9]+\\.[0-9]+\\.')}}"
 
 # FreeIPA master server
 freeipa_master_host: "{{groups.freeipa_master[0]}}"

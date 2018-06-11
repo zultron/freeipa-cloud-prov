@@ -21,11 +21,6 @@ dropin_dir_pat: "/etc/systemd/system/%s.d"
 # Swap partition size, GiB
 swap_size:  2
 
-# Container network
-container_network_prefix: "{{network_prefix}}.32"
-container_network_cidr: "{{container_network_prefix}}.0/24"
-container_network_gateway: "{{container_network_prefix}}.1"
-
 # Toolbox image; this one is customized for FreeIPA
 toolbox_image_base: "zultron/freeipa-cloud-prov"
 toolbox_image_tag: "ipaclient"
@@ -130,6 +125,16 @@ etcdctl_command:
 # Flanneld configuration
 
 flanneld_dir:  "{{ data_volume_path }}/flanneld"
+flannel_ipa_network:  10.4.0.1/16
+
+
+#################################
+# Calico configuration
+
+calico_version: 2.5.0
+calicoctl_version: 1.5.0
+calico_data_dir: "{{data_volume_path}}/calico"
+calico_log_dir:  "{{calico_data_dir}}/log"
 
 #################################
 # Kubernetes configuration

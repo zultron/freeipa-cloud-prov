@@ -101,3 +101,10 @@
   set_fact:
     certmonger_certs_changed:
       "{{ cacert_path_create.changed or cert_tracking.changed }}"
+
+- name:  Restart services after deploying certificates
+  systemd:
+    name: "{{item}}"
+    state:  "{{certmonger_certs_changed | ternary('restarted','started')}}"
+  with_items:  "{{args.restart_services}}"
+  when:  certmonger_certs_changed

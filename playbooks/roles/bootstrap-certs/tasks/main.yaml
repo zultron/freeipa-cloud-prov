@@ -62,12 +62,15 @@
 
 - block:
 
-    - name: "Create etcd SSL directory on host"
+    - name: "Create etcd and docker SSL directories on host"
       file:
-        path: "{{etcd_ssl_dir}}"
+        path: "{{item}}"
         state: directory
+      with_items:
+        - "{{etcd_ssl_dir}}"
+        - "{{docker_ssl_dir}}"
 
-    - name: "Copy etcd certificates to host"
+    - name: "Copy etcd and docker certificates to host"
       copy:
         src: "{{cfssl_dir}}/{{item.src}}"
         dest: "{{item.dest}}"
@@ -78,5 +81,11 @@
           dest: "{{etcd_ssl_cert}}"
         - src: "{{hostname}}-key.pem"
           dest: "{{etcd_ssl_key}}"
+        - src: "ca.pem"
+          dest: "{{docker_ssl_cacert}}"
+        - src: "{{hostname}}.pem"
+          dest: "{{docker_ssl_cert}}"
+        - src: "{{hostname}}-key.pem"
+          dest: "{{docker_ssl_key}}"
 
   become: true
