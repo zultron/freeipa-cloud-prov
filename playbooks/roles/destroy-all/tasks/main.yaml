@@ -28,3 +28,8 @@
     - "k8s"
   delegate_to: localhost
   run_once: true
+
+- name: "Kill cached ssh connections"
+  shell: "killall ssh || true"
+  delegate_to: localhost
+  run_once: true
