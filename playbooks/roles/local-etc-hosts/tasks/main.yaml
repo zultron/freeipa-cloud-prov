@@ -13,3 +13,14 @@
         unsafe_writes: yes
       become: true
       delegate_to: localhost
+      when:  ip_addr|default(false)
+
+    - name: "Remove host IP in /etc/hosts"
+      lineinfile:
+        dest: /etc/hosts
+        regexp: " {{fqdn}} "
+        state: absent
+        unsafe_writes: yes
+      become: true
+      delegate_to: localhost
+      when:  not (ip_addr|default(false))

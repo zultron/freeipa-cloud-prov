@@ -18,3 +18,5 @@
 
     - role: destroy-all
       when: confirm == 'all'
+
+    - role: local-etc-hosts

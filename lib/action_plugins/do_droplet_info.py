@@ -91,5 +91,6 @@ class ActionModule(ActionBase):
         # Otherwise, return a dict of name:info
         return dict(
             changed=False,
+            failed=False,
             d=dict( [(d['name'], d) for d in droplets] ),
         )

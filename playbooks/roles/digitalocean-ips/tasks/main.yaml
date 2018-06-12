@@ -6,9 +6,11 @@
     api_token:  "{{ digitalocean_token }}"
   register: do_droplet
   check_mode: yes
+  ignore_errors: True
 
 - name: Set IP address fact
   set_fact:
     ip_addr: "{{item}}"
   with_items:
     - "{{do_droplet.ip_address}}"
+  when: not do_droplet.failed
