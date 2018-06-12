@@ -6,3 +6,6 @@
     name: docker-py
   tags:
     - setup
+  environment:
+    # Path for python utilities from defunctzombie.coreos-bootstrap
+    PATH: "/usr/sbin:/usr/bin:/home/core/bin"

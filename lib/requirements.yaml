@@ -1,6 +1,3 @@
 ---
 # Requirements for this system
 
-# coreos-bootstrap
-# https://github.com/defunctzombie/ansible-coreos-bootstrap
-- src: defunctzombie.coreos-bootstrap
