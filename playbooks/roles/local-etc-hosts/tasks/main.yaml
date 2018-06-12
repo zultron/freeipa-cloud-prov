@@ -1,26 +1,34 @@
 ---
 #################################
 # Update local /etc/hosts
+#
+# - These run in a loop to avoid concurrency problems with unsafe_writes
 
 - block:
 
     - name: "Add/update host IP in /etc/hosts"
       lineinfile:
         dest: /etc/hosts
-        regexp: " {{fqdn}} "
+        regexp: " {{hostvars[item]['fqdn']}} "
         state: present
-        line: "{{ip_addr}} {{fqdn}} {{hostname}}"
+        line: "{{hostvars[item]['ip_addr']}} {{hostvars[item]['fqdn']}} {{item}}"
         unsafe_writes: yes
       become: true
       delegate_to: localhost
-      when:  ip_addr|default(false)
+      loop: "{{groups['all']}}"
+      when:
+        - hostvars[hostname]['ip_addr']|default(false)
+      run_once: true
 
     - name: "Remove host IP in /etc/hosts"
       lineinfile:
         dest: /etc/hosts
-        regexp: " {{fqdn}} "
+        regexp: " {{hostvars[item]['fqdn']}} "
         state: absent
         unsafe_writes: yes
       become: true
       delegate_to: localhost
-      when:  not (ip_addr|default(false))
+      loop: "{{groups['all']}}"
+      when:
+        - not (hostvars[hostname]['ip_addr']|default(false))
+      run_once: true
