@@ -16,6 +16,7 @@
     - "ansible.log"
     - "retries"
     - "cache"
+    - "cfssl"
     - "tmp"
     # SSH keys
     - "ssh_id_rsa"
