@@ -35,7 +35,7 @@
     api_token:  "{{ digitalocean_token }}"
   # Droplet can take time to be destroyed
   retries: 3
-  delay: 1
+  delay: 5
 
 - name:  "Destroy freeipa volume"
   digital_ocean_block_storage:
@@ -49,5 +49,5 @@
       region: "{{ region_id }}"
   # Droplet can take time to be destroyed
   retries: 3
-  delay: 1
+  delay: 5
   when: '"freeipa" in group_names'
