@@ -1,0 +1,9 @@
+---
+# Requirements for this system
+
+# coreos-bootstrap
+# https://github.com/defunctzombie/ansible-coreos-bootstrap
+# https://github.com/zultron/ansible-coreos-bootstrap
+- src: https://github.com/zultron/ansible-coreos-bootstrap
+  scm: git
+  name: ansible-coreos-bootstrap
