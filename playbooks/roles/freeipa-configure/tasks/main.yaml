@@ -74,7 +74,8 @@
         ipa_pass: "{{freeipa_admin_password}}"
       with_items:
         -
-          - "{{freeipa_dns_servers}}"
+          # - "{{freeipa_dns_servers}}"
+          - "{{hostvars | freeipa_dns_server_ips}}"
       run_once: true
 
   delegate_to: localhost

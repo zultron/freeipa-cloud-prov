@@ -52,11 +52,14 @@ freeipa_dns_zone: "{{fqdn}}"
 freeipa_fqdn: "{{freeipa_hostname}}.{{freeipa_dns_zone}}"
 
 # FreeIPA DNS server list
-freeipa_dns_servers:
-  "{{ hostvars
-        | json_query('[%s]' % groups.freeipa_servers|join(','))
-        | json_query('[].ipa_ip_addr')
-    }}"
+# freeipa_dns_servers:
+#   "{{ hostvars
+#         | json_query('[%s]' % groups.freeipa_servers|join(','))
+#         | json_query('[].ipa_ip_addr')
+#     }}"
+#
+# This moved to freeipa_filters filter plugin after Ansible upgrade
+# error saying hostvars undefined
 
 
 # FreeIPA published ports
