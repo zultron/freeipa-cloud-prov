@@ -172,8 +172,8 @@ TODO:
 Run `etcdctl` with SSL:
 
     cd /media/state/etcd
-    etcdctl --endpoint=https://127.0.0.1:2380 \
-        --ca-file=ca.pem --cert-file=client.pem --key-file=client-key.pem \
+    etcdctl --endpoint=https://$(hostname):2380 \
+        --ca-file=ca.pem --cert-file=cert.pem --key-file=key.pem \
         cluster-health
 
 Run shell in running container:
