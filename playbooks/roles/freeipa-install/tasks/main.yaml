@@ -147,7 +147,7 @@
 
     - name:  "Construct FreeIPA internal IP fact"
       set_fact:
-        ipa_dns_servers: "{{freeipa_dns_servers | join(' ')}}"
+        # ipa_dns_servers: "{{freeipa_dns_servers | join(' ')}}"
         ipa_dns_servers: "{{hostvars | freeipa_dns_servers_ips | join(' ')}}"
 
     - name: "Template resolved.conf with FreeIPA IPs"
