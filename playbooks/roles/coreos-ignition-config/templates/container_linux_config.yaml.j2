@@ -11,6 +11,9 @@
 etcd:
   # https://coreos.com/etcd/docs/latest/op-guide/runtime-configuration.html
   #
+  # 3.3.3 doesn't work; requirements explained here:
+  # https://github.com/coreos/etcd/pull/8651#issuecomment-342979191
+  version: 3.1.5
   # Member name
   name: {{hostname}}
   # URLs to listen on for peer and client traffic
