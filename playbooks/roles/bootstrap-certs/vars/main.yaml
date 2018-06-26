@@ -41,6 +41,7 @@ cfssl_host_csr:
   CN: "{{fqdn}}"
   hosts:
     - "{{fqdn}}"
+    - "{{discovery_srv}}"
   key:
     algo: "rsa"
     size: 2048

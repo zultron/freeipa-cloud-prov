@@ -2,6 +2,6 @@
 {# Create etcd SRV records for each coreos host #}
 {% for h in groups.coreos %}
 address=/{{h}}.{{domain_name}}/{{hostvars[h].ansible_default_ipv4.address}}
-srv-host=_etcd-server-ssl._tcp.{{domain_name}},{{h}}.{{domain_name}},2380,0,100
-srv-host=_etcd-client-ssl._tcp.{{domain_name}},{{h}}.{{domain_name}},2379,0,100
+srv-host=_etcd-server-ssl._tcp.{{discovery_srv}},{{h}}.{{domain_name}},2380,0,100
+srv-host=_etcd-client-ssl._tcp.{{discovery_srv}},{{h}}.{{domain_name}},2379,0,100
 {% endfor %}

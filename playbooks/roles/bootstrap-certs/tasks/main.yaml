@@ -48,7 +48,7 @@
       shell: "cfssl gencert
                   -ca=ca.pem -ca-key=ca-key.pem
                   -config=ca-config.json -profile=peer
-                  -hostname={{fqdn}} {{hostname}}.json |
+                  -hostname={{fqdn}},{{discovery_srv}} {{hostname}}.json |
               cfssljson -bare {{hostname}}"
       args:
         chdir: "{{cfssl_dir}}"

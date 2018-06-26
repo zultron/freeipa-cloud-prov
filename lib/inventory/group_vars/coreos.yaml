@@ -108,6 +108,8 @@ etcd_client_ssl_dir: "var/etcd"
 etcd_client_ssl_cacert: "{{etcd_client_ssl_dir}}/ca.pem"
 etcd_client_ssl_cert: "{{etcd_client_ssl_dir}}/cert.pem"
 etcd_client_ssl_key: "{{etcd_client_ssl_dir}}/key.pem"
+# - SRV record
+discovery_srv: "etcd.{{domain_name}}"
 
 # Endpoints
 etcd_endpoints:

@@ -11,9 +11,6 @@
 etcd:
   # https://coreos.com/etcd/docs/latest/op-guide/runtime-configuration.html
   #
-  # 3.3.3 doesn't work; requirements explained here:
-  # https://github.com/coreos/etcd/pull/8651#issuecomment-342979191
-  version: 3.1.5
   # Member name
   name: {{hostname}}
   # URLs to listen on for peer and client traffic
@@ -28,7 +25,7 @@ etcd:
   # Initial flags for bootstrapping new member (not used in
   # restarts)
   # Slaves use DNS srv records to join existing cluster
-  discovery_srv: {{domain_name}}
+  discovery_srv: {{discovery_srv}}
   initial_cluster_state: new
   initial_advertise_peer_urls: https://{{fqdn}}:2380
   initial_cluster_token: cluster_{{cluster_id}}
