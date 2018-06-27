@@ -49,8 +49,6 @@ ExecStart=/usr/bin/rkt \
   --mount volume=var-run,target=/var/run \
   --volume lib-modules,kind=host,source=/lib/modules,readOnly=false \
   --mount volume=lib-modules,target=/lib/modules \
-  --volume run,kind=host,source=/run \
-  --mount volume=run,target=/run \
   --volume docker-plugins,kind=host,source=/run/docker/plugins,readOnly=false \
   --mount volume=docker-plugins,target=/run/docker/plugins \
   --volume etc-hosts,kind=host,source=/etc/hosts \

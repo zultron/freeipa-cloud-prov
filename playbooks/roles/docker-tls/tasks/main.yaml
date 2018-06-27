@@ -97,6 +97,7 @@
         dest: "{{calico_data_dir}}/{{item}}"
       with_items:
         - calico-ip-pool.yaml
+        - calico-ip6-pool.yaml
         - calico-cnet.yaml
       register:  calico_cnet_templates
       become: true
@@ -106,6 +107,7 @@
       shell:  "bin/calicoctl apply -f {{calico_data_dir}}/{{item}}"
       with_items:
         - calico-ip-pool.yaml
+        - calico-ip6-pool.yaml
         - calico-cnet.yaml
       when:  calico_cnet_templates.changed
 
@@ -115,7 +117,8 @@
         driver:  calico
         ipam_driver:  calico-ipam
         ipam_options:
-          subnet:  "{{network_cidr}}"
+          subnet: "{{network_cidr}}"
+        ipv6: true
 
   # This only needs to happen once on the master
   when:  hostname in groups.freeipa_master

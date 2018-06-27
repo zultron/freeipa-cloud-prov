@@ -1,0 +1,9 @@
+# IPV6 pool with private addresses
+# https://serverfault.com/questions/216602/
+# Random address from https://simpledns.com/private-ipv6
+- apiVersion: v1
+  kind: ipPool
+  metadata:
+    cidr: fdc3:4282:f579:d5d0::/64
+  spec:
+    disabled: false
