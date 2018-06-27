@@ -1,9 +1,9 @@
 ---
 # Install and configure Docker dependencies
 
-- name: Install docker-py
+- name: Install python docker API
   pip:
-    name: docker-py
+    name: docker
   tags:
     - setup
   environment:
