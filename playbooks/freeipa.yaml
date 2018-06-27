@@ -4,7 +4,7 @@
 ############################################
 - name: Provision FreeIPA storage
   hosts:
-    - freeipa
+    - freeipa_all
   tags: freeipa-volume
   # FIXME WTF?  Suddenly needed why?
   environment:
@@ -56,7 +56,7 @@
       tags: freeipa-install
 
 - name: Configure FreeIPA
-  hosts: freeipa
+  hosts: freeipa_servers
   # FIXME WTF?  Suddenly needed why?
   environment:
     PYTHONPATH: "../lib/python"
