@@ -20,13 +20,16 @@ freeipa_role:
 # - GH:  https://github.com/zultron/freeipa-container/tree/client-merged
 #
 # - Server image
-freeipa_server_docker_image_base: freeipa/freeipa-server
-freeipa_server_docker_image_tag: fedora-27
+#freeipa_server_docker_image_base: freeipa/freeipa-server
+#freeipa_server_docker_image_tag: fedora-27
+freeipa_server_docker_image_base: zultron/freeipa-container
+freeipa_server_docker_image_tag: fedora-27-freeipa-4-6
 freeipa_server_docker_image:
   "{{freeipa_server_docker_image_base}}:{{freeipa_server_docker_image_tag}}"
 # - Client image
 freeipa_client_docker_image_base: freeipa/freeipa-server
-freeipa_client_docker_image_tag: fedora-27
+#freeipa_client_docker_image_tag: fedora-27
+freeipa_client_docker_image_tag: fedora-26
 freeipa_client_docker_image:
   "{{freeipa_client_docker_image_base}}:{{freeipa_client_docker_image_tag}}"
 freeipa_docker_image: "{{ (freeipa_role == 'client') | ternary(
